@@ -128,7 +128,6 @@ class User_System extends Abstract_User_System
 	{
 		// Recreate session when logging in
 		session_regenerate_id();
-		upgrade_session_cookie();
 		$_SESSION = Array();
 		$_SESSION['user'] = $user_details;
 		$_SESSION['login_time'] = time();
@@ -205,7 +204,7 @@ class User_System extends Abstract_User_System
 
 	public function havePerm($permission)
 	{
-		if (!is_int($permission)) trigger_error("Non-numeric permission level is invalid", E_USER_ERROR);
+		if (!is_int($permission)) throw new \RuntimeException("Non-numeric permission level is invalid");
 		if ($permission == 0) return true;
 		if (!empty($GLOBALS['JETHRO_INSTALLING'])) return true;
 		if (!array_key_exists($permission, $this->_permission_levels)) return false; // disabled feature
@@ -245,7 +244,7 @@ class User_System extends Abstract_User_System
 	public function printLogin()
 	{
 		if (!$this->hasUsers()) {
-			trigger_error("This system has no user accounts - it has not been installed properly", E_USER_ERROR);
+			throw new \RuntimeException("This system has no user accounts - it has not been installed properly");
 			exit;
 		}
 
@@ -515,7 +514,7 @@ class User_System extends Abstract_User_System
 		$emails = $GLOBALS['db']->queryCol($SQL);
 		if (empty($emails)) return;
 
-		$text = "Hi, \n\nThis is an automated message to System Administrators, sent from the Jethro system at ".BASE_URL.".\n\n";
+		$text = "Hi, \n\nThis is an automated message to System Administrators, sent from the Jethro system at ".base_url().".\n\n";
 		$text .= $message;
 
 		$message = Emailer::newMessage()

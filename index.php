@@ -32,13 +32,13 @@ $conf=JETHRO_ROOT.'/conf.php';
 if (!file_exists($conf)) {
 	$errmsg = "Jethro configuration file not found.  You need to copy $conf.sample to $conf and edit it before Jethro can run";
 	echo $errmsg;
-	trigger_error($errmsg, E_USER_ERROR);
+	throw new \RuntimeException($errmsg);
 	exit();
 }
 if (!is_readable($conf)) {
 	$errmsg = "$conf not readable by user ".$_SERVER["USER"].".";
 	echo $errmsg;
-	trigger_error($errmsg, E_USER_ERROR);
+	throw new \RuntimeException($errmsg);
 	exit();
 }
 require_once $conf;
@@ -52,7 +52,6 @@ require_once JETHRO_ROOT.'/include/system_controller.class.php';
 $GLOBALS['user_system'] = new User_System();
 
 if ($GLOBALS['user_system']->getCurrentUser() == NULL) {
-	System_Controller::checkConfigHealth();
 	// Nobody is logged in, so show login screen or installer
 	if (!$GLOBALS['db']->hasTables()) {
 		require_once JETHRO_ROOT.'/include/installer.class.php';

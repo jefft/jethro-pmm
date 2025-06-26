@@ -50,7 +50,7 @@ class Person_Group extends db_object
 									'type' => 'select',
 									'options' => Array('No', 'Yes'),
 									'default' => 0,
-									'note' => 'Should members of this group be able to see each other\'s details in <a href="'.BASE_URL.'members">member portal</a>?',
+									'note' => 'Should members of this group be able to see each other\'s details in <a href="'.BASE_PATH.'/members">member portal</a>?',
 									'label' => 'Share member details?',
 								),
 		);
@@ -186,7 +186,7 @@ class Person_Group extends db_object
 		list($statuses, $default_status) = self::getMembershipStatusOptionsAndDefault();
 		if ($membership_status === NULL) $membership_status = $default_status;
 		if (!isset($statuses[$membership_status])) {
-			trigger_error("Invalid membership status value '$membership_status'", E_USER_ERROR);
+			throw new \RuntimeException("Invalid membership status value '$membership_status'");
 			return FALSE;
 		}
 

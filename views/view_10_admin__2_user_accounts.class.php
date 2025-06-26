@@ -22,7 +22,7 @@ class View_Admin__User_Accounts extends View
 			<?php
 			// We assemble the HTML this way so that it can be translated as a simple string
 			$text = _("User accounts are usually created to give staff and ministry leaders access to Jethro.  You need to create their person record first, then add a user account to go with it.  Usually it's best to let church members create their own accounts in the member area");
-			$text = str_replace(_('member area'), '<a href="'.BASE_URL.'/members">'._('member area').'</a>', $text);
+			$text = str_replace(_('member area'), '<a href="'.BASE_PATH.'/members">'._('member area').'</a>', $text);
 			$text = str_replace(_('staff and ministry leaders'), '<i>'._('staff and ministry leaders').'</i>', $text);
 			$text = str_replace(_('church members'), '<i>'._('church members').'</i>', $text);
 			echo $text;
