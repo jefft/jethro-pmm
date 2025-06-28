@@ -28,7 +28,8 @@ return (new Config())
 		'visibility_required' => false,
         // Clean code rules
         'strict_param' => true,
-        'declare_strict_types' => true,
+		// Strict types breaks jethrodb.php and others, so disable for now
+        'declare_strict_types' => false,
         'no_unused_imports' => true,
         'ordered_imports' => ['sort_algorithm' => 'alpha'],
         'single_import_per_statement' => true,
