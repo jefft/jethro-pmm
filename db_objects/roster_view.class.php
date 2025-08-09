@@ -106,7 +106,7 @@ class roster_view extends db_object
 									'type'		=> 'select',
 									'options'	=> Array('' => 'Private', 'members' => 'Show in members area', 'public' => 'Show in public area'),
 									'default'	=> 0,
-									'note' => 'Whether this roster view is visible in the <a href="'.BASE_URL.'/public/">public area</a> and/or to church members via the <a href="'.BASE_URL.'members/">members area</a>',
+									'note' => 'Whether this roster view is visible in the <a href="'.BASE_PATH.'/public/">public area</a> and/or to church members via the <a href="'.BASE_PATH.'/members/">members area</a>',
 								),
 			'show_on_run_sheet' => Array(
 									'type'	=> 'select',
@@ -122,7 +122,7 @@ class roster_view extends db_object
 	{
 		$this->fields['members'] = Array(); // fake field for interface purposes
 		if ($this->id) {
-			$url = BASE_URL.'public/?view=display_roster&roster_view='.$this->id;
+			$url = BASE_PATH.'/public/?view=display_roster&roster_view='.$this->id;
 			if (defined('PUBLIC_ROSTER_SECRET') && strlen(PUBLIC_ROSTER_SECRET)) {
 				$url .= '&secret='.PUBLIC_ROSTER_SECRET;
 			}
@@ -219,9 +219,9 @@ class roster_view extends db_object
 						</td>
 						<td class="nowrap">
 
-							<img src="<?php echo BASE_URL; ?>/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move this role up" />
-							<img src="<?php echo BASE_URL; ?>/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move this role down" />
-							<img src="<?php echo BASE_URL; ?>/resources/img/cross_red.png" class="icon delete-row" title="Delete this role from the list" />
+							<img src="/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move this role up" />
+							<img src="/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move this role down" />
+							<img src="/resources/img/cross_red.png" class="icon delete-row" title="Delete this role from the list" />
 						</td>
 					</tr>
 					<?php
@@ -573,9 +573,9 @@ class roster_view extends db_object
 	{
 		if ($member['role_id']) {
 			if (ifdef('PUBLIC_AREA_ENABLED', 1)) {
-				echo '<a class="med-popup" href="'.BASE_URL.'/public/?view=display_role_description&role='.(int)$member['role_id'].'">';
+				echo '<a class="med-popup" href="'.BASE_PATH.'/public/?view=display_role_description&role='.(int)$member['role_id'].'">';
 			} else {
-				echo '<a class="med-popup" href="'.BASE_URL.'?view=rosters__define_roster_roles&roster_roleid='.(int)$member['role_id'].'">';
+				echo '<a class="med-popup" href="'.BASE_PATH.'?view=rosters__define_roster_roles&roster_roleid='.(int)$member['role_id'].'">';
 			}
 			echo ents($member['role_title']);
 			echo '</a>';
@@ -942,9 +942,9 @@ class roster_view extends db_object
 				<?php
 				if ($details['role_id']) {
 					if ($public) {
-						echo '<a class="med-popup" href="'.BASE_URL.'/public/?view=display_role_description&role='.(int)$details['role_id'].'">';
+						echo '<a class="med-popup" href="'.BASE_PATH.'/public/?view=display_role_description&role='.(int)$details['role_id'].'">';
 					} else {
-						echo '<a class="med-popup" href="'.BASE_URL.'?view=rosters__define_roster_roles&roster_roleid='.(int)$details['role_id'].'">';
+						echo '<a class="med-popup" href="'.BASE_PATH.'?view=rosters__define_roster_roles&roster_roleid='.(int)$details['role_id'].'">';
 					}
 					echo ents($details['role_title']);
 					echo '</a>';

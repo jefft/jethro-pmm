@@ -68,7 +68,7 @@ foreach ($reminders as $reminder) {
 		$content .= sprintf($totalNotesText, $reminder['total_notes']);
 	}
 	$content .= sprintf($outroText,
-						BASE_URL,
+						base_url(),
 						SYSTEM_NAME);
 	
 	$html = nl2br($content);
