@@ -21,12 +21,12 @@ define('DB_DATABASE', '');
 define('DB_USERNAME', '');
 define('DB_PASSWORD', '');
 
-// The URL jethro will be running at.  NB The final slash is important!!
-define('BASE_URL', 'http://example.com/jethro/');
+// BASE_URL used to hardcode the URL jethro will be running at. It is now unused (URL is inferred from request) and
+// should be deleted.
+// define('BASE_URL', 'http://example.com/jethro/');
 
-// Whether the system must be accessed by HTTPS.
-// If this is true, the BASE_URL above must begin with https://
-define('REQUIRE_HTTPS', FALSE);
+// REQUIRE_HTTPS use to force redirect to https. It is now unused. Redirect to https should be done in the webserver
+// define('REQUIRE_HTTPS', FALSE);
 
 ///////////////////////////////////////////////////////////////////////////
 // OPTIONAL DATABASE SETTINGS -
