@@ -348,7 +348,7 @@ class System_Controller
 			$content .= "REQUEST: \n".print_r($safe_request,1)."\n\n";
 			$content .= "BACKTRACE:\n";
 			$content .= print_r($bt, 1);
-			@mail(constant('ERRORS_EMAIL_ADDRESS'), 'Jethro Error from '.BASE_URL, $content);
+			@mail(constant('ERRORS_EMAIL_ADDRESS'), 'Jethro Error from '.base_url(), $content);
 		}
 		if ($send_email) error_log("$errstr - Line $errline of $errfile");
 	}
@@ -379,18 +379,7 @@ class System_Controller
 		return in_array(strtoupper($feature), $enabled_features);
 	}
 
-	public static function checkConfigHealth()
-	{
-		if (REQUIRE_HTTPS && (FALSE === strpos(BASE_URL, 'https://'))) {
-			trigger_error("Configuration file error: If you set REQUIRE_HTTPS to true, your BASE_URL must start with https", E_USER_ERROR);
-		}
-
-		if (substr(BASE_URL, -1) != '/') {
-			trigger_error("Configuration file error: Your BASE_URL must end with a slash", E_USER_ERROR);
-		}
-	}
-
-	public function setGlobalHeaders()
+    public function setGlobalHeaders()
 	{
         	if (session_id()) {
 			// log just a subset for security

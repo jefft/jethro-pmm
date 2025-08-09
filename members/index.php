@@ -42,7 +42,7 @@ require_once JETHRO_ROOT.'/include/init.php';
 // Check if member access is enabled
 if (!defined('MEMBER_LOGIN_ENABLED') || !MEMBER_LOGIN_ENABLED) {
 	?>
-	<p>Member Login is not enabled for this Jethro System.  You may like to view the <a href="<?php echo BASE_URL; ?>/public">public site</a>
+	<p>Member Login is not enabled for this Jethro System.  You may like to view the <a href="<?php echo BASE_PATH; ?>/public">public site</a>
 	<?php
 	exit;
 }

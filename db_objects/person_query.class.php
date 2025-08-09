@@ -590,9 +590,9 @@ class Person_Query extends DB_Object
 					?>
 				</td>
 				<td class="nowrap">
-					<img src="<?php echo BASE_URL; ?>/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move this item up" />
-					<img src="<?php echo BASE_URL; ?>/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move this item down" />
-					<img src="<?php echo BASE_URL; ?>/resources/img/cross_red.png" class="icon delete-row" title="Delete this item" />
+					<img src="<?php echo BASE_PATH; ?>/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move this item up" />
+					<img src="<?php echo BASE_PATH; ?>/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move this item down" />
+					<img src="<?php echo BASE_PATH; ?>/resources/img/cross_red.png" class="icon delete-row" title="Delete this item" />
 				</td>
 			</tr>
 			<?php
