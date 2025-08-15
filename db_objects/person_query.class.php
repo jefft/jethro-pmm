@@ -2128,11 +2128,9 @@ class Person_Query extends DB_Object
 
 	function validateFields()
 	{
-		if (!parent::validateFields()) {
-			return false;
-		}
+		return !(!parent::validateFields())
 
-		return true;
+		;
 	}
 
 	private function canSave($throwErrors = false)

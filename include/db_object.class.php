@@ -1148,7 +1148,7 @@ class db_object
 				case is_array($val):
 					$operator = 'IN';
 					break;
-				case   str_contains($val, '%') || (str_contains($val, '?')):
+				case str_contains($val, '%') || (str_contains($val, '?')):
 					$operator = 'LIKE';
 					break;
 				default:

@@ -39,11 +39,10 @@ class Config_Manager
 		if (str_starts_with($symbol, '2FA_')) {
 			return true;
 		}
-		if (str_starts_with($symbol, 'SMTP')) {
-			return true;
-		}
 
-		return false;
+		return (bool) (str_starts_with($symbol, 'SMTP'))
+
+		;
 	}
 
 	public static function getSettings()

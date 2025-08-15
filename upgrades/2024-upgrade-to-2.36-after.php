@@ -1,13 +1,13 @@
 #!/usr/bin/env php
 <?php
 
-/**
- * Run this script when upgrading from pre-2.36 to 2.36 or above, after applying upgrades/2024-upgrade-to-2.36.sql.
- * It is idempotent i.e. safe to run more than once in Jethro 2.36 and above.
- *
- * Jethro 2.36 introduced the person_status table (https://github.com/tbar0970/jethro-pmm/issues/1035).
- * This script edits reports (person_queries) and action plans (action_plan) stored in the database, to reference IDs in person_status.
- */
+ /**
+  * Run this script when upgrading from pre-2.36 to 2.36 or above, after applying upgrades/2024-upgrade-to-2.36.sql.
+  * It is idempotent i.e. safe to run more than once in Jethro 2.36 and above.
+  *
+  * Jethro 2.36 introduced the person_status table (https://github.com/tbar0970/jethro-pmm/issues/1035).
+  * This script edits reports (person_queries) and action plans (action_plan) stored in the database, to reference IDs in person_status.
+  */
  if ((\PHP_SAPI !== 'cli') && !defined('STDIN')) {
  	echo 'This script must be run from the command line';
  	exit;

@@ -43,11 +43,10 @@ class SMS_Sender
 		if (!self::_getSetting('POST_TEMPLATE')) {
 			return false;
 		}
-		if (!empty($GLOBALS['user_system']) && !$GLOBALS['user_system']->havePerm(PERM_SENDSMS)) {
-			return false;
-		}
 
-		return true;
+		return !(!empty($GLOBALS['user_system']) && !$GLOBALS['user_system']->havePerm(PERM_SENDSMS))
+
+		;
 	}
 
 	/**
@@ -169,7 +168,7 @@ class SMS_Sender
 	{
 		$content = self::_getSetting('POST_TEMPLATE');
 
-		return   str_contains($content, '_USER_MOBILE_');
+		return str_contains($content, '_USER_MOBILE_');
 	}
 
 	/**

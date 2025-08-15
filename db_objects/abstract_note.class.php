@@ -260,12 +260,10 @@ class Abstract_Note extends DB_Object
 			return true;
 		}
 
-		if ($GLOBALS['user_system']->havePerm(PERM_VIEWMYNOTES)
-			&& (array_get($this->_old_values, 'assignee') == $GLOBALS['user_system']->getCurrentUser('id'))) {
-			return true;
-		}
+		return (bool) ($GLOBALS['user_system']->havePerm(PERM_VIEWMYNOTES)
+			&& (array_get($this->_old_values, 'assignee') == $GLOBALS['user_system']->getCurrentUser('id')))
 
-		return false;
+		;
 	}
 
 	/**

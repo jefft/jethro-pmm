@@ -390,11 +390,10 @@ class Installer
 		$this->family = new Family();
 		$this->family->setValue('family_name', $this->user->getValue('last_name'));
 		$this->family->setValue('creator', 0);
-		if (!$this->family->validateFields()) {
-			return false;
-		}
 
-		return true;
+		return !(!$this->family->validateFields())
+
+		;
 	}
 
 	function createInitialEntities()

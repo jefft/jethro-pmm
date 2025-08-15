@@ -845,7 +845,7 @@ class Attendance_Record_Set
 					$r = strnatcmp($x['name'], $y['name']);
 				}
 
-return $r;
+				return $r;
 			}); // to ensure natural sorting
 		}
 		$lastCategory = -1;
