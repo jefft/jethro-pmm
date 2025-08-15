@@ -7,116 +7,113 @@ class Abstract_Note extends DB_Object
 
 	protected static function _getFields()
 	{
-		$fields = Array(
-			'subject'		=> Array(
-								'type'		=> 'text',
-								'width'		=> 40,
-								'maxlength'	=> 256,
-								'initial_cap'	=> true,
-								'allow_empty'	=> false,
-							   ),
-			'details'		=> Array(
-								'type'		=> 'text',
-								'width'		=> 50,
-								'height'	=> 5,
-								'initial_cap'	=> true,
-								'add_links'	=> TRUE,
+		$fields = [
+			'subject' => [
+				'type' => 'text',
+				'width' => 40,
+				'maxlength' => 256,
+				'initial_cap' => true,
+				'allow_empty' => false,
+			],
+			'details' => [
+				'type' => 'text',
+				'width' => 50,
+				'height' => 5,
+				'initial_cap' => true,
+				'add_links' => true,
+			],
+			'status' => [
+				'type' => 'select',
+				'options' => [
+					'no_action' => 'No Action Required',
+					'pending' => 'Requires Action',
+					'failed' => 'Failed',
+					'complete' => 'Complete',
+				],
+				'default' => ifdef('DEFAULT_NOTE_STATUS', 'no_action'),
+				'class' => 'note-status',
+				'allow_empty' => false,
+				'label' => 'Status',
+			],
+			'status_last_changed' => [
+				'type' => 'datetime',
+				'show_in_summary' => false,
+				'allow_empty' => true,
+				'editable' => false,
+				'default' => null,
+			],
+			'assignee' => [
+				'type' => 'reference',
+				'references' => 'staff_member',
+				'default' => $GLOBALS['user_system']->getCurrentUser('id'),
+				'tooltip' => 'Choose the user responsible for acting on this note',
+				'allow_empty' => true,
+				'filter' => function ($x) {return $x->getValue('active') && (($x->getValue('permissions') & PERM_VIEWMYNOTES) == PERM_VIEWMYNOTES); },
+			],
+			'assignee_last_changed' => [
+				'type' => 'datetime',
+				'show_in_summary' => false,
+				'allow_empty' => true,
+				'editable' => false,
+				'default' => null,
+			],
+			'action_date' => [
+				'type' => 'date',
+				'allow_empty' => false,
+				'default' => date('Y-m-d'),
+			],
+			'creator' => [
+				'type' => 'reference',
+				'editable' => false,
+				'references' => 'person',
+			],
+			'created' => [
+				'type' => 'timestamp',
+				'readonly' => true,
+			],
+			'editor' => [
+				'type' => 'reference',
+				'editable' => false,
+				'references' => 'person',
+				'visible' => false,
+				'default' => null,
+				'allow_empty' => true,
+			],
+			'edited' => [
+				'type' => 'datetime',
+				'visible' => false,
+				'editable' => false,
+				'allow_empty' => true,
+				'default' => null,
+			],
+			'history' => [
+				'type' => 'serialise',
+				'editable' => false,
+				'show_in_summary' => false,
+			],
+		];
 
-							   ),
-			'status'		=> Array(
-								'type'		=> 'select',
-								'options'	=> Array(
-												'no_action'	=> 'No Action Required',
-												'pending'	=> 'Requires Action',
-												'failed'	=> 'Failed',
-												'complete'	=> 'Complete',
-											   ),
-								'default'	=> ifdef('DEFAULT_NOTE_STATUS', 'no_action'),
-								'class'		=> 'note-status',
-								'allow_empty'	=> false,
-								'label'		=> 'Status',
-							   ),
-			'status_last_changed' => Array(
-									'type'				=> 'datetime',
-									'show_in_summary'	=> false,
-									'allow_empty'		=> TRUE,
-									'editable'			=> false,
-									'default'			=> NULL,
-								   ),
-			'assignee'		=> Array(
-								'type'			=> 'reference',
-								'references'	=> 'staff_member',
-								'default'		=> $GLOBALS['user_system']->getCurrentUser('id'),
-								'tooltip'			=> 'Choose the user responsible for acting on this note',
-								'allow_empty'	=> true,
-								'filter'		=> function($x) {return $x->getValue("active") && (($x->getValue("permissions") & PERM_VIEWMYNOTES) == PERM_VIEWMYNOTES);},
-							   ),
-			'assignee_last_changed' => Array(
-									'type'				=> 'datetime',
-									'show_in_summary'	=> false,
-									'allow_empty'		=> TRUE,
-									'editable'			=> false,
-									'default'			=> NULL,
-								   ),
-			'action_date'	=> Array(
-								'type'			=> 'date',
-								'allow_empty'	=> false,
-								'default'		=> date('Y-m-d'),
-							   ),
-			'creator'		=> Array(
-								'type'			=> 'reference',
-								'editable'		=> false,
-								'references'	=> 'person',
-							   ),
-			'created'		=> Array(
-								'type'			=> 'timestamp',
-								'readonly'		=> true,
-							   ),
-			'editor'		=> Array(
-								'type'			=> 'reference',
-								'editable'		=> false,
-								'references'	=> 'person',
-								'visible'		=> false,
-								'default'		=> NULL,
-								'allow_empty'   => TRUE,
-							   ),
-			'edited'		=> Array(
-								'type'			=> 'datetime',
-								'visible'		=> false,
-								'editable'		=> false,
-								'allow_empty'	=> true,
-								'default'		=> NULL,
-							   ),
-			'history'		=> Array(
-								'type'			=> 'serialise',
-								'editable'		=> false,
-								'show_in_summary'	=> false,
-							   ),
-		);
 		return $fields;
 	}
 
-
-	function getInitSQL($table_name=NULL)
+	function getInitSQL($table_name = null)
 	{
 		return parent::getInitSQL('_abstract_note');
 	}
 
 	/**
-	 *
-	 * @return Array (columnName => referenceExpression) eg 'tagid' => 'tagoption(id) ON DELETE CASCADE'
+	 * @return array (columnName => referenceExpression) eg 'tagid' => 'tagoption(id) ON DELETE CASCADE'
 	 */
 	public function getForeignKeys()
 	{
-		return Array(
-				'_abstract_note.assignee' => '`staff_member`(`id`) ON DELETE RESTRICT',
-				'_abstract_note.creator' => '`staff_member`(`id`) ON DELETE RESTRICT',
-				'_abstract_note.editor' => '`staff_member`(`id`) ON DELETE RESTRICT',
-		);
+		return [
+			'_abstract_note.assignee' => '`staff_member`(`id`) ON DELETE RESTRICT',
+			'_abstract_note.creator' => '`staff_member`(`id`) ON DELETE RESTRICT',
+			'_abstract_note.editor' => '`staff_member`(`id`) ON DELETE RESTRICT',
+		];
 	}
 
 	/**
-	 *
 	 * @return The SQL to run to create any database views used by this class
 	 */
 	public function getViewSQL()
@@ -127,28 +124,34 @@ class Abstract_Note extends DB_Object
 			WHERE (
 				(an.assignee = getCurrentUserID() AND an.status = 'pending')
 				OR (`getCurrentUserID`() = -(1))
-				OR (".PERM_VIEWNOTE." = (SELECT permissions & ".PERM_VIEWNOTE." FROM staff_member WHERE id = getCurrentUserID()))
+				OR (".PERM_VIEWNOTE.' = (SELECT permissions & '.PERM_VIEWNOTE.' FROM staff_member WHERE id = getCurrentUserID()))
 			);
-			";
+			';
 	}
 
 	function toString()
 	{
 		$creator = $GLOBALS['system']->getDBObject('person', $this->values['creator']);
-		return $this->values['subject'].' ('.$creator->toString().', '.format_date( strtotime($this->values['created'])).')';
+
+		return $this->values['subject'].' ('.$creator->toString().', '.format_date(strtotime($this->values['created'])).')';
 	}
 
-	function printFieldInterface($name, $prefix='')
+	function printFieldInterface($name, $prefix = '')
 	{
-		if ($this->id && in_array($name, Array('subject', 'details'))) {
+		if ($this->id && in_array($name, ['subject', 'details'], true)) {
 			if ($GLOBALS['user_system']->getCurrentUser('id') != $this->values['creator']) {
 				$this->printFieldValue($name, $prefix);
+
 				return;
 			}
 		}
-		if ($name == 'status') echo '<div class="note-status" data-original-val="'.ents($this->getValue('status')).'">';
+		if ($name == 'status') {
+			echo '<div class="note-status" data-original-val="'.ents($this->getValue('status')).'">';
+		}
 		parent::printFieldInterface($name, $prefix);
-		if ($name == 'status') echo '</div>';
+		if ($name == 'status') {
+			echo '</div>';
+		}
 		if ($name == 'action_date') {
 			?>
 			<span class="nowrap smallprint">
@@ -162,19 +165,24 @@ class Abstract_Note extends DB_Object
 		}
 	}
 
-	function printFieldValue($name, $value=NULL)
+	function printFieldValue($name, $value = null)
 	{
-		if (is_null($value)) $value = $this->values[$name];
-		if (in_array($name, Array('assignee', 'action_date'))) {
+		if (null === $value) {
+			$value = $this->values[$name];
+		}
+		if (in_array($name, ['assignee', 'action_date'], true)) {
 			if ($value == 'no_action') {
 				echo 'N/A';
+
 				return;
 			}
 		}
 		if ($name == 'subject') {
 			echo '<strong>'.$value.'</strong>';
+
 			return;
 		}
+
 		return parent::printFieldValue($name, $value);
 	}
 
@@ -188,15 +196,13 @@ class Abstract_Note extends DB_Object
 		$res['select'][] = 'assignee.first_name as assignee_fn';
 		$res['select'][] = 'assignee.last_name as assignee_ln';
 		if (!$GLOBALS['user_system']->havePerm(PERM_VIEWNOTE)) {
-		//	$res['where'] = '('.$res['where'].') AND abstract_note.assignee = '.$GLOBALS['user_system']->getCurrentUser('id');
+			//	$res['where'] = '('.$res['where'].') AND abstract_note.assignee = '.$GLOBALS['user_system']->getCurrentUser('id');
 		}
-		return $res;
 
+		return $res;
 	}
 
-
-
-	function getInstancesData($params, $logic='OR', $order='')
+	function getInstancesData($params, $logic = 'OR', $order = '')
 	{
 		$res = parent::getInstancesData($params, $logic, $order);
 
@@ -206,15 +212,14 @@ class Abstract_Note extends DB_Object
 					FROM note_comment c JOIN person p on c.creator = p.id
 					WHERE noteid IN ('.implode(', ', array_keys($res)).')
 					ORDER BY noteid, created';
-			$db =& $GLOBALS['db'];
+			$db = &$GLOBALS['db'];
 			$comments = $db->queryAll($sql, null, null, true, false, true);
 			foreach ($res as $i => $v) {
-				$res[$i]['comments'] = array_get($comments, $i, Array());
+				$res[$i]['comments'] = array_get($comments, $i, []);
 			}
 		}
 
 		return $res;
-
 	}
 
 	function printStatusSummary()
@@ -233,36 +238,41 @@ class Abstract_Note extends DB_Object
 	}
 
 	/**
-	 * @return boolean	True if the current user is allowed to delete this note
+	 * @return bool True if the current user is allowed to delete this note
 	 */
-	public function canBeDeleted() {
+	public function canBeDeleted()
+	{
 		return ($this->getValue('status') !== 'pending')
-			&& ($GLOBALS['user_system']->havePerm(PERM_SYSADMIN));
+			&& $GLOBALS['user_system']->havePerm(PERM_SYSADMIN);
 	}
 
 	/**
-	 *
-	 * @return boolean True if current user is allowed to edit this note (change status, assignee etc)
+	 * @return bool True if current user is allowed to edit this note (change status, assignee etc)
 	 */
-	public function canEdit() {
-		if ($GLOBALS['user_system']->havePerm(PERM_EDITNOTE)) return TRUE;
+	public function canEdit()
+	{
+		if ($GLOBALS['user_system']->havePerm(PERM_EDITNOTE)) {
+			return true;
+		}
 
 		if ($GLOBALS['user_system']->havePerm(PERM_VIEWMYNOTES)
 			&& ($this->getValue('assignee') == $GLOBALS['user_system']->getCurrentUser('id'))) {
-			return TRUE;
+			return true;
 		}
 
 		if ($GLOBALS['user_system']->havePerm(PERM_VIEWMYNOTES)
 			&& (array_get($this->_old_values, 'assignee') == $GLOBALS['user_system']->getCurrentUser('id'))) {
-			return TRUE;
+			return true;
 		}
-		return FALSE;
+
+		return false;
 	}
 
 	/**
-	 * @return boolean	True if the current user is allowed to edit the original content of this note
+	 * @return bool True if the current user is allowed to edit the original content of this note
 	 */
-	public function canEditOriginal() {
+	public function canEditOriginal()
+	{
 		return $GLOBALS['user_system']->havePerm(PERM_SYSADMIN)
 				|| ($GLOBALS['user_system']->getCurrentUser('id') == $this->getValue('creator'));
 	}
@@ -270,20 +280,25 @@ class Abstract_Note extends DB_Object
 	function delete()
 	{
 		if (!$this->canBeDeleted()) {
-			trigger_error("This note can not be deleted", E_USER_WARNING);
-			return FALSE;
+			trigger_error('This note can not be deleted', \E_USER_WARNING);
+
+			return false;
 		}
-		if (!parent::delete()) return FALSE;
-		$db =& $GLOBALS['db'];
+		if (!parent::delete()) {
+			return false;
+		}
+		$db = &$GLOBALS['db'];
 		$sql = 'DELETE FROM note_comment WHERE noteid = '.$db->quote($this->id);
 		$res = $db->query($sql);
-		return TRUE;
+
+		return true;
 	}
 
 	function save()
 	{
 		if (!$this->canEdit()) {
-			trigger_error("Current user cannot save note #".$this->id);
+			trigger_error('Current user cannot save note #'.$this->id);
+
 			return false;
 		}
 		// If the subject or details is updated, set the 'editor' and 'edited' fields
@@ -293,23 +308,23 @@ class Abstract_Note extends DB_Object
 			$this->setValue('edited', 'CURRENT_TIMESTAMP');
 			$this->setValue('editor', $GLOBALS['user_system']->getCurrentUser('id'));
 		}
+
 		return parent::save();
 	}
-
 
 	function printUpdateForm()
 	{
 		?>
-		<form method="post" id="update-note" class="form-horizontal"  data-lock-length="<?php echo db_object::getLockLength() ?>">
+		<form method="post" id="update-note" class="form-horizontal"  data-lock-length="<?php echo db_object::getLockLength(); ?>">
 			<input type="hidden" name="update_note_submitted" value="1" />
 			<div class="control-group">
 				<label class="control-label">Comment</label>
 				<div class="controls">
 					<?php
 					$GLOBALS['system']->includeDBClass('note_comment');
-					$comment = new Note_Comment();
-					$comment->printFieldInterface('contents');
-					?>
+		$comment = new Note_Comment();
+		$comment->printFieldInterface('contents');
+		?>
 				</div>
 			</div>
 			<div class="control-group">
@@ -340,7 +355,7 @@ class Abstract_Note extends DB_Object
 					<input type="submit" name="delete_note" data-confirm="Notes are designed to accumulate as a historical record, and should usually only be deleted to correct a mistake.  Are you sure you want to delete this note?" class="pull-right btn" value="Delete this note" />
 					<?php
 				}
-				?>
+		?>
 				</div>
 			</div>
 		</form>
@@ -348,8 +363,10 @@ class Abstract_Note extends DB_Object
 	}
 
 	/**
-	 * Get notifications that should be sent by email advising people about recently-assigned notes
-	 * @param int	 $minutes	Number of minutes in the past to look.
+	 * Get notifications that should be sent by email advising people about recently-assigned notes.
+	 *
+	 * @param int $minutes number of minutes in the past to look
+	 *
 	 * @return array
 	 */
 	public static function getNotifications($minutes)
@@ -359,12 +376,12 @@ class Abstract_Note extends DB_Object
 		$userless = $GLOBALS['user_system']->isCLIScript();
 		$persontable = $userless ? '_person' : 'person';
 		$notetable = $userless ? '_abstract_note' : 'abstract_note';
-		
+
 		// get notes recently marked for action, notes recently assigned to a new person
 		// and notes which have just reached their action date in the last $minutes minutes
 		// We operate 10 seconds in the past to allow time for things to setting down
 		// We ignore notes that a user has assigned to themselves
-		$between = 'BETWEEN (NOW() - INTERVAL '.(int)(($minutes*60)+10).' SECOND) AND (NOW() - INTERVAL 10 SECOND)';
+		$between = 'BETWEEN (NOW() - INTERVAL '.(int) (($minutes * 60) + 10).' SECOND) AND (NOW() - INTERVAL 10 SECOND)';
 		$SQL = 'SELECT p.first_name, p.last_name, p.email,
 					(SELECT count(*)
 						FROM '.$notetable.' an
@@ -385,16 +402,18 @@ class Abstract_Note extends DB_Object
 												OR (nn.created '.$between.'))
 										) OR (
 											/* recently reached their action date, regardless of assigner */
-											DATE(NOW()) = nn.action_date AND DATE(NOW() - INTERVAL '.(int)$minutes.' MINUTE) <> nn.action_date
+											DATE(NOW()) = nn.action_date AND DATE(NOW() - INTERVAL '.(int) $minutes.' MINUTE) <> nn.action_date
 										))
 				WHERE email <> ""
 				GROUP BY p.id';
+
 		return $GLOBALS['db']->queryAll($SQL);
 	}
 
 	/**
-	 * Clean up any orphaned records that are not references by a person or family note
-	 * @return boolean
+	 * Clean up any orphaned records that are not references by a person or family note.
+	 *
+	 * @return bool
 	 */
 	public static function cleanupInstances()
 	{
@@ -403,6 +422,7 @@ class Abstract_Note extends DB_Object
 					UNION
 					SELECT id from family_note
 				)';
+
 		return $GLOBALS['db']->exec($SQL);
 	}
 }

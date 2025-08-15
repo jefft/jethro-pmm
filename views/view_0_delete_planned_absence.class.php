@@ -1,17 +1,18 @@
 <?php
+
 class View__Delete_Planned_Absence extends View
 {
 	function processView()
 	{
-		$absence = new Planned_Absence((int)$_REQUEST['id']);
+		$absence = new Planned_Absence((int) $_REQUEST['id']);
 		if ($absence && $absence->delete()) {
 			add_message('Planned absence deleted', 'success');
-			redirect(-1, Array(), 'rosters');
+			redirect(-1, [], 'rosters');
 		} else {
-			add_message("Error while deleting planned absence");
+			add_message('Error while deleting planned absence');
 		}
 	}
-	
+
 	function printView()
 	{
 	}
@@ -20,5 +21,4 @@ class View__Delete_Planned_Absence extends View
 	{
 		return _('Delete ').$this->_person->toString();
 	}
-
 }

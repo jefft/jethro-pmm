@@ -1,7 +1,7 @@
 <?php
 class View_Groups extends View
 {
-	var $_group = NULL;
+	var $_group;
 
 	function getTitle()
 	{
@@ -16,13 +16,13 @@ class View_Groups extends View
 			$_REQUEST['groupid'] = $_REQUEST['person_groupid'];
 		}
 		if (!empty($_REQUEST['groupid'])) {
-			$this->_group = $GLOBALS['system']->getDBObject('person_group', (int)$_REQUEST['groupid']);
+			$this->_group = $GLOBALS['system']->getDBObject('person_group', (int) $_REQUEST['groupid']);
 		}
 		if (empty($this->_group)) {
-			add_message("The specified group does not exist or you do not have permission to view it", 'error');
+			add_message('The specified group does not exist or you do not have permission to view it', 'error');
 		}
 		if (isset($_REQUEST['show_archived'])) {
-			$_SESSION['show_archived_group_members'] = (int)$_REQUEST['show_archived'];
+			$_SESSION['show_archived_group_members'] = (int) $_REQUEST['show_archived'];
 		}
 
 		if (!empty($_POST['membership_status'])) {
@@ -34,17 +34,19 @@ class View_Groups extends View
 
 	function printView()
 	{
-		if (!$this->_group) return;
+		if (!$this->_group) {
+			return;
+		}
 
 		require_once 'include/size_detector.class.php';
 		if (!SizeDetector::isNarrow()) {
 			?>
-			<h3><?php echo _('Group Details');?></h3>
+			<h3><?php echo _('Group Details'); ?></h3>
 			<table class="table table-full-width no-borders table-condensed">
 				<tr>
-					<th class="narrow"><?php echo _('Category');?></th>
+					<th class="narrow"><?php echo _('Category'); ?></th>
 					<td><?php $this->_group->printFieldValue('categoryid'); ?>&nbsp;&nbsp;</td>
-					<th class="narrow hidden-phone"><?php echo _('Record Attendance?');?></th>
+					<th class="narrow hidden-phone"><?php echo _('Record Attendance?'); ?></th>
 					<td class="hidden-phone"><?php $this->_group->printFieldValue('attendance_recording_days'); ?></td>
 					<td class="group-details-links">
 						<?php
@@ -52,44 +54,44 @@ class View_Groups extends View
 							?>
 							<a class="link-collapse"
 							   href="?view=attendance__record&cohortids[]=g-<?php echo $this->_group->id; ?>">
-								<i class="icon-check"></i><?php echo _('Record attendance');?>
+								<i class="icon-check"></i><?php echo _('Record attendance'); ?>
 							</a>
 							<?php
 						}
-						?>
+			?>
 					</td>
 				</tr>
 				<tr>
-					<th class="narrow"><?php echo _('Status');?></th>
+					<th class="narrow"><?php echo _('Status'); ?></th>
 					<td><?php $this->_group->printFieldValue('is_archived'); ?></td>
-					<th class="narrow hidden-phone"><?php echo _('Share Member Details?');?></th>
+					<th class="narrow hidden-phone"><?php echo _('Share Member Details?'); ?></th>
 					<td class="hidden-phone"><?php $this->_group->printFieldValue('share_member_details'); ?></td>
 					<td class="align-right">
 					<?php
 					if ($GLOBALS['user_system']->havePerm(PERM_EDITGROUP)) {
 						?>
-						<a class="link-collapse" href="?view=_edit_group&groupid=<?php echo $this->_group->id; ?>"><i class="icon-wrench"></i><?php echo _('Edit group details');?></a>
+						<a class="link-collapse" href="?view=_edit_group&groupid=<?php echo $this->_group->id; ?>"><i class="icon-wrench"></i><?php echo _('Edit group details'); ?></a>
 						<?php
 					}
-					?>
+			?>
 					</td>
 				</tr>
 				<tr>
-					<th class="narrow"><?php echo _('Visibility');?></th>
+					<th class="narrow"><?php echo _('Visibility'); ?></th>
 					<td><?php $this->_group->printFieldValue('owner'); ?></td>
-					<th class="narrow hidden-phone"><?php echo _('Show on add-family page?');?></th>
+					<th class="narrow hidden-phone"><?php echo _('Show on add-family page?'); ?></th>
 					<td class="hidden-phone"><?php $this->_group->printFieldValue('show_add_family'); ?></td>
 					<td class="align-right">
 						<?php
-						if ($GLOBALS['user_system']->havePerm(PERM_EDITGROUP)) {
-							?>
-							<a data-method="post" class="double-confirm-title link-collapse" title="<?php echo _('Delete group');?>"
+				if ($GLOBALS['user_system']->havePerm(PERM_EDITGROUP)) {
+					?>
+							<a data-method="post" class="double-confirm-title link-collapse" title="<?php echo _('Delete group'); ?>"
 							   href="?view=_edit_group&action=delete&groupid=<?php echo $this->_group->id; ?>">
-								<i class="icon-trash"></i><?php echo _('Delete group');?>
+								<i class="icon-trash"></i><?php echo _('Delete group'); ?>
 							</a>
 							<?php
-						}
-						?>
+				}
+			?>
 					</td>
 				</tr>
 			</table>
@@ -102,26 +104,26 @@ class View_Groups extends View
 			<div class="modal hide fade" id="action-plan-modal" role="dialog" aria-hidden="true">
 				<form method="post" action="?view=_edit_group&action=add_member&groupid=<?php echo $this->_group->id; ?>">
 					<div class="modal-header">
-						<h4><?php echo _('Add Members by Name Search');?></h4>
+						<h4><?php echo _('Add Members by Name Search'); ?></h4>
 					</div>
 					<div class="modal-body">
 						<table>
 							<tr>
-								<td><?php echo _('Select persons:');?></td>
+								<td><?php echo _('Select persons:'); ?></td>
 								<td>
 									<?php
 									$GLOBALS['system']->includeDBClass('person');
-									Person::printMultipleFinder('personid');
-									?>
+			Person::printMultipleFinder('personid');
+			?>
 								</td>
 							</tr>
 							<tr>
-								<td><?php echo _('Membership status:');?></td>
+								<td><?php echo _('Membership status:'); ?></td>
 								<td>
 									<?php
-									$GLOBALS['system']->includeDBClass('person_group');
-									Person_Group::printMembershipStatusChooser('membership_status');
-									?>
+			$GLOBALS['system']->includeDBClass('person_group');
+			Person_Group::printMembershipStatusChooser('membership_status');
+			?>
 								</td>
 							</tr>
 						</table>
@@ -135,14 +137,14 @@ class View_Groups extends View
 			<?php
 		}
 
-		$mParams = Array();
-		if (!array_get($_SESSION, 'show_archived_group_members', FALSE)) {
+		$mParams = [];
+		if (!array_get($_SESSION, 'show_archived_group_members', false)) {
 			$mParams['!(status'] = Person_Status::getArchivedIDs();
 		}
 		$persons = $this->_group->getMembers($mParams);
-		list ($status_options, $default_status) = Person_Group::getMembershipStatusOptionsAndDefault();
+		[$status_options, $default_status] = Person_Group::getMembershipStatusOptionsAndDefault();
 		?>
-		<h3><?php echo _('Group Members');?> (<?php echo count($persons); ?>)</h3>
+		<h3><?php echo _('Group Members'); ?> (<?php echo count($persons); ?>)</h3>
 
 		<?php
 		if (empty($_REQUEST['edit_statuses'])) {
@@ -152,39 +154,38 @@ class View_Groups extends View
 					<?php
 					if (empty($_SESSION['show_archived_group_members'])) {
 						?>
-						<a class="hidden-phone" href="<?php echo build_url(Array('show_archived' => 1)); ?>"><i class="icon-eye-open"></i><?php echo _('Show archived members');?></a>
+						<a class="hidden-phone" href="<?php echo build_url(['show_archived' => 1]); ?>"><i class="icon-eye-open"></i><?php echo _('Show archived members'); ?></a>
 						<?php
 					} else {
 						?>
-						<a class="hidden-phone" href="<?php echo build_url(Array('show_archived' => 0)); ?>"><i class="icon-eye-close"></i><?php echo _('Hide archived members');?></a>
+						<a class="hidden-phone" href="<?php echo build_url(['show_archived' => 0]); ?>"><i class="icon-eye-close"></i><?php echo _('Hide archived members'); ?></a>
 						<?php
 					}
-					?>
+			?>
 				</div>
 			<?php
 			if (SizeDetector::isNarrow()) {
 				?>
-				<a href="?view=_edit_group&groupid=<?php echo $this->_group->id; ?>"><i class="icon-wrench"></i><?php echo _('Edit group details');?></a>
+				<a href="?view=_edit_group&groupid=<?php echo $this->_group->id; ?>"><i class="icon-wrench"></i><?php echo _('Edit group details'); ?></a>
 				<?php
 			}
 			if (!empty($persons)) {
 				?>
 				<div class="email-link">
-					<a href="<?php echo build_url(Array('view' => NULL, 'call' => 'email', 'groupid' => $this->_group->id, 'print_modal' => 1)); ?>" target="_append"><i class="icon-email">@</i><?php echo _('Email members');?></a>
+					<a href="<?php echo build_url(['view' => null, 'call' => 'email', 'groupid' => $this->_group->id, 'print_modal' => 1]); ?>" target="_append"><i class="icon-email">@</i><?php echo _('Email members'); ?></a>
 				</div>
 				<?php
 				if ($GLOBALS['user_system']->havePerm(PERM_RUNREPORT)) {
 					?>
-					<div><a href="<?php echo build_url(Array('view' => 'persons__reports', 'queryid' => 0, 'configure' => 1)); ?>#showme"><i class="icon-list-alt"></i><?php echo _('Create report');?></a></div>
+					<div><a href="<?php echo build_url(['view' => 'persons__reports', 'queryid' => 0, 'configure' => 1]); ?>#showme"><i class="icon-list-alt"></i><?php echo _('Create report'); ?></a></div>
 					<?php
 				}
-
 			}
 			if (!empty($persons) && $GLOBALS['user_system']->havePerm(PERM_EDITGROUP)) {
 				if (count($status_options) > 1) {
 					?>
 					<div class="edit-status-link">
-						<a href="<?php echo build_url(Array('edit_statuses' => 1)); ?>"><i class="icon-wrench"></i><?php echo _('Edit membership statuses');?></a>
+						<a href="<?php echo build_url(['edit_statuses' => 1]); ?>"><i class="icon-wrench"></i><?php echo _('Edit membership statuses'); ?></a>
 					</div>
 					<?php
 				}
@@ -192,7 +193,7 @@ class View_Groups extends View
 			if ($GLOBALS['user_system']->havePerm(PERM_EDITGROUP)) {
 				?>
 				<div class="add-link">
-					<a href="#action-plan-modal" data-toggle="modal"><i class="icon-plus-sign"></i><?php echo _('Add members');?></a>
+					<a href="#action-plan-modal" data-toggle="modal"><i class="icon-plus-sign"></i><?php echo _('Add members'); ?></a>
 				</div>
 				<?php
 			}
@@ -205,13 +206,13 @@ class View_Groups extends View
 			foreach ($persons as $k => &$v) {
 				$v['joined_group'] = format_date($v['joined_group']);
 			}
-			$special_fields = Array('joined_group', 'congregation');
+			$special_fields = ['joined_group', 'congregation'];
 			if (count($status_options) > 1) {
 				array_unshift($special_fields, 'membership_status');
 			}
 			if (!empty($_REQUEST['edit_statuses'])) {
 				?>
-				<form method="post" action="<?php echo build_url(Array('edit_statuses' => NULL)); ?>">
+				<form method="post" action="<?php echo build_url(['edit_statuses' => null]); ?>">
 				<?php
 			} else {
 				?>
@@ -219,7 +220,9 @@ class View_Groups extends View
 				<?php
 			}
 			$tclasses = 'table table-hover table-striped table-auto-width';
-			if (empty($_REQUEST['edit_statuses'])) $tclasses .= ' clickable-rows';
+			if (empty($_REQUEST['edit_statuses'])) {
+				$tclasses .= ' clickable-rows';
+			}
 			?>
 			<table class="<?php echo $tclasses; ?>">
 				<thead>
@@ -236,20 +239,20 @@ class View_Groups extends View
 						<th><?php echo _('Membership status'); ?></th>
 						<?php
 					}
-					if (SizeDetector::isWide()) {
-						?>
+			if (SizeDetector::isWide()) {
+				?>
 						<th><?php echo _('Age'); ?></th>
 						<th><?php echo _('Gender'); ?></th>
 						<?php
-					}
-					if (!SizeDetector::isNarrow()) {
-						?>
+			}
+			if (!SizeDetector::isNarrow()) {
+				?>
 						<th><?php echo _('Joined Group'); ?></th>
 						<?php
-					}
-					?>
+			}
+			?>
 						<th>&nbsp;</th>
-						<th class="narrow selector form-inline"><input type="checkbox" class="select-all" title="<?php echo _('Select all')?>" /></th>
+						<th class="narrow selector form-inline"><input type="checkbox" class="select-all" title="<?php echo _('Select all'); ?>" /></th>
 					</tr>
 
 				</thead>
@@ -258,7 +261,7 @@ class View_Groups extends View
 			$dummy_person = new Person();
 			foreach ($persons as $id => $details) {
 				$dummy_person->populate($id, $details);
-				$tr_class = in_array($details['status'], Person_Status::getArchivedIDs()) ? ' class="archived"' : '';
+				$tr_class = in_array($details['status'], Person_Status::getArchivedIDs(), true) ? ' class="archived"' : '';
 				?>
 				<tr data-personid="<?php echo $id; ?>" <?php echo $tr_class; ?>>
 					<td class="nowrap"><?php echo $dummy_person->printFieldvalue('name'); ?></td>
@@ -268,7 +271,7 @@ class View_Groups extends View
 					<td class="nowrap"><?php echo $dummy_person->printFieldvalue('congregationid'); ?></td>
 					<td class="nowrap"><?php echo $dummy_person->printFieldvalue('status'); ?></td>
 					<?php
-				} else if (!empty($_REQUEST['edit_statuses'])){
+				} elseif (!empty($_REQUEST['edit_statuses'])) {
 					?>
 					<td><?php $this->printMembershipStatusChooser($id, $details['membership_status_id']); ?></td>
 					<?php
@@ -304,8 +307,8 @@ class View_Groups extends View
 			if (!empty($_REQUEST['edit_statuses'])) {
 				?>
 				<div class="align-right">
-					<input type="submit" class="btn" value="<?php echo _('Save membership statuses');?>" />
-					<a class="btn" href="<?php echo build_url(Array('edit_statuses' => NULL)); ?>"><?php echo _('Cancel');?></a>
+					<input type="submit" class="btn" value="<?php echo _('Save membership statuses'); ?>" />
+					<a class="btn" href="<?php echo build_url(['edit_statuses' => null]); ?>"><?php echo _('Cancel'); ?></a>
 				</div>
 				<?php
 			} else {
@@ -315,16 +318,15 @@ class View_Groups extends View
 			</form>
 			<?php
 
-
 		} else {
 			?>
-			<p><em><?php echo _('This group does not currently have any members');?></em></p>
+			<p><em><?php echo _('This group does not currently have any members'); ?></em></p>
 			<?php
 		}
-
 	}
 
-	public static function printMembershipStatusChooser($personid, $value) {
-		Person_Group::printMembershipStatusChooser('membership_status['.(int)$personid.']', $value);
+	public static function printMembershipStatusChooser($personid, $value)
+	{
+		Person_Group::printMembershipStatusChooser('membership_status['.(int) $personid.']', $value);
 	}
 }

@@ -91,13 +91,13 @@ class Call_document_merge_help extends Call
 					<li><code>[person.address_postcode]</code></li>
 
 					<?php
-					$fields = $GLOBALS['system']->getDBObjectData('custom_field', Array());
-						foreach ($fields as $id => $field) {
-							?>
+					$fields = $GLOBALS['system']->getDBObjectData('custom_field', []);
+		foreach ($fields as $id => $field) {
+			?>
 							<li><code>[person.<?php echo $fname = strtoupper(str_replace(' ', '_', $field['name'])); ?>]</code> -  custom field</li>
 							<?php
-						}
-						?>
+		}
+		?>
 				</ul>
 				<br />The available fields for merging <b>per family</b> are:
 				<ul>

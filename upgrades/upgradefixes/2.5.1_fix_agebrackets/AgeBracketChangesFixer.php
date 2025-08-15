@@ -9,7 +9,8 @@ class AgeBracketChangesFixer
 {
 	/**
 	 * Identify persons that may have been incorrectly set to age bracket 'Adult' during a bulk edit.
-	 * @return BadChangeGroup[]  An array of instances where Age Bracket may have gone wrong, each grouped by bulk edit.
+	 *
+	 * @return BadChangeGroup[] an array of instances where Age Bracket may have gone wrong, each grouped by bulk edit
 	 */
 	public static function getBadChangeGroups(): array
 	{
@@ -22,10 +23,12 @@ class AgeBracketChangesFixer
 			$GLOBALS['db']->queryAll($sql),
 			function ($all, $row) {
 				$all[$row['id']] = $row;
+
 				return $all;
 			},
-			[]);
-		$dateBuggyJethroReleased = strtotime("2024-05-30");
+			[],
+		);
+		$dateBuggyJethroReleased = strtotime('2024-05-30');
 
 		// The fact that N changes were made 'together' is an important indicator that bulk change (and hence the bug)
 		// was involved. So our first step is to group likely problems by time.
@@ -38,18 +41,26 @@ class AgeBracketChangesFixer
 				continue;
 			}
 			foreach (array_reverse($hist, true) as $time => $histrecord) {
-				if ($time < $dateBuggyJethroReleased) break; // Ignore history record that happened before the buggy Jethro was released
-				$histlines = explode(PHP_EOL, $histrecord); // Separate lines of history record
-				if (count($histlines) <= 2) continue; // Besides the 'Updated by' and 'Age bracket changed from ..' line, there must be some other change for the Age bracket change to have been accidental
+				if ($time < $dateBuggyJethroReleased) {
+					break;
+				} // Ignore history record that happened before the buggy Jethro was released
+				$histlines = explode(\PHP_EOL, $histrecord); // Separate lines of history record
+				if (count($histlines) <= 2) {
+					continue;
+				} // Besides the 'Updated by' and 'Age bracket changed from ..' line, there must be some other change for the Age bracket change to have been accidental
 				$oldAgeBrackets = array_filter(array_map(function ($line) use ($adult) {
 					if (preg_match('/Age bracket changed from "(.*)" to "'.$adult.'"/', $line, $match)) {
 						return $match[1];
-					} else return null;
+					} else {
+						return null;
+					}
 				}, $histlines));
-				if (empty($oldAgeBrackets)) continue;  // This change doesn't change 'Age Bracket'.
+				if (empty($oldAgeBrackets)) {
+					continue;
+				}  // This change doesn't change 'Age Bracket'.
 				$oldagebracket = array_values($oldAgeBrackets)[0];
 				$badchange = new BadChange($time, $personid, $oldagebracket, $adult, $persondetails, $histlines);
-				$quantized_timestamp = intval($time / 10) * 10; // Group by 10s intervals in case a bulk edit took more than 1s
+				$quantized_timestamp = (int) ($time / 10) * 10; // Group by 10s intervals in case a bulk edit took more than 1s
 				$tstamp_to_affectedpersons[$quantized_timestamp][$personid] = $badchange;
 				break; // We've found the most recent 'Age bracket changed' history item; older ones are irrelevant, so finish with this person.
 			}
@@ -61,21 +72,23 @@ class AgeBracketChangesFixer
 			$firstlines = array_map(function ($changeinfo) {
 				return $changeinfo->getHistLines()[0];
 			}, $badchange);
-			if (count(array_unique($firstlines)) != 1) throw new \RuntimeException("First lines in history are expected to always be 'Updated by ...");
+			if (count(array_unique($firstlines)) != 1) {
+				throw new RuntimeException("First lines in history are expected to always be 'Updated by ...");
+			}
 			$oldagebracket = array_values(array_unique($firstlines))[0];
 			if (preg_match('/Updated by (.+) \(#(\d+)\)/', $oldagebracket, $matches)) {
 				$updater = $matches[1];
 				$updaterid = $matches[2];
 			} else {
-				throw new \RuntimeException('First line of change, '.$firstlines[1].' does not match expected /Updated by ... (#...)/ regex.');
+				throw new RuntimeException('First line of change, '.$firstlines[1].' does not match expected /Updated by ... (#...)/ regex.');
 			}
 			// Get the other fields changed (e.g. 'Status'), that the user was trying to set, when they accidentally set 'Age bracket'
 			$other_changed_fieldnames = array_values(array_map(function ($personinfo) use ($adult) {
 				return array_values(array_map(function ($histline) {
 					return preg_replace('/(.+) changed from "(.*)" to "(.*)"/', '\1', $histline);
 				}, array_filter($personinfo->getHistLines(), function ($histline) use ($adult) {
-					return !preg_match('/^Updated by /', $histline) &&
-						!preg_match('/Age bracket changed from ".+" to "'.$adult.'"/', $histline);
+					return !preg_match('/^Updated by /', $histline)
+						&& !preg_match('/Age bracket changed from ".+" to "'.$adult.'"/', $histline);
 				})));
 			}, $badchange));
 			$other_changed_fieldnames = array_unique(array_merge(...$other_changed_fieldnames));
@@ -84,14 +97,15 @@ class AgeBracketChangesFixer
 			$badchangegroups[$time] = $badchangegroup;
 		}
 		// Sort by the number of persons affected, ascending. The low-count changes are more likely to not be buggy.
-		uasort($badchangegroups, fn($a, $b) => ($a->count() <=> $b->count()));
+		uasort($badchangegroups, fn ($a, $b) => ($a->count() <=> $b->count()));
+
 		return $badchangegroups;
 	}
 
 	/**
 	 * @param BadChangeGroup[] $badchangegroups
-	 * @return BadChangeFixInfo[]
 	 *
+	 * @return BadChangeFixInfo[]
 	 */
 	public static function fix($badchangegroups): array
 	{
@@ -101,13 +115,12 @@ class AgeBracketChangesFixer
 				$results[] = self::fixBadChange($badchange);
 			}
 		}
+
 		return $results;
 	}
 
 	/**
 	 * Fix the 'Age Bracket' of all persons in a BadChange. The change will be recorded in the person's history as done by user 'system'.
-	 * @param BadChange $badchange
-	 * @return BadChangeFixInfo
 	 */
 	public static function fixBadChange(BadChange $badchange): BadChangeFixInfo
 	{
@@ -121,27 +134,32 @@ class AgeBracketChangesFixer
 		$_SESSION['user']['last_name'] = '';
 		$_SESSION['id']['id'] = -1;
 		$person->save();
+
 		return new BadChangeFixInfo($person->id, $person->toString(), $person->getValue('history'), $badchange->getOldAgebracket());
-}
+	}
 
 	/**
 	 * Return the default Age Bracket name, usually 'Adult'.
-	 * @return string
 	 */
 	static function getDefaultAgeBracketLabel(): string
 	{
-		return $GLOBALS['db']->queryOne("select label from age_bracket where is_default=1;");
+		return $GLOBALS['db']->queryOne('select label from age_bracket where is_default=1;');
 	}
 
 	/**
 	 * Return the database id of the given Age Bracket. If $label isn't found an error is triggered.
+	 *
 	 * @param $label e.g. 'Adult'
+	 *
 	 * @return int e.g. 1
 	 */
-	private static function _getAgeBracketIdByLabel($label) : int
+	private static function _getAgeBracketIdByLabel($label): int
 	{
-		$id = $GLOBALS['db']->queryOne("select id from age_bracket where label=".$GLOBALS['db']->quote($label));
-		if (is_null($id)) trigger_error("No age bracket '$label'.");
+		$id = $GLOBALS['db']->queryOne('select id from age_bracket where label='.$GLOBALS['db']->quote($label));
+		if (null === $id) {
+			trigger_error("No age bracket '$label'.");
+		}
+
 		return $id;
 	}
 }
@@ -150,7 +168,7 @@ class AgeBracketChangesFixer
  * A collection of BadChanges that happened at (roughly) the same time, by the same person.
  * If a BadChangeGroup contains more than one BadChange, that indicates a Bulk Edit happened and the Age Bracket changes are likely wrong.
  * If the BadChangeGroup contains just one BadChange, it might be a bulk edit (affected by the bug) or a regular edit (not affected).
- **/
+ */
 class BadChangeGroup
 {
 	private int $quantized_time;
@@ -160,7 +178,7 @@ class BadChangeGroup
 	 * @var array<string>
 	 */
 	private array $other_changed_fieldnames;
-	/** @var BadChange[] $changes */
+	/** @var BadChange[] */
 	private array $changes;
 
 	public function __construct(int $quantized_time, string $updater, int $updaterid, array $other_changed_fieldnames, array $agebracket_change_info)
@@ -210,9 +228,9 @@ class BadChangeGroup
 	{
 		return count($this->changes) > 1;
 	}
+
 	/**
 	 * Number of persons changed. If only one, this might not have been a bulk edit affected by the bug!
-	 * @return int
 	 */
 	public function count(): int
 	{
@@ -229,12 +247,12 @@ class BadChangeGroup
 
 	public function getAffectedPersons(): array
 	{
-		return array_unique(array_map(fn($c) => $c->getPersonName(), $this->changes));
+		return array_unique(array_map(fn ($c) => $c->getPersonName(), $this->changes));
 	}
 
 	public function toString(): string
 	{
-		return "On ".$this->getQuantizedTime().", ".$this->getUpdater()." changed ".$this->count()." ".($this->count() == 1 ? "person" : "people")." to '".AgeBracketChangesFixer::getDefaultAgeBracketLabel()."', when changing other fields ".(implode(', ', array_map(fn($s) => "'".$s."'", $this->other_changed_fieldnames))).PHP_EOL;
+		return 'On '.$this->getQuantizedTime().', '.$this->getUpdater().' changed '.$this->count().' '.($this->count() == 1 ? 'person' : 'people')." to '".AgeBracketChangesFixer::getDefaultAgeBracketLabel()."', when changing other fields ".implode(', ', array_map(fn ($s) => "'".$s."'", $this->other_changed_fieldnames)).\PHP_EOL;
 	}
 }
 
@@ -250,13 +268,6 @@ class BadChange
 	protected $histlines;
 	protected $persondetail;
 
-	/**
-	 * @param int $time
-	 * @param int $personid
-	 * @param string $oldagebracket
-	 * @param array $persondetail
-	 * @param array $histlines
-	 */
 	public function __construct(int $time, int $personid, string $oldagebracket, string $newagebracket, array $persondetail, array $histlines)
 	{
 		$this->time = $time;
@@ -309,33 +320,21 @@ class BadChangeFixInfo
 	private $history;
 	private $agebracket;
 
-	/**
-	 * @return mixed
-	 */
 	public function getPersonid()
 	{
 		return $this->personid;
 	}
 
-	/**
-	 * @return mixed
-	 */
 	public function getPersonName()
 	{
 		return $this->personname;
 	}
 
-	/**
-	 * @return mixed
-	 */
 	public function getHistory()
 	{
 		return $this->history;
 	}
 
-	/**
-	 * @return mixed
-	 */
 	public function getAgebracket()
 	{
 		return $this->agebracket;
@@ -343,7 +342,6 @@ class BadChangeFixInfo
 
 	public function __construct($personid, $personname, $history, $agebracket)
 	{
-
 		$this->personid = $personid;
 		$this->personname = $personname;
 		$this->history = $history;

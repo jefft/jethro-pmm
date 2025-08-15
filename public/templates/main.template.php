@@ -21,7 +21,7 @@ if (empty($_REQUEST['raw'])) {
 				?>
 				<div class="user-detail pull-right">
 					<div>
-						<a href="<?php echo build_url(Array('raw' => 1)); ?>">Raw View</a>
+						<a href="<?php echo build_url(['raw' => 1]); ?>">Raw View</a>
 					</div>
 				</div>
 				
@@ -35,7 +35,7 @@ if (empty($_REQUEST['raw'])) {
 				</span>
 				<?php
 			}
-			?>
+	?>
 
 				<!-- logo and system name -->
 				<h1>
@@ -55,11 +55,11 @@ if (empty($_REQUEST['raw'])) {
 		</div>
 		<div id="body">
 			<?php
-			dump_messages();
+	dump_messages();
 
-			if ($title = $GLOBALS['system']->getPageHeading()) {
-				echo '<h1>'.ents($title).'</h1>';
-			}
+	if ($title = $GLOBALS['system']->getPageHeading()) {
+		echo '<h1>'.ents($title).'</h1>';
+	}
 }
 $GLOBALS['system']->printBody();
 if (empty($_REQUEST['raw'])) {

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<?php include dirname(dirname(dirname(__FILE__))).'/templates/head.template.php' ?>
+	<?php include dirname(__DIR__, 2).'/templates/head.template.php'; ?>
 </head>
 <body id="login">
 	<form method="post" action="?" id="login-box" class="well disable-submit-buttons">
@@ -15,7 +15,7 @@
 			} else {
 				echo ' <h3>Set Password</h3>';
 			}
-			?>
+	?>
 			<p>Great - your email address has now been verified. </p>
 			
 			<p>Now we just need you to choose a password to use next time you log in.</p>

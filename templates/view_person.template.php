@@ -4,17 +4,17 @@ include_once 'size_detector.class.php';
 
 // -------ACTION PLAN MODAL --------- //
 $GLOBALS['system']->includeDBClass('action_plan');
-$plan_chooser = Action_Plan::getMultiChooser('planid', Array());
+$plan_chooser = Action_Plan::getMultiChooser('planid', []);
 if ($plan_chooser) {
 	?>
 	<div id="action-plan-modal" class="modal hide fade" role="dialog" aria-hidden="true">
-		<form method="post" action="?view=_execute_plans&personid[]=<?php echo (int)$person->id; ?>">
+		<form method="post" action="?view=_execute_plans&personid[]=<?php echo (int) $person->id; ?>">
 			<div class="modal-header">
-				<h4><?php echo _('Execute Action Plan for ')?><?php $person->printFieldValue('name'); ?></h4>
+				<h4><?php echo _('Execute Action Plan for '); ?><?php $person->printFieldValue('name'); ?></h4>
 			</div>
 			<div class="modal-body">
 				<p><?php echo $plan_chooser; ?></p>
-				<p><?php echo _('Reference date for plans: ')?><?php print_widget('plan_reference_date', Array('type' => 'date'), NULL); ?></p>
+				<p><?php echo _('Reference date for plans: '); ?><?php print_widget('plan_reference_date', ['type' => 'date'], null); ?></p>
 			</div>
 			<div class="modal-footer">
 				<button type="submit" class="btn" accesskey="s">Go</button>
@@ -26,9 +26,9 @@ if ($plan_chooser) {
 }
 
 // -------ADD TO GROUP MODAL --------- //
-$can_add_group = FALSE;
+$can_add_group = false;
 $GLOBALS['system']->includeDBClass('person_group');
-$groups = Person_Group::getGroups($person->id, TRUE);
+$groups = Person_Group::getGroups($person->id, true);
 if ($GLOBALS['user_system']->havePerm(PERM_EDITGROUP)) {
 	?>
 	<div id="add-group-modal" class="modal hide fade" role="dialog" aria-hidden="true">
@@ -40,16 +40,16 @@ if ($GLOBALS['user_system']->havePerm(PERM_EDITGROUP)) {
 			<input type="hidden" name="back_to" value="persons" />
 
 			<div class="modal-header">
-				<h4><?php echo _('Add ')?> <?php $person->printFieldValue('name'); ?><?php echo _(' to a group');?></h4>
+				<h4><?php echo _('Add '); ?> <?php $person->printFieldValue('name'); ?><?php echo _(' to a group'); ?></h4>
 			</div>
 			<div class="modal-body">
 				<?php
 				$GLOBALS['system']->includeDBClass('person_group');
-				echo _('Add as a ');
-				Person_Group::printMembershipStatusChooser('membership_status');
-				echo _(' of ');
-				$can_add_group = Person_Group::printChooser('groupid', 0, array_keys($groups));
-				?>
+	echo _('Add as a ');
+	Person_Group::printMembershipStatusChooser('membership_status');
+	echo _(' of ');
+	$can_add_group = Person_Group::printChooser('groupid', 0, array_keys($groups));
+	?>
 			</div>
 			<div class="modal-footer">
 				<input type="submit" class="btn" value="Go" accesskey="s" onclick="if (!$('[name=groupid]').val()) { alert('<?php echo _('Choose a group first'); ?>'); return false; }" />
@@ -64,9 +64,9 @@ if ($GLOBALS['user_system']->havePerm(PERM_EDITGROUP)) {
 
 $accordion = SizeDetector::getWidth() && SizeDetector::isNarrow();
 
-$tabs = Array(
-	'basic' => _('Basic Details')
-);
+$tabs = [
+	'basic' => _('Basic Details'),
+];
 if ($GLOBALS['user_system']->havePerm(PERM_VIEWMYNOTES)) {
 	$notes = $person->getNotesHistory();
 	$tabs['notes'] = _('Notes').' ('.count($notes).')';
@@ -83,8 +83,12 @@ if ($GLOBALS['user_system']->havePerm(PERM_VIEWROSTER)) {
 if ($GLOBALS['user_system']->havePerm(PERM_SYSADMIN)) {
 	$accountCount = 0;
 	$sm = $GLOBALS['system']->getDBOBject('staff_member', $person->id);
-	if ($sm) $accountCount++;
-	if ($person->hasMemberAccount()) $accountCount++;
+	if ($sm) {
+		++$accountCount;
+	}
+	if ($person->hasMemberAccount()) {
+		++$accountCount;
+	}
 	$tabs['accounts'] = _('Accounts').' ('.$accountCount.')';
 }
 if (!$accordion
@@ -94,9 +98,6 @@ if (!$accordion
 	// then history is hidden (sponsored by Coast Evangelical Church)
 	$tabs['history'] = _('History');
 }
-
-
-
 
 // ------------------- SET UP HEADERS AND DIVIDERS ------------------
 
@@ -111,7 +112,9 @@ if (!$accordion) {
 	$current_tab = 'basic';
 	foreach ($tabs as $id => $label) {
 		?>
-		<li <?php if ($current_tab == $id) echo 'class="active"'; ?>><a data-toggle="tab" href="#<?php echo $id; ?>"><?php echo ents($label); ?></a></li>
+		<li <?php if ($current_tab == $id) {
+			echo 'class="active"';
+		} ?>><a data-toggle="tab" href="#<?php echo $id; ?>"><?php echo ents($label); ?></a></li>
 		<?php
 	}
 	?>
@@ -145,8 +148,7 @@ if (!$accordion) {
 	<?php
 }
 
-
-/**************** BASIC DETAILS TAB *************/
+/* BASIC DETAILS TAB */
 
 printf($panel_header, 'basic', _('Basic Details'), 'active');
 ?>
@@ -157,92 +159,91 @@ printf($panel_header, 'basic', _('Basic Details'), 'active');
 				<?php
 				if ($GLOBALS['user_system']->havePerm(PERM_EDITPERSON)) {
 					?>
-					<a href="?view=_edit_person&personid=<?php echo $person->id; ?>"><i class="icon-white icon-wrench"></i><?php echo _('Edit');?></a>
+					<a href="?view=_edit_person&personid=<?php echo $person->id; ?>"><i class="icon-white icon-wrench"></i><?php echo _('Edit'); ?></a>
 					<?php
 				}
-				?>
+?>
 			</div>
 
-			<h3><?php echo _('Person Details')?></h3>
+			<h3><?php echo _('Person Details'); ?></h3>
 
 			<?php
 
 			$person->printSummary();
 
-			if ($GLOBALS['user_system']->havePerm(PERM_SYSADMIN)) {
-				?>
+if ($GLOBALS['user_system']->havePerm(PERM_SYSADMIN)) {
+	?>
 				<a class="pull-right hidden-phone indent-left" href="?view=_delete_person&personid=<?php echo $person->id; ?>"><i class="icon-trash"></i><?php echo _('Delete'); ?></a>
 				<?php
-			}
-			if ($family->getValue('address_street')) {
-				?>
-				<a href="?call=envelopes&personid=<?php echo $person->id; ?>" class="pull-right envelope-popup hidden-phone"><i class="icon-envelope"></i><?php echo _('Print Envelope')?></a>
+}
+if ($family->getValue('address_street')) {
+	?>
+				<a href="?call=envelopes&personid=<?php echo $person->id; ?>" class="pull-right envelope-popup hidden-phone"><i class="icon-envelope"></i><?php echo _('Print Envelope'); ?></a>
 				<?php
-			}
-			if ($plan_chooser) {
-				?>
-				<a href="#action-plan-modal" data-toggle="modal"><i class="icon-forward"></i><?php echo _('Execute Action Plan')?></a>
+}
+if ($plan_chooser) {
+	?>
+				<a href="#action-plan-modal" data-toggle="modal"><i class="icon-forward"></i><?php echo _('Execute Action Plan'); ?></a>
 				<?php
-			}
-			?>
+}
+?>
 		</div>
 
 		<div class="details-box match-height">
 			<div class="header-link pull-right">
-				<a href="?view=families&familyid=<?php echo $family->id; ?>"><i class="icon-home icon-white"></i><?php echo _('View')?></a>
+				<a href="?view=families&familyid=<?php echo $family->id; ?>"><i class="icon-home icon-white"></i><?php echo _('View'); ?></a>
 				<?php
-				if ($GLOBALS['user_system']->havePerm(PERM_EDITPERSON)) {
-					?>
-					&nbsp; <a href="?view=_edit_family&familyid=<?php echo $family->id; ?>"><i class="icon-white icon-wrench"></i><?php echo _('Edit')?></a>
+	if ($GLOBALS['user_system']->havePerm(PERM_EDITPERSON)) {
+		?>
+					&nbsp; <a href="?view=_edit_family&familyid=<?php echo $family->id; ?>"><i class="icon-white icon-wrench"></i><?php echo _('Edit'); ?></a>
 					<?php
-				}
-				?>
+	}
+?>
 			</div>
-			<h3><?php echo _('Family Details')?></h3>
+			<h3><?php echo _('Family Details'); ?></h3>
 			<?php
 			$family->printSummaryWithMembers();
-			?>
+?>
 		</div>
 
 		<?php
 		if ($accordion && $GLOBALS['system']->featureEnabled('PHOTOS')) {
 			?>
-			<img class="person-photo" src="?call=photo&personid=<?php echo (int)$person->id; ?>" />
+			<img class="person-photo" src="?call=photo&personid=<?php echo (int) $person->id; ?>" />
 			<?php
 		}
-		?>
+?>
 	</div>
 
 	<?php
 	if (!$accordion && $GLOBALS['system']->featureEnabled('PHOTOS')) {
 		?>
-		<img class="person-photo" width="<?php echo Photo_Handler::MAX_PHOTO_WIDTH; ?>" src="?call=photo&personid=<?php echo (int)$person->id; ?>" />
+		<img class="person-photo" width="<?php echo Photo_Handler::MAX_PHOTO_WIDTH; ?>" src="?call=photo&personid=<?php echo (int) $person->id; ?>" />
 		<?php
 	}
-	?>
+?>
 	<br class="clearfix" />
 
 <?php
 echo $panel_footer;
 
-/************** NOTES TAB **************/
+/* NOTES TAB */
 
 if (isset($tabs['notes'])) {
-
 	printf($panel_header, 'notes', _('Notes').' ('.count($notes).')', '');
 
 	if ($GLOBALS['user_system']->havePerm(PERM_EDITNOTE)) {
 		?>
-		<div class="pull-right"><a href="?view=_add_note_to_person&personid=<?php echo $person->id; ?>"><i class="icon-plus-sign"></i><?php echo _('Add Note')?></a></div>
+		<div class="pull-right"><a href="?view=_add_note_to_person&personid=<?php echo $person->id; ?>"><i class="icon-plus-sign"></i><?php echo _('Add Note'); ?></a></div>
 		<?php
 	}
 	if (empty($notes)) {
 		?>
-		<p><i><?php echo _('There are no person or family notes to show for ')?><?php $person->printFieldValue('name'); ?></i></p>
+		<p><i><?php echo _('There are no person or family notes to show for '); ?><?php $person->printFieldValue('name'); ?></i></p>
 		<?php
 	} else {
 		?>
-		<p><i><?php echo _('Person and Family Notes for ')?><?php $person->printFieldValue('name'); ?>:</i></p>
+		<p><i><?php echo _('Person and Family Notes for '); ?><?php $person->printFieldValue('name'); ?>:</i></p>
 		<?php
 	}
 	$show_edit_link = true;
@@ -251,37 +252,36 @@ if (isset($tabs['notes'])) {
 	echo $panel_footer;
 }
 
-
-/************** GROUPS TAB *****************/
+/* GROUPS TAB */
 if (isset($tabs['groups'])) {
 	printf($panel_header, 'groups', _('Groups').' ('.count($groups).')', '');
 
 	if ($can_add_group) {
 		?>
-		<div class="pull-right"><a href="#add-group-modal" data-toggle="modal"><i class="icon-plus-sign"></i><?php echo _('Add to a group')?></a></div>
+		<div class="pull-right"><a href="#add-group-modal" data-toggle="modal"><i class="icon-plus-sign"></i><?php echo _('Add to a group'); ?></a></div>
 		<?php
 	}
 
 	if (empty($groups)) {
 		?>
-		<p><i><?php $person->printFieldValue('name'); ?><?php echo _(' is not a member of any active groups')?></i></p>
+		<p><i><?php $person->printFieldValue('name'); ?><?php echo _(' is not a member of any active groups'); ?></i></p>
 		<?php
 	} else {
 		?>
-		<p><i><?php $person->printFieldValue('name'); ?><?php echo _(' is a member of:')?></i></p>
+		<p><i><?php $person->printFieldValue('name'); ?><?php echo _(' is a member of:'); ?></i></p>
 		<table class="table table-condensed table-auto-width table-striped table-hover clickable-rows">
 			<thead>
 				<tr>
 					<th>ID</th>
-					<th><?php echo _('Group Name')?></th>
-					<th><?php echo _('Membership Status')?></th>
+					<th><?php echo _('Group Name'); ?></th>
+					<th><?php echo _('Membership Status'); ?></th>
 				<?php
 				if (!SizeDetector::isNarrow()) {
 					?>
-					<th><?php echo _('Joined Group')?></th>
+					<th><?php echo _('Joined Group'); ?></th>
 					<?php
 				}
-				?>
+		?>
 					<th></th>
 				</tr>
 			</thead>
@@ -306,14 +306,14 @@ if (isset($tabs['groups'])) {
 						<a data-method="post" class="link-collapse confirm-title"
 						   href="?view=_edit_group&action=remove_member&groupid=<?php echo $id; ?>&back_to=persons&personid=<?php echo $person->id; ?>"
 						   title="Remove <?php $person->printFieldValue('name'); ?> from <?php echo ents($details['name']); ?>">
-							<i class="icon-remove-sign"></i><?php echo _('Remove')?>
+							<i class="icon-remove-sign"></i><?php echo _('Remove'); ?>
 						</a>
 						<?php } ?>
 					</td>
 				</tr>
 				<?php
 			}
-			?>
+		?>
 			</tbody>
 		</table>
 		<?php
@@ -326,7 +326,9 @@ if (isset($tabs['accounts'])) {
 	printf($panel_header, 'accounts', _('Accounts'), '');
 
 	echo '<h4>';
-	if ($sm) echo '<a class="pull-right" href="?view=_edit_user_account&staff_member_id='.$person->id.'"><i class="icon-wrench"></i>Edit</a>';
+	if ($sm) {
+		echo '<a class="pull-right" href="?view=_edit_user_account&staff_member_id='.$person->id.'"><i class="icon-wrench"></i>Edit</a>';
+	}
 	echo _('Control Centre Account');
 	echo '</h4>';
 
@@ -355,7 +357,7 @@ if (isset($tabs['accounts'])) {
 	echo '<h4>'._('Members Area Account').'</h4>';
 	$ma = $person->hasMemberAccount();
 	if ($ma) {
-		if ($ma === TRUE) {
+		if ($ma === true) {
 			echo '<i class="icon-check"></i>'.ents($person->toString()).' has a members area account. &nbsp;';
 		} else {
 			echo '<i>'.ents($person->toString()).' has been sent the registration email but not yet completed the rego process. &nbsp;</i>';
@@ -369,9 +371,9 @@ if (isset($tabs['accounts'])) {
 	} else {
 		if ($sm) {
 			echo '<i>'.$person->toString().' has not registered a members area account, but can log into the members area using their control centre password.</i>';
-		} else if (in_array($person->getValue('status'), Person_Status::getArchivedIDs())) {
+		} elseif (in_array($person->getValue('status'), Person_Status::getArchivedIDs(), true)) {
 			echo '<i>'.$person->toString().' has not yet registered a members area account, and cannot register because they are archived. </i>';
-		} else if (!strlen($person->getValue('email'))) {
+		} elseif (!strlen($person->getValue('email'))) {
 			echo '<i>'.$person->toString().' must have an email address recorded to register for a member account. </i>';
 		} else {
 			echo '<i>'.$person->toString().' has not yet registered a members area account. </i>';
@@ -386,7 +388,7 @@ if (isset($tabs['accounts'])) {
 	echo $panel_footer;
 }
 
-/************************ HISTORY TAB ********************/
+/* HISTORY TAB */
 
 if (isset($tabs['history'])) {
 	printf($panel_header, 'history', _('History'), '');
@@ -395,8 +397,7 @@ if (isset($tabs['history'])) {
 }
 
 if (isset($tabs['attendance'])) {
-
-	/********************** ATTENDANCE TAB **************/
+	/* ATTENDANCE TAB */
 
 	printf($panel_header, 'attendance', _('Attendance'), '');
 
@@ -404,24 +405,24 @@ if (isset($tabs['attendance'])) {
 	$attendances = $person->getAttendance(date('Y-m-d', strtotime('-'.$weeks.' weeks')));
 	if (empty($attendances)) {
 		?>
-		<p><i><?php echo _('No attendance has been recorded for ')?><?php $person->printFieldValue('name'); ?></i></p>
+		<p><i><?php echo _('No attendance has been recorded for '); ?><?php $person->printFieldValue('name'); ?></i></p>
 		<?php
 	} else {
-		$groups = Array();
+		$groups = [];
 		$groupids = array_keys($attendances);
 		if (count($groupids) > 1 || reset($attendances) != '') {
-			$groups = $GLOBALS['system']->getDBObjectData('person_group', Array('id' => $groupids));
+			$groups = $GLOBALS['system']->getDBObjectData('person_group', ['id' => $groupids]);
 		}
-		$classes = Array(
-					'0'	=> 'absent',
-					'1'	=> 'present',
-					NULL => 'unknown'
-				   );
-		$labels = Array(
-					'0'	=> 'A',
-					'1'	=> 'P',
-					NULL => '?'
-				   );
+		$classes = [
+			'0' => 'absent',
+			'1' => 'present',
+			null => 'unknown',
+		];
+		$labels = [
+			'0' => 'A',
+			'1' => 'P',
+			null => '?',
+		];
 		foreach ($attendances as $groupid => $group_attendances) {
 			$start = reset($group_attendances);
 			$end = end($group_attendances);
@@ -443,20 +444,20 @@ if (isset($tabs['attendance'])) {
 						<th><?php echo date('j M', strtotime($att['date'])); ?></th>
 						<?php
 					}
-					?>
+			?>
 					</tr>
 				</thead>
 				<tbody>
 					<tr>
 					<?php
-					foreach ($group_attendances as $att) {
-						?>
+			foreach ($group_attendances as $att) {
+				?>
 						<td class="<?php echo $classes[$att['present']]; ?>">
 							<?php echo $labels[$att['present']]; ?>
 						</td>
 						<?php
-					}
-					?>
+			}
+			?>
 					</tr>
 				</tbody>
 			</table>
@@ -465,22 +466,21 @@ if (isset($tabs['attendance'])) {
 	}
 
 	echo $panel_footer;
-
 }
 
 if (isset($tabs['rosters'])) {
-	/*************** ROSTERS TAB ****************/
+	/* ROSTERS TAB */
 
 	printf($panel_header, 'rosters', _('Rosters'), '');
 
 	$GLOBALS['system']->includeDBClass('roster_role_assignment');
 	$assignments = Roster_Role_Assignment::getUpcomingAssignments($person->id, '99 weeks');
 	$absences = $GLOBALS['system']->getDBObjectData(
-											'planned_absence', 
-											Array('personid' => $person->id, '>=end_date' => date('Y-m-d')),
-											'start_date'
-									);
-	
+		'planned_absence',
+		['personid' => $person->id, '>=end_date' => date('Y-m-d')],
+		'start_date',
+	);
+
 	?>
 	<h4>Upcoming roster assignments</h4>
 	<?php
@@ -514,17 +514,17 @@ if (isset($tabs['rosters'])) {
 						foreach ($allocs as $alloc) {
 							echo ents($alloc['cong'].' '.$alloc['title']).'<br />';
 						}
-						?>
+				?>
 					</td>
 				</tr>
 				<?php
 			}
-			?>
+		?>
 			</tbody>
 		</table>
 		<?php
 	}
-	
+
 	?>
 	<h4>
 		<?php
@@ -533,7 +533,7 @@ if (isset($tabs['rosters'])) {
 			<a class="pull-right" href="?view=_add_planned_absence&personid=<?php echo $person->id; ?>"><i class="icon-plus-sign"></i>Add</a>
 			<?php
 		}
-		?>
+	?>
 		Planned absences</h4>
 	<?php
 	if ($absences) {
@@ -563,18 +563,17 @@ if (isset($tabs['rosters'])) {
 				</tr>
 				<?php
 			}
-			?>
+		?>
 			</tbody>	
 		</table>
 		<?php
 	} else {
 		?>
 		<p><i><?php $person->printFieldValue('name'); ?> has no upcoming planned absences</i></p>
-		<?php	
+		<?php
 	}
 
 	echo $panel_footer;
-
 }
 
 ?>

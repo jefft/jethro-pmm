@@ -61,12 +61,12 @@ if (empty($_REQUEST['raw'])) {
 
 		</div>
 		<div id="body">
-			<?php 
+			<?php
 			dump_messages();
 
-			if ($title = $GLOBALS['system']->getPageHeading()) {
-				echo '<h1>'.ents($title).'</h1>';
-			}
+	if ($title = $GLOBALS['system']->getPageHeading()) {
+		echo '<h1>'.ents($title).'</h1>';
+	}
 }
 
 $GLOBALS['system']->printBody();

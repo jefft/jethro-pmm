@@ -43,13 +43,12 @@ class View__Fix_Age_Brackets extends View
 	{
 		if (!empty($_REQUEST['done'])) {
 			$this->_stage = 'done';
-		} else if (!empty($_POST['confirm_fix'])) {
+		} elseif (!empty($_POST['confirm_fix'])) {
 			$this->_processFix();
 		} else {
 			$this->_findAffectedPersons();
 		}
 	}
-
 
 	private function _printBeginView()
 	{
@@ -66,15 +65,15 @@ class View__Fix_Age_Brackets extends View
 					?>
                     <tr>
                         <td></td>
-                        <td colspan="6"><?= $changegroup->toString() ?>
-							<?= ($changegroup->isBulkEdit() ? "" : "<br><small>Warning: this may have been deliberate, and not be from a bulk change!</small>") ?>
+                        <td colspan="6"><?php echo $changegroup->toString(); ?>
+							<?php echo $changegroup->isBulkEdit() ? '' : '<br><small>Warning: this may have been deliberate, and not be from a bulk change!</small>'; ?>
                         </td>
                     </tr>
                     <tr>
                         <td style="vertical-align: center; min-width: 2em">
                             <input type="checkbox" name='time[]'
-                                   value="<?= $changegroup->getId() ?>"
-							<?= ($changegroup->isBulkEdit()  ? "checked" : "unchecked") ?>
+                                   value="<?php echo $changegroup->getId(); ?>"
+							<?php echo $changegroup->isBulkEdit() ? 'checked' : 'unchecked'; ?>
                         </td>
                         <td>
                             <table class="table table-striped table-condensed table-hover table-min-width clickable-rows query-results">
@@ -93,16 +92,16 @@ class View__Fix_Age_Brackets extends View
 									?>
                                     <tr>
                                         <td>
-                                            <a href="/?view=persons&personid=<?= $change->getPersonid() ?>"><?= $change->getPersonName() ?></a>
+                                            <a href="/?view=persons&personid=<?php echo $change->getPersonid(); ?>"><?php echo $change->getPersonName(); ?></a>
                                         </td>
-                                        <td><?= $change->getOldagebracket() ?></td>
-                                        <td><?= $change->getNewagebracket() ?></td>
-                                        <td><?= array_reduce($change->getHistlines(), fn($s, $line) => $s .= $line.'</br>', '') ?></td>
-                                        <td><?= $change->getNewagebracket() ?> → <?= $change->getOldagebracket() ?></td>
+                                        <td><?php echo $change->getOldagebracket(); ?></td>
+                                        <td><?php echo $change->getNewagebracket(); ?></td>
+                                        <td><?php echo array_reduce($change->getHistlines(), fn ($s, $line) => $s .= $line.'</br>', ''); ?></td>
+                                        <td><?php echo $change->getNewagebracket(); ?> → <?php echo $change->getOldagebracket(); ?></td>
                                     </tr>
 									<?php
 								}
-								?>
+					?>
                                 </tbody>
                             </table>
                         </td>
@@ -124,24 +123,23 @@ class View__Fix_Age_Brackets extends View
 		<?php
 	}
 
-	private
-	function _printDoneView()
+	private function _printDoneView()
 	{
 		?><h3>Fix completed</h3>
 		<?php
-		if (!is_null($this->_fixresults)) {
+		if (null !== $this->_fixresults) {
 			echo '<table class="table table-striped table-condensed table-hover table-min-width clickable-rows query-results">';
 			echo '<tr><th>Person</th><th>Age Bracket</th></tr>';
 			foreach ($this->_fixresults as $fixresult) {
-				echo "<tr>";
-				echo "<td><a href='/?view=persons&personid=".$fixresult->getPersonid()."'>".$fixresult->getPersonName()."</a></td>";
-				echo "<td>".$fixresult->getAgebracket();
-				echo "</td>";
-				echo "</tr>";
+				echo '<tr>';
+				echo "<td><a href='/?view=persons&personid=".$fixresult->getPersonid()."'>".$fixresult->getPersonName().'</a></td>';
+				echo '<td>'.$fixresult->getAgebracket();
+				echo '</td>';
+				echo '</tr>';
 			}
-			echo "</table>";
+			echo '</table>';
 		} else {
-			echo "No fix results??";
+			echo 'No fix results??';
 		}
 	}
 
@@ -151,11 +149,11 @@ class View__Fix_Age_Brackets extends View
 		$changes = [];
 		if (array_key_exists('time', $_REQUEST)) { // 'time' is an array of timestamps of changes deemed to be in error. Null if none were picked.
 			foreach (AgeBracketChangesFixer::getBadChangeGroups() as $id => $change) {
-				if (in_array($id, $_REQUEST['time'])) {
+				if (in_array($id, $_REQUEST['time'], true)) {
 					$changes[$id] = $change;
 				}
 			}
-	    }
+		}
 		$this->_fixresults = AgeBracketChangesFixer::fix($changes);
 		Config_Manager::deleteSetting('NEEDS_1086_CHECK');
 		$GLOBALS['system']->doTransaction('COMMIT');
@@ -165,14 +163,11 @@ class View__Fix_Age_Brackets extends View
 	/**
 	 * @return stdClass
 	 */
-
-	private
-	function _getAffectedPersons()
+	private function _getAffectedPersons()
 	{
 	}
 
-	private
-	function _findAffectedPersons()
+	private function _findAffectedPersons()
 	{
 		$this->_affectedpersons = AgeBracketChangesFixer::getBadChangeGroups();
 	}
@@ -181,7 +176,7 @@ class View__Fix_Age_Brackets extends View
 	{
 		$this->_findAffectedPersons();
 		if ($this->_affectedpersons) {
-			print_message('Some records in your system need review for accidental changes. <a href="?view=_fix_age_brackets">Click here for details.</a>', 'error', TRUE);
+			print_message('Some records in your system need review for accidental changes. <a href="?view=_fix_age_brackets">Click here for details.</a>', 'error', true);
 		} else {
 			Config_Manager::deleteSetting('NEEDS_1086_CHECK');
 		}

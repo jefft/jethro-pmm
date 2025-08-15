@@ -1,27 +1,29 @@
 <?php
 class View_Documents extends View
 {
-	var $_rootpath = NULL;
-	var $_realdir = NULL;
-	var $_editfile = NULL;
-	var $_messages = Array();
-	
+	var $_rootpath;
+	var $_realdir;
+	var $_editfile;
+	var $_messages = [];
+
 	function getTitle()
 	{
-		return NULL;
+		return null;
 	}
 
-	function _addMessage($msg) {
+	function _addMessage($msg)
+	{
 		$this->_messages[] = $msg;
 	}
 
-	function _dumpMessages() {
+	function _dumpMessages()
+	{
 		static $i = 0;
 		foreach ($this->_messages as $msg) {
 			?>
 			<div id="msg-<?php echo $i; ?>" class="alert alert-success document-message" ><?php echo ents($msg); ?></div>
 			<?php
-			$i++;
+			++$i;
 		}
 	}
 
@@ -29,10 +31,10 @@ class View_Documents extends View
 	{
 		$this->_rootpath = Documents_Manager::getRootPath();
 		if (!is_dir($this->_rootpath)) {
-			throw new \RuntimeException("Documents root path ".$this->_rootpath.' does not exist, please check your config file'); // exits
+			throw new RuntimeException('Documents root path '.$this->_rootpath.' does not exist, please check your config file'); // exits
 		}
 		$this->_realdir = $this->_rootpath;
-		$this->_messages = Array();
+		$this->_messages = [];
 		if (!empty($_REQUEST['dir'])) {
 			$this->_realdir = Documents_Manager::validateDirPath($_REQUEST['dir']);
 		}
@@ -57,7 +59,9 @@ class View_Documents extends View
 				if ($newname = Documents_Manager::validateDirName($_POST['newfolder'])) {
 					$newdir = $this->_realdir.'/'.$newname;
 					if (is_dir($newdir) || mkdir($newdir)) {
-						if ($p = fileperms($this->_rootpath)) chmod($newdir, $p);
+						if ($p = fileperms($this->_rootpath)) {
+							chmod($newdir, $p);
+						}
 						$this->_addMessage('Folder "'.$newname.'" created');
 						$this->_realdir = $newdir;
 					}
@@ -65,30 +69,35 @@ class View_Documents extends View
 			}
 			if (!empty($_FILES['newfile'])) {
 				foreach ($_FILES['newfile']['error'] as $key => $error) {
-					if ($error == UPLOAD_ERR_OK) {
-						$tmp_name = $_FILES["newfile"]["tmp_name"][$key];
-						if ($name = Documents_Manager::validateFileName($_FILES["newfile"]["name"][$key])) {
+					if ($error == \UPLOAD_ERR_OK) {
+						$tmp_name = $_FILES['newfile']['tmp_name'][$key];
+						if ($name = Documents_Manager::validateFileName($_FILES['newfile']['name'][$key])) {
 							if (move_uploaded_file($tmp_name, $this->_realdir.'/'.$name)) {
-								if ($p = fileperms($this->_rootpath)) chmod($this->_realdir.'/'.$name, $p);
+								if ($p = fileperms($this->_rootpath)) {
+									chmod($this->_realdir.'/'.$name, $p);
+								}
 								$this->_addMessage('File "'.$name.'" saved');
 							}
 						}
-					} else if (in_array($error, Array(UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE))) {
-						add_message("Your file could not be saved because the file is too big.", 'error');
-						return NULL;
+					} elseif (in_array($error, [\UPLOAD_ERR_INI_SIZE, \UPLOAD_ERR_FORM_SIZE], true)) {
+						add_message('Your file could not be saved because the file is too big.', 'error');
+
+						return null;
 					} else {
-						throw new \RuntimeException("Technical error uploading photo file: Error #".$error);
+						throw new RuntimeException('Technical error uploading photo file: Error #'.$error);
 					}
 				}
 			}
 			if (!empty($_FILES['replacefile'])) {
 				foreach ($_FILES['replacefile']['error'] as $origname => $error) {
-					if (($error == UPLOAD_ERR_OK) && ($origname = Documents_Manager::validateFileName($origname))) {
-						$tmp_name = $_FILES["replacefile"]["tmp_name"][$origname];
+					if (($error == \UPLOAD_ERR_OK) && ($origname = Documents_Manager::validateFileName($origname))) {
+						$tmp_name = $_FILES['replacefile']['tmp_name'][$origname];
 						$origname = urldecode($origname);
 						if (file_exists($this->_realdir.'/'.$origname)) {
 							if (move_uploaded_file($tmp_name, $this->_realdir.'/'.$origname)) {
-								if ($p = fileperms($this->_rootpath)) chmod($this->_realdir.'/'.$origname, $p);
+								if ($p = fileperms($this->_rootpath)) {
+									chmod($this->_realdir.'/'.$origname, $p);
+								}
 								$this->_addMessage('File "'.$origname.'" replaced');
 							}
 						}
@@ -135,14 +144,16 @@ class View_Documents extends View
 				if ($filename = Documents_Manager::validateFileName($_POST['savefile'])) {
 					if (!Documents_Manager::isHTML($filename)) {
 						// Append .html if entered filename has missing or non-HTML extension
-						$filename .= ".html";
+						$filename .= '.html';
 					}
 					if (!empty($_POST['isnew']) && file_exists($this->_realdir.'/'.$filename)) {
 						trigger_error("$filename already exists in this folder.  Please choose another name.");
 						$this->_editfile = $filename;
 					} else {
-						if (file_put_contents($this->_realdir.'/'.$filename, process_widget('contents', array('type' => 'html')))) {
-							if ($p = fileperms($this->_rootpath)) chmod($this->_realdir.'/'.$filename, $p);
+						if (file_put_contents($this->_realdir.'/'.$filename, process_widget('contents', ['type' => 'html']))) {
+							if ($p = fileperms($this->_rootpath)) {
+								chmod($this->_realdir.'/'.$filename, $p);
+							}
 							$this->_addMessage("\"$filename\" saved");
 						}
 					}
@@ -153,9 +164,12 @@ class View_Documents extends View
 
 	// Given a fullly qualified path, returns the portion that we should show to the user
 	// eg /var/www/jethro/files/foo/bar becomes /foo/bar
-	function getPrintedDir($dir=NULL)
+	function getPrintedDir($dir = null)
 	{
-		if (is_null($dir)) $dir = $this->_realdir;
+		if (null === $dir) {
+			$dir = $this->_realdir;
+		}
+
 		return str_replace($this->_rootpath, '', $dir);
 	}
 
@@ -165,18 +179,18 @@ class View_Documents extends View
 		?>
 		<div class="documents-container clearfix">
 			<div class="documents-tree well">
-				<a href="<?php echo build_url(Array('dir'=>NULL)); ?>"<?php echo $id; ?>>Top Level</a>
+				<a href="<?php echo build_url(['dir' => null]); ?>"<?php echo $id; ?>>Top Level</a>
 				<?php $this->_printFolderTree(); ?>
 			</div>
 			<div class="documents-body">
 				<?php $this->_dumpMessages(); ?>
-				<?php 
+				<?php
 				if (!empty($this->_editfile)) {
 					$this->printEditor();
 				} else {
 					$this->printFolderContents();
 				}
-				?>
+		?>
 			</div>
 		</div>
 			<div id="rename-folder-modal" class="modal hide fade" role="dialog" aria-hidden="true">
@@ -276,11 +290,15 @@ class View_Documents extends View
 		<?php
 	}
 
-	function _printFolderOptions($dir=NULL, $indent='')
+	function _printFolderOptions($dir = null, $indent = '')
 	{
-		if (is_null($dir)) $dir = $this->_rootpath;
+		if (null === $dir) {
+			$dir = $this->_rootpath;
+		}
 		$di = new DirectoryIterator($dir);
-		if (!$di->valid()) return; // nothing to list
+		if (!$di->valid()) {
+			return;
+		} // nothing to list
 		$currentprinted = $this->getPrintedDir();
 		foreach ($di as $fileinfo) {
 			if ($fileinfo->isDir() && !$fileinfo->isDot()) {
@@ -297,17 +315,21 @@ class View_Documents extends View
 		}
 	}
 
-	function _printFolderTree($dir=NULL)
+	function _printFolderTree($dir = null)
 	{
-		if (is_null($dir)) $dir = $this->_rootpath;
+		if (null === $dir) {
+			$dir = $this->_rootpath;
+		}
 		$di = new DirectoryIterator($dir);
-		if (!$di->valid()) return; // nothing to list
+		if (!$di->valid()) {
+			return;
+		} // nothing to list
 
 		?>
 		<ul>
 		<?php
 		$currentprinted = $this->getPrintedDir();
-		$dirlist = Array();
+		$dirlist = [];
 		foreach ($di as $fileinfo) {
 			if ($fileinfo->isDir() && !$fileinfo->isDot() && substr($fileinfo->getFilename(), 0, 1) != '.') {
 				$dirlist[] = $fileinfo->getPath().'/'.$fileinfo->getFilename();
@@ -315,18 +337,18 @@ class View_Documents extends View
 		}
 		natsort($dirlist);
 		foreach ($dirlist as $dirpath) {
-				$printed_dir = $this->getPrintedDir($dirpath);
-				$id = ($printed_dir == $currentprinted) ? ' id="current-folder"' : '';
-				?>
+			$printed_dir = $this->getPrintedDir($dirpath);
+			$id = ($printed_dir == $currentprinted) ? ' id="current-folder"' : '';
+			?>
 				<li>
 					<div <?php echo $id; ?>>
-					<a href="<?php echo build_url(Array('dir'=>$printed_dir, 'editfile'=>NULL)); ?>"><?php echo ents(basename($dirpath)); ?></a>
+					<a href="<?php echo build_url(['dir' => $printed_dir, 'editfile' => null]); ?>"><?php echo ents(basename($dirpath)); ?></a>
 					</div>
 					<?php
-					if (0 === strpos($currentprinted, $printed_dir)) {
-						$this->_printFolderTree($dirpath);
-					}
-					?>
+				if (str_starts_with($currentprinted, $printed_dir)) {
+					$this->_printFolderTree($dirpath);
+				}
+			?>
 				</li>
 				<?php
 		}
@@ -338,11 +360,13 @@ class View_Documents extends View
 	function printEditor()
 	{
 		?>
-		<form method="post" action="<?php echo build_url(Array('editfile' => NULL)); ?>">
+		<form method="post" action="<?php echo build_url(['editfile' => null]); ?>">
 		<?php
 		if ($this->_editfile == '_new_') {
 			$i = 1;
-			while (file_exists($this->_realdir.'/newfile'.$i.'.html')) $i++;
+			while (file_exists($this->_realdir.'/newfile'.$i.'.html')) {
+				++$i;
+			}
 			?>
 			<p><b>Filename: </b><input name="savefile" class="select-basename" type="text" value="newfile<?php echo $i; ?>.html" /></p>
 			<input type="hidden" name="isnew" value="1" />
@@ -356,11 +380,11 @@ class View_Documents extends View
 			$content = file_get_contents($this->_realdir.'/'.$this->_editfile);
 		}
 
-		print_widget('contents', Array('type' => 'html'), $content);
+		print_widget('contents', ['type' => 'html'], $content);
 		?>
 		<p class="align-right">
 			<input type="submit" class="btn" value="Save" />
-			<a class="btn" href="<?php echo build_url(Array('editfile' => NULL)); ?>">Cancel</a>
+			<a class="btn" href="<?php echo build_url(['editfile' => null]); ?>">Cancel</a>
 		</p>
 		</form>
 		<?php
@@ -369,37 +393,39 @@ class View_Documents extends View
 	function printFolderContents()
 	{
 		$di = new DirectoryIterator($this->_realdir);
-		$dirlist = $dirinfo = Array();
-		$filelist = $fileinfo = Array();
+		$dirlist = $dirinfo = [];
+		$filelist = $fileinfo = [];
 		foreach ($di as $file) {
 			if ($file->isDir() && !$file->isDot() && substr($file->getFilename(), 0, 1) != '.') {
 				$dirlist[] = $file->getFilename();
-				$dirinfo[$file->getFilename()] = array('size' => $file->getSize(), 'mtime' => $file->getMTime());
+				$dirinfo[$file->getFilename()] = ['size' => $file->getSize(), 'mtime' => $file->getMTime()];
 			}
 			if ($file->isFile() && !$file->isDot() && substr($file->getFilename(), 0, 1) != '.') {
 				$filelist[] = $file->getFilename();
-				$fileinfo[$file->getFilename()] = array('size' => $file->getSize(), 'mtime' => $file->getMTime());
+				$fileinfo[$file->getFilename()] = ['size' => $file->getSize(), 'mtime' => $file->getMTime()];
 			}
 		}
 		natsort($dirlist);
 		natsort($filelist);
 
 		if ($GLOBALS['user_system']->havePerm(PERM_EDITDOC)) {
-			$parentaction = build_url(Array('call'=>NULL,'view'=>'documents','dir'=>$this->getPrintedDir()));
+			$parentaction = build_url(['call' => null, 'view' => 'documents', 'dir' => $this->getPrintedDir()]);
 			?>
 			<h2>
-				<?php 
+				<?php
 				$title = $this->getPrintedDir();
-				if (empty($title)) $title = '(Top Level)';
-				echo 'Documents: '.$title;
-				?>
+			if (empty($title)) {
+				$title = '(Top Level)';
+			}
+			echo 'Documents: '.$title;
+			?>
 			</h2>
 			<div class="pull-right document-icons">
 			<?php
 			if ($this->getPrintedDir()) {
 				if (empty($dirlist) && empty($filelist)) {
 					?>
-					<form class="min" method="post" target="_parent" action="<?php echo $parentaction ?>">
+					<form class="min" method="post" target="_parent" action="<?php echo $parentaction; ?>">
 						<input type="hidden" name="deletefolder" value="1" />
 						<input type="image" title="Delete this folder" class="confirm-title" src="resources/img/folder_delete.png" />
 					</form>
@@ -412,7 +438,7 @@ class View_Documents extends View
 			?>
 				<a href="#add-folder-modal" data-toggle="modal"><img title="Add new sub-folder" data-togl src="resources/img/folder_add.png" /></a>
 
-				<a href="<?php echo build_url(Array('editfile' => '_new_')); ?>"><img title="Edit new HTML document" src="resources/img/document_new.png" /></a>
+				<a href="<?php echo build_url(['editfile' => '_new_']); ?>"><img title="Edit new HTML document" src="resources/img/document_new.png" /></a>
 
 				<a href="#upload-file-modal" data-toggle="modal"><img title="Upload new file" src="resources/img/document_upload.png" /></a>
 			</div><!-- .document-icons -->
@@ -425,7 +451,7 @@ class View_Documents extends View
 		if (empty($filelist) && empty($dirlist)) {
 			?>
 			<p><i>There are no files in this folder</i></p>
-			<p class="parent-folder"><a href="<?php echo build_url(Array('dir' => $this->getPrintedDir(dirname($this->_realdir)))); ?>"><i class="icon-circle-arrow-up"></i>Parent folder</a></p>
+			<p class="parent-folder"><a href="<?php echo build_url(['dir' => $this->getPrintedDir(dirname($this->_realdir))]); ?>"><i class="icon-circle-arrow-up"></i>Parent folder</a></p>
 			<?php
 			return;
 		} else {
@@ -442,7 +468,7 @@ class View_Documents extends View
 						<th>Actions</th>
 						<?php
 					}
-					?>
+			?>
 					</tr>
 				</thead>
 				<tbody>
@@ -450,20 +476,20 @@ class View_Documents extends View
 				if (!empty($_REQUEST['dir'])) {
 					?>
 					<tr class="parent-folder">
-						<td class="filename"><a href="<?php echo build_url(Array('dir' => $this->getPrintedDir(dirname($this->_realdir)))); ?>"><i class="icon-circle-arrow-up"></i>Parent folder</a></td>
+						<td class="filename"><a href="<?php echo build_url(['dir' => $this->getPrintedDir(dirname($this->_realdir))]); ?>"><i class="icon-circle-arrow-up"></i>Parent folder</a></td>
 						<td class="file-detail">&nbsp;</td>
 						<td class="file-detail">&nbsp;</td>
 						<td class="narrow">&nbsp;</td>
 					</tr>
 					<?php
 				}
-				?>
+			?>
 			<?php
 			foreach ($dirlist as $dirname) {
 				?>
 				<tr>
 					<td class="filename middle">
-						<a href="<?php echo build_url(array('call'=>null, 'view' => 'documents', 'dir' => $this->getPrintedDir().'/'.$dirname)); ?>" target="_parent">
+						<a href="<?php echo build_url(['call' => null, 'view' => 'documents', 'dir' => $this->getPrintedDir().'/'.$dirname]); ?>" target="_parent">
 						<img src="resources/img/folder.png" style="margin-right: 5px" /><?php echo ents($dirname); ?></a>
 					</td>
 					<td class="file-detail">&nbsp;</td>
@@ -487,14 +513,14 @@ class View_Documents extends View
 						<span class="clickable replace-file"><i class="icon-upload"></i>Replace</span> &nbsp;
 						<span class="clickable move-file"><i class="icon-random"></i>Move</span> &nbsp;
 						<form method="post" class="min">
-							<input type="hidden" name="deletefile[]" value="<?php echo ents($filename);?>" ?>
+							<input type="hidden" name="deletefile[]" value="<?php echo ents($filename); ?>" ?>
 							<button type="submit" class="btn btn-link confirm-title" title="Delete this file">
 								<i class="icon-trash"></i>Delete</button>
 						</form>&nbsp;
 					<?php
 					if (Documents_Manager::isHTML($filename)) {
 						?>
-						<a href="<?php echo build_url(array('editfile' => $filename)); ?>"><i class="icon-pencil"></i>Edit</a> &nbsp;
+						<a href="<?php echo build_url(['editfile' => $filename]); ?>"><i class="icon-pencil"></i>Edit</a> &nbsp;
 						<?php
 					}
 					?>
@@ -523,12 +549,13 @@ class View_Documents extends View
 			$size = number_format($size / 1024, 1);
 			$units = 'MB';
 		}
+
 		return $size.$units;
 	}
 
 	function _getFileURL($filename)
 	{
-		return build_url(array('call'=>'documents', 'getfile'=>$filename));
+		return build_url(['call' => 'documents', 'getfile' => $filename]);
 	}
 
 	static function getMenuPermissionLevel()
@@ -547,15 +574,17 @@ class View_Documents extends View
 	{
 		// array of files to zip
 		$downloadFilename = array_get($_REQUEST, 'zipname', 'JethroFiles');
-		if (substr($downloadFilename, -4) != '.zip') $downloadFilename .= '.zip';
+		if (substr($downloadFilename, -4) != '.zip') {
+			$downloadFilename .= '.zip';
+		}
 		$zip = new ZipArchive();
 		$zipFilename = tempnam(sys_get_temp_dir(), 'jethrozip');
-		rename($zipFilename, $zipFilename.".zip");
-		$zipFilename .= ".zip";
-		if ($zip->open($zipFilename, ZipArchive::CREATE)!==TRUE) {
+		rename($zipFilename, $zipFilename.'.zip');
+		$zipFilename .= '.zip';
+		if ($zip->open($zipFilename, ZipArchive::CREATE) !== true) {
 			exit("cannot open <$zipFilename>\n");
 		}
-		foreach ((array)$_REQUEST['zipfile'] as $filename) {
+		foreach ((array) $_REQUEST['zipfile'] as $filename) {
 			if (($dir = Documents_Manager::validateDirPath(dirname($filename)))
 					&& ($filename = Documents_Manager::validateFileName(basename($filename)))
 			) {
@@ -566,15 +595,13 @@ class View_Documents extends View
 			}
 		}
 		$zip->close();
-		header("Pragma: public"); // required
-		header("Expires: 0");
-		header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
-		header("Cache-Control: private",false); // required for certain browsers
-		header("Content-Transfer-Encoding: binary");
+		header('Pragma: public'); // required
+		header('Expires: 0');
+		header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+		header('Cache-Control: private', false); // required for certain browsers
+		header('Content-Transfer-Encoding: binary');
 		header('Content-Disposition: attachment; filename="'.$downloadFilename.'"');
 		readfile($zipFilename);
 		unlink($zipFilename);
 	}
-
-
 }

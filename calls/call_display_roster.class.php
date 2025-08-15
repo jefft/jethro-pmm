@@ -1,24 +1,24 @@
 <?php
 /**
- * LEVI CPM
- * 
+ * LEVI CPM.
  *
  * @author Tom Barrett <tom@tombarrett.id.au>
+ *
  * @version $Id: call_display_roster.class.php,v 1.2 2013/03/19 09:47:51 tbar0970 Exp $
- * @package jethro-pmm
  */
 class Call_Display_Roster extends Call
 {
 	/**
-	 * Execute this call
+	 * Execute this call.
 	 *
 	 * @return void
-	 * @access public
 	 */
 	function run()
 	{
-		$roster_id = (int)array_get($_REQUEST, 'viewid');
-		if (empty($roster_id)) return;
+		$roster_id = (int) array_get($_REQUEST, 'viewid');
+		if (empty($roster_id)) {
+			return;
+		}
 		$view = $GLOBALS['system']->getDBObject('roster_view', $roster_id);
 
 		?>
@@ -86,9 +86,9 @@ class Call_Display_Roster extends Call
 				<?php
 
 				$start_date = substr(array_get($_REQUEST, 'start_date', ''), 0, 10);
-				$end_date = substr(array_get($_REQUEST, 'end_date', ''), 0, 10);
-				$view->printView($start_date, $end_date, FALSE, TRUE, TRUE);
-				?>
+		$end_date = substr(array_get($_REQUEST, 'end_date', ''), 0, 10);
+		$view->printView($start_date, $end_date, false, true, true);
+		?>
 			</body>
 		</html>
 		<?php

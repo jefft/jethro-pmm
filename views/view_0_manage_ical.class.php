@@ -1,4 +1,5 @@
 <?php
+
 require_once 'members/views/view_0_edit_ical.class.php';
 class View__Manage_Ical extends View__Edit_Ical
 {

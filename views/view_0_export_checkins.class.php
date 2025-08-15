@@ -6,20 +6,21 @@ class View__Export_Checkins extends View
 		return PERM_VIEWATTENDANCE;
 	}
 
-	private $data = NULL;
-	private $venue = NULL;
+	private $data;
+	private $venue;
 
-	function processView() {
+	function processView()
+	{
 		$this->venue = new Venue($_REQUEST['venueid']);
 		if (!empty($_REQUEST['from_y'])) {
-			$from = process_widget('from', Array('type' => 'date')).' 00:00:00';
-			$to = process_widget('to', Array('type' => 'date')).' 23:59:59';
-			$params['-timestamp'] = Array($from, $to);
+			$from = process_widget('from', ['type' => 'date']).' 00:00:00';
+			$to = process_widget('to', ['type' => 'date']).' 23:59:59';
+			$params['-timestamp'] = [$from, $to];
 			$params['venueid'] = $_REQUEST['venueid'];
 			$this->data = $GLOBALS['system']->getDBObjectData('checkin', $params, 'AND');
 			if ($this->data) {
-				header("Content-type: text/csv");
-				header("Content-Disposition: attachment; filename=checkins.csv");
+				header('Content-type: text/csv');
+				header('Content-Disposition: attachment; filename=checkins.csv');
 				$fp = fopen('php://output', 'w');
 				$firstRow = reset($this->data);
 				fputcsv($fp, array_keys($firstRow));
@@ -29,14 +30,13 @@ class View__Export_Checkins extends View
 				}
 				fclose($fp);
 				exit;
-
 			}
 		}
 	}
 
 	function getTitle()
 	{
-		return "Export check-ins for ".$this->venue->getValue('name');
+		return 'Export check-ins for '.$this->venue->getValue('name');
 	}
 
 	public function printView()
@@ -44,13 +44,12 @@ class View__Export_Checkins extends View
 		?>
 		Please select the date range to export:
 		<form method="post" class="form-horizontal well">
-		From <?php print_widget('from', Array('type' => 'date'), date('Y-m-d', strtotime('-1 month'))); ?>
-		to <?php print_widget('to', Array('type' => 'date'), date('Y-m-d')); ?>
+		From <?php print_widget('from', ['type' => 'date'], date('Y-m-d', strtotime('-1 month'))); ?>
+		to <?php print_widget('to', ['type' => 'date'], date('Y-m-d')); ?>
 		<?php
 		?>
 		<input type="submit" class="btn" />
 		</form>
 		<?php
 	}
-
 }

@@ -1,8 +1,7 @@
 <?php
 
-class Status_Upgrader 
+class Status_Upgrader
 {
-
 	static $person_status;
 	static $archived_id;
 	static $contact_id;
@@ -21,38 +20,47 @@ class Status_Upgrader
 		global $db;
 		if (!ifdef('NEEDS_1035_UPGRADE')) {
 			echo "Upgrade already completed \n";
+
 			return;
 		}
-		self::$person_status = $db->queryAll('SELECT id, label FROM person_status', NULL, NULL, true);
-		if (self::$person_status === null) throw new \RuntimeException('No person_status table in the database. If this is a pre-2.36 Jethro instance, please first run 2024-upgrade-to-2.36.sql');
-		self::$archived_id = array_search("Archived", self::$person_status);
-		if (self::$archived_id===false) throw new \RuntimeException("Missing 'Archived' person_status");
-		self::$contact_id = array_search("Contact", self::$person_status);
-		if (self::$contact_id===false) throw new \RuntimeException("Missing 'Contact' person_status");
+		self::$person_status = $db->queryAll('SELECT id, label FROM person_status', null, null, true);
+		if (self::$person_status === null) {
+			throw new RuntimeException('No person_status table in the database. If this is a pre-2.36 Jethro instance, please first run 2024-upgrade-to-2.36.sql');
+		}
+		self::$archived_id = array_search('Archived', self::$person_status, true);
+		if (self::$archived_id === false) {
+			throw new RuntimeException("Missing 'Archived' person_status");
+		}
+		self::$contact_id = array_search('Contact', self::$person_status, true);
+		if (self::$contact_id === false) {
+			throw new RuntimeException("Missing 'Contact' person_status");
+		}
 
 		self::fixPersonReports();
-		self::fixActionPlans();	
+		self::fixActionPlans();
 		Config_Manager::deleteSetting('NEEDS_1035_UPGRADE');
-
 	}
 
 	/**
 	 * Convert from old status string ("1") to new status id (2). If $oldstatus is already an int it is considered already upgraded, and is returned unmodified.
+	 *
 	 * @param $oldstatus string ("1") or int (2)
+	 *
 	 * @return int|string int (2))
 	 */
-	static function upgradeStatus($oldstatus)  {
+	static function upgradeStatus($oldstatus)
+	{
 		// Before 2.36 p.status was an array of strings, e.g. ["0"] for 'Regular' or ["1", "archived"] for "Irregular and archived"
 		// In 2.36+ p.status is an int, a foreign key into person_status.
 		if (is_string($oldstatus)) {
 			// Pre-2.36 - return an int equivalent of the old string.
-			if ($oldstatus == "archived") {
+			if ($oldstatus == 'archived') {
 				return self::$archived_id;
-			} elseif ($oldstatus == "contact") {
+			} elseif ($oldstatus == 'contact') {
 				return self::$contact_id;
 			} else {
 				// $newval is oldval plus one, as set in upgrades/2024-upgrade-to-2.36.sql
-				$newval = ((int)$oldstatus) + 1;
+				$newval = ((int) $oldstatus) + 1;
 				if (self::$person_status[$newval]) {
 					return $newval;
 				} else {
@@ -60,6 +68,7 @@ class Status_Upgrader
 				}
 			}
 		}
+
 		// Post-2.36. Return unaltered int.
 		return $oldstatus;
 	}
@@ -77,18 +86,18 @@ class Status_Upgrader
 			if (isset($params['rules']['p.status'])) {
 				$oldstatuses = $params['rules']['p.status'];
 				$newstatuses = array_map(
-					Array(__CLASS__, 'upgradeStatus'),
-					$oldstatuses);
+					[__CLASS__, 'upgradeStatus'],
+					$oldstatuses,
+				);
 				if ($oldstatuses != $newstatuses) {
 					echo "Updating report $row[id]\n";
 					$params['rules']['p.status'] = $newstatuses;
-					$SQL = 'UPDATE person_query SET params = '.$db->quote(serialize($params)).' WHERE id = '.(int)$row['id'];
+					$SQL = 'UPDATE person_query SET params = '.$db->quote(serialize($params)).' WHERE id = '.(int) $row['id'];
 					$res = $db->exec($SQL);
 				}
 			}
 		}
 	}
-
 
 	/**
 	 * Fix action_plans if needed.
@@ -103,11 +112,11 @@ class Status_Upgrader
 			$actions = unserialize($row['actions']);
 			if (isset($actions['fields']['status'])) {
 				$oldstatus = $actions['fields']['status']['value'];
-				$newstatus = Status_Upgrader::upgradeStatus($oldstatus);
+				$newstatus = self::upgradeStatus($oldstatus);
 				if ($oldstatus != $newstatus) {
 					echo "Updating \n";
 					$actions['fields']['status']['value'] = $newstatus;
-					$SQL = 'UPDATE action_plan SET actions = '.$db->quote(serialize($actions)).' WHERE id = '.(int)$row['id'];
+					$SQL = 'UPDATE action_plan SET actions = '.$db->quote(serialize($actions)).' WHERE id = '.(int) $row['id'];
 					$res = $db->exec($SQL);
 				} else {
 					echo "No update needed \n";
@@ -117,6 +126,4 @@ class Status_Upgrader
 			}
 		}
 	}
-
-
 }

@@ -3,13 +3,13 @@ class View_Home extends View
 {
 	function getTitle()
 	{
-		return NULL;
+		return null;
 	}
 
 	function processView()
 	{
 	}
-	
+
 	function printView()
 	{
 		?>
@@ -17,8 +17,5 @@ class View_Home extends View
 		<p><i>Use the menu above to view rosters and role descriptions for <?php echo SYSTEM_NAME; ?></i><p>
 		<?php
 
-
-
 	}
-
 }

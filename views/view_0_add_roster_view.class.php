@@ -16,7 +16,7 @@ class View__Add_Roster_View extends View
 			$this->_view->processForm();
 			if ($this->_view->create()) {
 				add_message('View added');
-				redirect('rosters__define_roster_views', Array()); // exits
+				redirect('rosters__define_roster_views', []); // exits
 			}
 		}
 	}
@@ -26,7 +26,6 @@ class View__Add_Roster_View extends View
 		return 'Add Roster View';
 	}
 
-
 	function printView()
 	{
 		?>
@@ -35,7 +34,7 @@ class View__Add_Roster_View extends View
 			<h3>New View Details</h3>
 			<?php
 			$this->_view->printForm();
-			?>
+		?>
 			<div class="controls">
 				<input type="submit" class="btn" value="Add View" />
 				<input type="button" class="btn back" value="Cancel" />

@@ -1,8 +1,10 @@
 <?php
+
 include_once 'include/db_object.class.php';
 class Custom_Field_Value extends db_object
 {
-	function getInitSQL($table_name=NULL) {
+	function getInitSQL($table_name = null)
+	{
 		return '
 			CREATE TABLE custom_field_value (
 				id int(11) NOT NULL PRIMARY KEY AUTO_INCREMENT,
@@ -15,15 +17,14 @@ class Custom_Field_Value extends db_object
 	}
 
 	/**
-	 *
-	 * @return Array (columnName => referenceExpression) eg 'tagid' => 'tagoption.id ON DELETE CASCADE'
+	 * @return array (columnName => referenceExpression) eg 'tagid' => 'tagoption.id ON DELETE CASCADE'
 	 */
 	public function getForeignKeys()
 	{
-		return Array(
+		return [
 			'personid' => '_person(id) ON DELETE CASCADE',
-			'fieldid'  => 'custom_field(id) ON DELETE CASCADE',
+			'fieldid' => 'custom_field(id) ON DELETE CASCADE',
 			'value_optionid' => 'custom_field_option(id) ON DELETE CASCADE',
-		);
+		];
 	}
 }

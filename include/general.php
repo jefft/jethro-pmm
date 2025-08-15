@@ -1,5 +1,5 @@
 <?php
-function array_get($array, $index, $alt=NULL)
+function array_get($array, $index, $alt = null)
 {
 	if (array_key_exists($index, $array)) {
 		return $array[$index];
@@ -9,7 +9,7 @@ function array_get($array, $index, $alt=NULL)
 }
 
 /**
- * A workaround when you want to call reset(some_function()) and get 'only vars can be passed by reference'
+ * A workaround when you want to call reset(some_function()) and get 'only vars can be passed by reference'.
  */
 function jreset($x)
 {
@@ -21,26 +21,30 @@ function hard_trim($value)
 	return trim($value, ",;. \t\n\r\0\x0B");
 }
 
-function ifdef($constantName, $fallback=NULL)
+function ifdef($constantName, $fallback = null)
 {
 	return defined($constantName) ? constant($constantName) : $fallback;
 }
 
 function array_remove_empties($ar)
 {
-	$res = Array();
+	$res = [];
 	foreach ($ar as $x) {
-		if (($x != '')) {
+		if ($x != '') {
 			$res[] = $x;
 		}
 	}
+
 	return $res;
 }
 
-function stripslashes_array(&$array, $strip_keys=false) {
-	if(is_string($array)) return stripslashes($array);
-	$keys_to_replace = Array();
-	foreach($array as $key => $value) {
+function stripslashes_array(&$array, $strip_keys = false)
+{
+	if (is_string($array)) {
+		return stripslashes($array);
+	}
+	$keys_to_replace = [];
+	foreach ($array as $key => $value) {
 		if (is_string($value)) {
 			$array[$key] = stripslashes($value);
 		} elseif (is_array($value)) {
@@ -51,14 +55,16 @@ function stripslashes_array(&$array, $strip_keys=false) {
 			$keys_to_replace[$key] = $stripped_key;
 		}
 	}
-	foreach($keys_to_replace as $from => $to) {
-		$array[$to]   = &$array[$from];
+	foreach ($keys_to_replace as $from => $to) {
+		$array[$to] = &$array[$from];
 		unset($array[$from]);
 	}
+
 	return $array;
 }
 
-function strip_all_slashes() {
+function strip_all_slashes()
+{
 	if (function_exists('get_magic_quotes_gpc') && get_magic_quotes_gpc()) {
 		stripslashes_array($_GET, true);
 		stripslashes_array($_POST, true);
@@ -69,7 +75,7 @@ function strip_all_slashes() {
 
 function bam($x)
 {
-	if (php_sapi_name() == 'cli') {
+	if (\PHP_SAPI == 'cli') {
 		print_r($x);
 		echo "\n";
 	} else {
@@ -79,30 +85,43 @@ function bam($x)
 	}
 }
 
-
 function format_datetime($d)
 {
-	if (empty($d)) return '';
+	if (empty($d)) {
+		return '';
+	}
 	if (!is_int($d)) {
-		if (0 === strpos($d, '0000-00-00')) return '';
+		if (str_starts_with($d, '0000-00-00')) {
+			return '';
+		}
 		$d = strtotime($d);
 	}
-	if ($d == -1) return '';
-	if (empty($d)) return ''; // 1 Jan 1970 is not treated as a valid date
+	if ($d == -1) {
+		return '';
+	}
+	if (empty($d)) {
+		return '';
+	} // 1 Jan 1970 is not treated as a valid date
+
 	return date('j M Y g:ia', $d);
 }
 
-function format_date($d, $includeYear=NULL)
+function format_date($d, $includeYear = null)
 {
-	if ($d == '0000-00-00') return '';
+	if ($d == '0000-00-00') {
+		return '';
+	}
 	$yearless = is_string($d) && ($d[0] == '-');
 	if (!is_int($d)) {
 		$d = strtotime($yearless ? "2012{$d}" : $d);
 	}
-	if ($includeYear === FALSE) {
-		if (date('Y') == date('Y', $d)) $yearless = TRUE;
+	if ($includeYear === false) {
+		if (date('Y') == date('Y', $d)) {
+			$yearless = true;
+		}
 	}
 	$format = $yearless ? 'j M' : 'j M Y';
+
 	return date($format, $d);
 }
 
@@ -110,52 +129,59 @@ function nbsp($x)
 {
 	$x = str_replace(' ', '&nbsp;', $x);
 	$x = str_replace('-', '&#8209;', $x);
+
 	return $x;
 }
 
 /**
  * Multibyte-aware version of htmlentities. Also has a shorter name.
- * @param string $str  The string to entitise
+ *
+ * @param string $str The string to entitise
+ *
  * @return string
  */
 function ents($str)
 {
-	if ($str === NULL) return '';
-	if (trim(strval($str)) == '') {
+	if ($str === null) {
 		return '';
 	}
-	return htmlspecialchars(strval($str), ENT_QUOTES, "UTF-8", false);
+	if (trim((string) $str) == '') {
+		return '';
+	}
 
+	return htmlspecialchars((string) $str, \ENT_QUOTES, 'UTF-8', false);
 }
 
 /**
  * Take a string, which may include HTML tags or entities, and prepare it to be XML-safe.
+ *
  * @param type $x
  */
 function xml_safe_string($x)
 {
-	$res = strip_tags(html_entity_decode($x, ENT_QUOTES, 'UTF-8'));
-	
+	$res = strip_tags(html_entity_decode($x, \ENT_QUOTES, 'UTF-8'));
+
 	// decode some entities that are missed by html_entity_decode in PHP5.3
-	$res = str_replace("&rsquo;", "’", $res);
-	$res = str_replace("&lsquo;", "‘", $res);
-	$res = str_replace("&ldquo;", "“", $res);
-	$res = str_replace("&ldquo;", "”", $res);
-	$res = str_replace("&ndash;", "–", $res);
-	$res = str_replace("&hellip;", "…", $res);
-	$res = str_replace("", "'", $res);
-	$res = str_replace("", "'", $res);
-	
+	$res = str_replace('&rsquo;', '’', $res);
+	$res = str_replace('&lsquo;', '‘', $res);
+	$res = str_replace('&ldquo;', '“', $res);
+	$res = str_replace('&ldquo;', '”', $res);
+	$res = str_replace('&ndash;', '–', $res);
+	$res = str_replace('&hellip;', '…', $res);
+	$res = str_replace('', "'", $res);
+	$res = str_replace('', "'", $res);
+
 	// now encode the small list of XML entities
-	$res = str_replace("&", '&amp;', $res);
+	$res = str_replace('&', '&amp;', $res);
 	$res = str_replace("'", '&apos;', $res);
 	$res = str_replace('"', '&quot;', $res);
 	$res = str_replace('>', '&gt;', $res);
 	$res = str_replace('<', '&lt;', $res);
+
 	return $res;
 }
 
-function redirect($view, $params=Array(), $hash='')
+function redirect($view, $params = [], $hash = '')
 {
 	session_write_close();
 	if ($view == -1) {
@@ -165,49 +191,55 @@ function redirect($view, $params=Array(), $hash='')
 		$params['view'] = $view;
 		$url = build_url($params);
 	}
-	if ($hash) $url .= '#'.$hash;
+	if ($hash) {
+		$url .= '#'.$hash;
+	}
 	header('Location: '.urldecode(html_entity_decode($url)));
 	exit;
 }
 
-
-function add_message($msg, $class='success', $html=FALSE)
+function add_message($msg, $class = 'success', $html = false)
 {
-	if (php_sapi_name() == 'cli') {
+	if (\PHP_SAPI == 'cli') {
 		echo strtoupper($class).': '.$msg."\n";
 	} else {
-		$_SESSION['messages'][] = Array('message' => $msg, 'class' => $class, 'html' => $html);
+		$_SESSION['messages'][] = ['message' => $msg, 'class' => $class, 'html' => $html];
 	}
 }
 
 function dump_messages()
 {
 	if (!empty($_SESSION['messages'])) {
-		foreach ($_SESSION['messages'] as $msg) print_message($msg['message'], $msg['class'], $msg['html']);
+		foreach ($_SESSION['messages'] as $msg) {
+			print_message($msg['message'], $msg['class'], $msg['html']);
+		}
 		unset($_SESSION['messages']);
 	}
 }
 
-function print_message($msg, $class='success', $html=FALSE)
+function print_message($msg, $class = 'success', $html = false)
 {
-	if (php_sapi_name() == 'cli') {
+	if (\PHP_SAPI == 'cli') {
 		echo strtoupper($class).': '.$msg."\n";
 	} else {
-		if ($class == 'failure') $class='error';
-		$chars = Array(
-					'success' => '<i class="icon-ok"></i> ',
-					'warning' => '<i class="icon-info-sign"></i> ',
-					'error' => '<i class="icon-exclamation-sign"></i> ',
-				);
+		if ($class == 'failure') {
+			$class = 'error';
+		}
+		$chars = [
+			'success' => '<i class="icon-ok"></i> ',
+			'warning' => '<i class="icon-info-sign"></i> ',
+			'error' => '<i class="icon-exclamation-sign"></i> ',
+		];
 		$char = '';
-		if (!$html) $char = array_get($chars, $class);
+		if (!$html) {
+			$char = array_get($chars, $class);
+		}
 		?>
-		<div class="alert alert-<?php echo $class; ?>"><?php echo $char; echo $html ? $msg : ents($msg); ?></div>
+		<div class="alert alert-<?php echo $class; ?>"><?php echo $char;
+		echo $html ? $msg : ents($msg); ?></div>
 		<?php
 	}
 }
-
-
 
 function print_widget($name, $params, $value)
 {
@@ -215,8 +247,8 @@ function print_widget($name, $params, $value)
 	if (!array_get($params, 'allow_empty', 1)) {
 		$classes .= ' compulsory';
 	}
-	$attrs = Array();
-	foreach (array_get($params, 'attrs', Array()) as $attr => $val) {
+	$attrs = [];
+	foreach (array_get($params, 'attrs', []) as $attr => $val) {
 		$attrs[] = $attr.'="'.ents($val).'"';
 	}
 	$attrs = implode(' ', $attrs);
@@ -225,7 +257,7 @@ function print_widget($name, $params, $value)
 			$lengths = get_valid_phone_number_lengths($params['formats']);
 			$width = max(get_phone_format_lengths($params['formats']));
 			?>
-			<input name="<?php echo $name; ?>" type="tel" size="<?php echo $width+3; ?>" value="<?php echo format_phone_number($value, $params['formats']); ?>" class="phone-number" validlengths="<?php echo implode(',', $lengths); ?>" <?php echo $attrs; ?> />
+			<input name="<?php echo $name; ?>" type="tel" size="<?php echo $width + 3; ?>" value="<?php echo format_phone_number($value, $params['formats']); ?>" class="phone-number" validlengths="<?php echo implode(',', $lengths); ?>" <?php echo $attrs; ?> />
 			<?php
 			break;
 		case 'bibleref':
@@ -234,6 +266,7 @@ function print_widget($name, $params, $value)
 			$value = $br->toShortString();
 			$params['class'] = 'bible-ref';
 			// fall through
+			// no break
 		case 'text':
 		case 'email':
 			$maxlength_exp = empty($params['maxlength']) ? '' : 'maxlength="'.$params['maxlength'].'"';
@@ -244,7 +277,7 @@ function print_widget($name, $params, $value)
 				<textarea name="<?php echo $name; ?>"
 						  rows="<?php echo $params['height']; ?>"
 						  class="<?php echo trim($classes); ?>"
-						  <?php echo $maxlength_exp.' '.$cols_exp .' '.$placeholder_exp; ?>
+						  <?php echo $maxlength_exp.' '.$cols_exp.' '.$placeholder_exp; ?>
 				><?php echo ents($value); ?></textarea>
 				<?php
 			} else {
@@ -253,7 +286,7 @@ function print_widget($name, $params, $value)
 				$placeholder_exp = empty($params['placeholder']) ? '' : 'placeholder="'.ents($params['placeholder']).'"';
 				$autocomplete_exp = isset($params['autocomplete']) ? 'autocomplete='.($params['autocomplete'] ? 'on' : 'new-password').'"' : '';
 				?>
-				<input type="<?php echo $params['type']; ?>" name="<?php echo $name; ?>" value="<?php echo ents($value); ?>" class="<?php echo trim($classes); ?>" <?php echo implode(' ', Array($maxlength_exp, $width_exp, $regex_exp, $autocomplete_exp, $placeholder_exp)); ?> <?php echo $attrs; ?> />
+				<input type="<?php echo $params['type']; ?>" name="<?php echo $name; ?>" value="<?php echo ents($value); ?>" class="<?php echo trim($classes); ?>" <?php echo implode(' ', [$maxlength_exp, $width_exp, $regex_exp, $autocomplete_exp, $placeholder_exp]); ?> <?php echo $attrs; ?> />
 				<?php
 			}
 			break;
@@ -304,11 +337,11 @@ function print_widget($name, $params, $value)
 		case 'int':
 			$width_exp = '';
 			if (!empty($params['width'])) {
-				$width_exp = 'size="'.($params['width']+2).'" ';
+				$width_exp = 'size="'.($params['width'] + 2).'" ';
 			} else {
 				$width_exp = 'size="5" ';
 			}
-			$intType = (FALSE !== strpos($_SERVER['HTTP_USER_AGENT'], 'iPhone')) ? 'tel' : 'number';
+			$intType = (str_contains($_SERVER['HTTP_USER_AGENT'], 'iPhone')) ? 'tel' : 'number';
 			?>
 			<input pattern="[0-9]*" inputmode="numeric" type="<?php echo $intType; ?>" name="<?php echo $name; ?>" value="<?php echo $value; ?>" class="<?php echo trim($classes); ?>" <?php echo $width_exp; ?> <?php echo $attrs; ?> />
 			<?php
@@ -317,30 +350,38 @@ function print_widget($name, $params, $value)
 		case 'bool':
 			if (empty($params['options'])) {
 				$params['type'] = 'checkbox';
+
 				return print_widget($name, $params, $value);
 			}
 			// deliberate fallthrough...
+			// no break
 		case 'select':
-			$our_val = Array();
+			$our_val = [];
 			if (!empty($params['allow_multiple']) && $value === '*') {
 				// magic value to select all
 				$our_val = array_keys($params['options']);
-			} else if ($value !== NULL && (isset($params['options']['']) || $value !== '')) {
-				$our_val = is_array($value) ? $value : Array("$value");
+			} elseif ($value !== null && (isset($params['options']['']) || $value !== '')) {
+				$our_val = is_array($value) ? $value : ["$value"];
 			}
-			foreach ($our_val as $k => $v) $our_val[$k] = "$v";
+			foreach ($our_val as $k => $v) {
+				$our_val[$k] = "$v";
+			}
 			if (array_get($params, 'style', 'dropbox') == 'colour-buttons') {
 				?>
 				<div class="radio-button-group <?php echo array_get($params, 'class', ''); ?>"
 					 <?php
-					 if (!SizeDetector::isNarrow()) echo ' tabindex="1"';
-					 ?>
+					 if (!SizeDetector::isNarrow()) {
+					 	echo ' tabindex="1"';
+					 }
+				?>
 				>
 				<input type="hidden" name="<?php echo $name; ?>" value="<?php echo reset($our_val); ?>" />
 				<?php
 				foreach ($params['options'] as $k => $v) {
 					$classes = 'btn value-'.$k;
-					if (in_array("$k", $our_val, true)) $classes .= ' active';
+					if (in_array("$k", $our_val, true)) {
+						$classes .= ' active';
+					}
 					?>
 					<div
 						class="<?php echo $classes; ?>"
@@ -354,12 +395,18 @@ function print_widget($name, $params, $value)
 				?>
 				</div>
 				<?php
-			} else if (array_get($params, 'allow_multiple')) {
+			} elseif (array_get($params, 'allow_multiple')) {
 				$height = array_get($params, 'height', min(count($params['options']), 4));
-				if (count($params['options']) < 4) $height = 0;
-				if (substr($name, -2) != '[]') $name .= '[]';
+				if (count($params['options']) < 4) {
+					$height = 0;
+				}
+				if (substr($name, -2) != '[]') {
+					$name .= '[]';
+				}
 				$style = '';
-				if ($height > 0) $style = 'height: '.($height*1.7).'em';
+				if ($height > 0) {
+					$style = 'height: '.($height * 1.7).'em';
+				}
 				$classes .= ' multi-select';
 				// the empty onclick below is to make labels work on iOS
 				// see https://stackoverflow.com/questions/5421659/html-label-command-doesnt-work-in-iphone-browser
@@ -368,7 +415,7 @@ function print_widget($name, $params, $value)
 					<?php
 					foreach ($params['options'] as $k => $v) {
 						$checked_exp = in_array("$k", $our_val, true) ? ' checked="checked"' : '';
-						$disabled_exp = (!empty($params['disabled_prefix']) && (strpos($k, $params['disabled_prefix']) === 0)) ? ' disabled="disabled" ' : '';
+						$disabled_exp = (!empty($params['disabled_prefix']) && str_starts_with($k, $params['disabled_prefix'])) ? ' disabled="disabled" ' : '';
 						?>
 						<label class="checkbox" title="<?php echo ents($v); ?>">
 							<input type="checkbox" name="<?php echo $name; ?>" value="<?php echo $k; ?>" <?php echo $checked_exp.$disabled_exp; ?>>
@@ -376,111 +423,123 @@ function print_widget($name, $params, $value)
 						</label>
 						<?php
 					}
-					?>
+				?>
 				</div>
 				<?php
 			} else {
 				// SOme JS needs to know this
-				$attrs .= ' data-allow-empty='.(int)array_get($params, 'allow_empty');
+				$attrs .= ' data-allow-empty='.(int) array_get($params, 'allow_empty');
 				?>
-				<select name="<?php echo $name; ?>" class="<?php echo $classes;?>" <?php echo $attrs; ?> >
+				<select name="<?php echo $name; ?>" class="<?php echo $classes; ?>" <?php echo $attrs; ?> >
 					<?php
-					$showEmpty = FALSE;
-					if (!array_get($params, 'allow_multiple')) {
-						if (array_get($params, 'allow_empty')) {
-							$showEmpty = TRUE;
-						} else if (array_get($params, 'default_empty') && empty($our_val)) {
-							$showEmpty = TRUE;
-						}
+					$showEmpty = false;
+				if (!array_get($params, 'allow_multiple')) {
+					if (array_get($params, 'allow_empty')) {
+						$showEmpty = true;
+					} elseif (array_get($params, 'default_empty') && empty($our_val)) {
+						$showEmpty = true;
 					}
-					if ($showEmpty) {
-						$emptyText = array_get($params, 'empty_text');
-						if (!$emptyText) {
-							$emptyText = array_get($params, 'allow_empty') ? '(None)' : '--Choose--';
-						}
-						?>
-						<option value=""><?php echo $emptyText; ?></option>
-						<?php
-					}
-					foreach (array_get($params, 'options', Array()) as $k => $v) {
-						$selected_exp = in_array("$k", $our_val, true) ? ' selected="selected"' : '';
-						$disabled_exp = (!empty($params['disabled_prefix']) && (strpos($k, $params['disabled_prefix']) === 0)) ? ' disabled="disabled" ' : '';
-						?>
-						<option value="<?php echo $k; ?>"<?php echo $selected_exp.$disabled_exp; ?>><?php echo ents($v); ?></option>
-						<?php
+				}
+				if ($showEmpty) {
+					$emptyText = array_get($params, 'empty_text');
+					if (!$emptyText) {
+						$emptyText = array_get($params, 'allow_empty') ? '(None)' : '--Choose--';
 					}
 					?>
+						<option value=""><?php echo $emptyText; ?></option>
+						<?php
+				}
+				foreach (array_get($params, 'options', []) as $k => $v) {
+					$selected_exp = in_array("$k", $our_val, true) ? ' selected="selected"' : '';
+					$disabled_exp = (!empty($params['disabled_prefix']) && str_starts_with($k, $params['disabled_prefix'])) ? ' disabled="disabled" ' : '';
+					?>
+						<option value="<?php echo $k; ?>"<?php echo $selected_exp.$disabled_exp; ?>><?php echo ents($v); ?></option>
+						<?php
+				}
+				?>
 				</select>
 				<?php
 			}
 			break;
 		case 'date':
 			$year_classes = $day_year_classes = $classes;
-			if (array_get($params, 'allow_blank_year', false)) $year_classes .= ' optional-year';
-			if (FALSE === strpos($name, '[')) {
+			if (array_get($params, 'allow_blank_year', false)) {
+				$year_classes .= ' optional-year';
+			}
+			if (!str_contains($name, '[')) {
 				$name_template = $name.'%s';
 			} else {
 				$name_template = substr($name, 0, strpos($name, '[')).'%s'.substr($name, strpos($name, '['));
 			}
-			$months = Array();
+			$months = [];
 			// "default_empty" means show a blank value initially
 			// even though submitting a blank value is not allowed.
 			if (array_get($params, 'allow_empty', false)
 				|| (array_get($params, 'default_empty', false) && empty($value))
 			) {
 				$months[''] = '(Month)';
-				if (empty($value)) $value = '--';
+				if (empty($value)) {
+					$value = '--';
+				}
 			} else {
-				if (empty($value)) $value = date('Y-m-d'); // blank dates not allowed
+				if (empty($value)) {
+					$value = date('Y-m-d');
+				} // blank dates not allowed
 			}
-			for ($i = 1; $i < 13; $i++) $months[$i] = date(array_get($params, 'month_format', 'F'), strtotime("2007-$i-01"));
+			for ($i = 1; $i < 13; ++$i) {
+				$months[$i] = date(array_get($params, 'month_format', 'F'), strtotime("2007-$i-01"));
+			}
 			$value = explode(' ', $value);
 			$value = reset($value);
-			list($year_val, $month_val, $day_val) = explode('-', substr($value, 0, 10));
+			[$year_val, $month_val, $day_val] = explode('-', substr($value, 0, 10));
 			?>
 			<span class="nowrap" <?php echo $attrs; ?> >
 			<input type="number" min="1" max="31" name="<?php printf($name_template, '_d'); ?>" class="day-box <?php echo $day_year_classes; ?>" size="2" maxlength="2" value="<?php echo $day_val; ?>" placeholder="DD" /><select name="<?php printf($name_template, '_m'); ?>" class="month-box <?php echo $classes; ?>">
 				<?php
 				foreach ($months as $i => $month_name) {
-					$selected = (($i) == $month_val) ? ' selected="selected"' : '';
+					$selected = ($i == $month_val) ? ' selected="selected"' : '';
 					?>
 					<option value="<?php echo $i; ?>"<?php echo $selected; ?>><?php echo $month_name; ?></option>
 					<?php
 				}
-				?>
+			?>
 			</select><input type="number" min="1900" max="2100" name="<?php printf($name_template, '_y'); ?>" class="year-box <?php echo $year_classes; ?>" size="4" maxlength="4" value="<?php echo $year_val; ?>" placeholder="YYYY"/>
 			</span>
 			<?php
 			break;
 		case 'reference':
 			if (!empty($params['references'])) {
-				$where = Array();
-				if (!empty($params['filter']) && is_array($params['filter'])) $where = $params['filter'];
+				$where = [];
+				if (!empty($params['filter']) && is_array($params['filter'])) {
+					$where = $params['filter'];
+				}
 				$where_logic = array_get($params, 'filter_logic', 'AND');
 				$options = $GLOBALS['system']->getDBObjectData($params['references'], $where, $where_logic, array_get($params, 'order_by'));
 
 				$dummy = new $params['references']();
-				$our_val = is_array($value) ? $value : (empty($value) ? Array() : Array($value));
-				$default = NULL;
+				$our_val = is_array($value) ? $value : (empty($value) ? [] : [$value]);
+				$default = null;
 				if (!empty($params['filter']) && is_callable($params['filter'])) {
 					foreach ($options as $i => $o) {
 						$dummy->populate($i, $o);
-						if (!in_array($i, $our_val) && !$params['filter']($dummy)) {
+						if (!in_array($i, $our_val, true) && !$params['filter']($dummy)) {
 							unset($options[$i]);
 						}
 					}
 				}
-				$params['options'] = Array();
+				$params['options'] = [];
 				foreach ($options as $k => $details) {
 					$dummy->populate($k, $details);
 					$params['options'][$k] = $dummy->toString();
-					if (!empty($details['is_default'])) $default = $k;
+					if (!empty($details['is_default'])) {
+						$default = $k;
+					}
 				}
 
 				// Some filtering might mean currently-selected values are not yet included
 				// in the options. Add more options to make sure the current value can be expressed.
-				foreach ((array)$value as $val) {
-					if (!empty($val) && intval($val) && !isset($options[$val])) {
+				foreach ((array) $value as $val) {
+					if (!empty($val) && (int) $val && !isset($options[$val])) {
 						$obj = $GLOBALS['system']->getDBObject($params['references'], $val);
 						if ($obj) {
 							$params['options'][$val] = $obj->toString();
@@ -491,14 +550,15 @@ function print_widget($name, $params, $value)
 				}
 
 				$params['type'] = 'select';
-				if (empty($params['allow_empty']) && (($value === '') || ($value === NULL))) {
+				if (empty($params['allow_empty']) && (($value === '') || ($value === null))) {
 					$value = $default;
 				}
+
 				return print_widget($name, $params, $value);
 			}
 			break;
 		case 'bitmask':
-			$value = (int)$value;
+			$value = (int) $value;
 			?>
 			<div class="bitmask-boxes">
 			<?php
@@ -508,7 +568,7 @@ function print_widget($name, $params, $value)
 			if (SizeDetector::getWidth()) {
 				if (SizeDetector::isNarrow()) {
 					$cols = 1;
-				} else if (SizeDetector::isMedium()) {
+				} elseif (SizeDetector::isMedium()) {
 					$cols = 2;
 				}
 			}
@@ -520,7 +580,7 @@ function print_widget($name, $params, $value)
 			}
 			$i = 0;
 			foreach ($params['options'] as $k => $v) {
-				$checked_exp = (($value & (int)$k) == $k) ? 'checked="checked"' : '';
+				$checked_exp = (($value & (int) $k) == $k) ? 'checked="checked"' : '';
 				// the empty onclick below is to make labels work on iOS
 				// see https://stackoverflow.com/questions/5421659/html-label-command-doesnt-work-in-iphone-browser
 				?>
@@ -549,9 +609,11 @@ function print_widget($name, $params, $value)
 			?>
 			<input type="checkbox" name="<?php echo ents($name); ?>" value="1"
 				   <?php
-				   if ($value) echo 'checked="checked" ';
-				   echo $attrs;
-				   ?>
+				   if ($value) {
+				   	echo 'checked="checked" ';
+				   }
+			echo $attrs;
+			?>
 			>
 			<?php
 			break;
@@ -562,25 +624,28 @@ function print_widget($name, $params, $value)
 		<i class="clickable icon-question-sign" data-toggle="visible" data-target="#tooltip<?php echo $toolTipID; ?>"></i>
 		<div class="help-block custom-field-tooltip" id="tooltip<?php echo $toolTipID; ?>"><?php echo nl2br(ents($params['tooltip'])); ?></div>
 		<?php
-		$toolTipID++;
+		++$toolTipID;
 	}
-
 }
 
-function process_widget($name, $params, $index=NULL, $preserveEmpties=FALSE)
+function process_widget($name, $params, $index = null, $preserveEmpties = false)
 {
 	$testVal = $rawVal = array_get($_REQUEST, $name);
-	if (empty($testVal) && $params['type'] == 'date') $testVal = $rawVal = array_get($_REQUEST, $name.'_d');
+	if (empty($testVal) && $params['type'] == 'date') {
+		$testVal = $rawVal = array_get($_REQUEST, $name.'_d');
+	}
 	if (is_array($testVal) && ($params['type'] != 'bitmask') && (array_get($params, 'allow_multiple', 0) == 0)) {
-		if (!is_null($index)) {
+		if (null !== $index) {
 			$rawVal = $rawVal[$index];
 		} else {
-			$res = Array();
+			$res = [];
 			foreach ($testVal as $i => $v) {
 				$x = process_widget($name, $params, $i);
-				if ($preserveEmpties || strlen($x)) $res[] = $x;
-
+				if ($preserveEmpties || strlen($x)) {
+					$res[] = $x;
+				}
 			}
+
 			return $res;
 		}
 	}
@@ -588,12 +653,12 @@ function process_widget($name, $params, $index=NULL, $preserveEmpties=FALSE)
 	$value = null;
 	switch ($params['type']) {
 		case 'phone':
-			if (array_get($params, 'allow_empty', TRUE) && empty($rawVal)) {
+			if (array_get($params, 'allow_empty', true) && empty($rawVal)) {
 				$value = '';
 			} else {
 				if (!is_valid_phone_number($rawVal, $params['formats'])) {
-					trigger_error('The phone number "'.$rawVal.'" is not valid and has not been set', E_USER_NOTICE);
-					$value = NULL;
+					trigger_error('The phone number "'.$rawVal.'" is not valid and has not been set', \E_USER_NOTICE);
+					$value = null;
 				} else {
 					$value = clean_phone_number($rawVal);
 				}
@@ -606,34 +671,46 @@ function process_widget($name, $params, $index=NULL, $preserveEmpties=FALSE)
 					return $rawVal;
 				}
 			}
-			if (FALSE === strpos($name, '[')) {
-				$subindex = NULL;
+			if (!str_contains($name, '[')) {
+				$subindex = null;
 			} else {
-				$subindex = substr($name, strpos($name, '[')+1, strpos($name, ']')-strpos($name, '[')-1);
+				$subindex = substr($name, strpos($name, '[') + 1, strpos($name, ']') - strpos($name, '[') - 1);
 				$name = substr($name, 0, strpos($name, '['));
 			}
-			if (!isset($_REQUEST[$name.'_d'])) return NULL;
-			if (!is_null($subindex) && !isset($_REQUEST[$name.'_d'][$subindex])) return NULL;
+			if (!isset($_REQUEST[$name.'_d'])) {
+				return null;
+			}
+			if (null !== $subindex && !isset($_REQUEST[$name.'_d'][$subindex])) {
+				return null;
+			}
 
-			foreach (Array('y', 'm', 'd') as $comp) {
+			foreach (['y', 'm', 'd'] as $comp) {
 				$comp_vals[$comp] = array_get($_REQUEST, $name.'_'.$comp, 0);
-				if (!is_null($index)) $comp_vals[$comp] = $comp_vals[$comp][$index];
-				if (!is_null($subindex)) $comp_vals[$comp] = $comp_vals[$comp][$subindex];
+				if (null !== $index) {
+					$comp_vals[$comp] = $comp_vals[$comp][$index];
+				}
+				if (null !== $subindex) {
+					$comp_vals[$comp] = $comp_vals[$comp][$subindex];
+				}
 			}
 			$value = sprintf('%04d-%02d-%02d', $comp_vals['y'], $comp_vals['m'], $comp_vals['d']);
-			if ($value == '0000-00-00') return NULL;
-			if ($value == '0000-01-00') return NULL;
+			if ($value == '0000-00-00') {
+				return null;
+			}
+			if ($value == '0000-01-00') {
+				return null;
+			}
 
-			if (array_get($params, 'allow_blank_year') && !((int)$comp_vals['y'])) {
+			if (array_get($params, 'allow_blank_year') && !((int) $comp_vals['y'])) {
 				$value = substr($value, 4);
 				if (date('-m-d', strtotime('2000'.$value)) != $value) {
-					trigger_error('The date "'.$value.'" is not valid and has not been set', E_USER_NOTICE);
-					$value = NULL;
+					trigger_error('The date "'.$value.'" is not valid and has not been set', \E_USER_NOTICE);
+					$value = null;
 				}
 			} else {
 				if (date('Y-m-d', strtotime($value)) != $value) {
-					trigger_error('The date "'.$value.'" is not valid and has not been set', E_USER_NOTICE);
-					$value = NULL;
+					trigger_error('The date "'.$value.'" is not valid and has not been set', \E_USER_NOTICE);
+					$value = null;
 				}
 			}
 			break;
@@ -641,22 +718,24 @@ function process_widget($name, $params, $index=NULL, $preserveEmpties=FALSE)
 			if (!empty($rawVal)) {
 				require_once 'bible_ref.class.php';
 				$br = new bible_ref($rawVal);
-				if ($br->book) $value = $br->toCode();
+				if ($br->book) {
+					$value = $br->toCode();
+				}
 			}
 			break;
 		case 'bitmask':
 			// value is the bitwise-or of all submitted values
 			$value = 0;
 			if (isset($rawVal)) {
-				foreach ((array)$rawVal as $i) {
-					$value = $value | (int)$i;
+				foreach ((array) $rawVal as $i) {
+					$value |= (int) $i;
 				}
 			}
 			break;
 		case 'html':
 			if (isset($rawVal)) {
 				require_once 'htmLawed.php';
-				$value = htmLawed($rawVal, array('deny_attribute' => '* -href', 'safe'=>1));
+				$value = htmLawed($rawVal, ['deny_attribute' => '* -href', 'safe' => 1]);
 
 				while (true) {
 					// Trim whitespace and paragraphs with a space from end
@@ -670,19 +749,20 @@ function process_widget($name, $params, $index=NULL, $preserveEmpties=FALSE)
 			break;
 		case 'reference':
 			if (!array_key_exists($name, $_REQUEST)) {
-				$value = NULL;
+				$value = null;
 			} else {
-				$value = (int)$rawVal;
+				$value = (int) $rawVal;
 			}
 			break;
 		default:
 			$value = $rawVal;
 			if (!empty($params['regex']) && !empty($value) && !preg_match('/'.trim($params['regex'], '/').'/i', $value)) {
 				trigger_error($value.' is not a valid value for '.array_get($params, 'label', ucfirst($name)));
-				$value = NULL;
+				$value = null;
 			}
 			break;
 	}
+
 	return $value;
 }
 
@@ -690,17 +770,18 @@ function format_value($value, $params)
 {
 	if (!empty($params['references'])) {
 		$obj = $GLOBALS['system']->getDBObject($params['references'], $value);
-		if (!is_null($obj)) {
+		if (null !== $obj) {
 			if (!array_get($params, 'show_id', true)) {
 				return $obj->toString();
 			} else {
 				return $obj->toString().' (#'.$value.')';
 			}
 		} else {
-			if ($value != 0)  {
+			if ($value != 0) {
 				return $value;
 			}
 		}
+
 		return '';
 	}
 	switch ($params['type']) {
@@ -708,16 +789,23 @@ function format_value($value, $params)
 			return array_get($params['options'], $value, '(Invalid Value)');
 			break;
 		case 'datetime':
-			if (empty($value) && array_get($params, 'allow_empty')) return '';
+			if (empty($value) && array_get($params, 'allow_empty')) {
+				return '';
+			}
+
 			return format_datetime($value);
 			break;
 		case 'date':
-			if (empty($value) && array_get($params, 'allow_empty')) return '';
+			if (empty($value) && array_get($params, 'allow_empty')) {
+				return '';
+			}
+
 			return format_date($value);
 			break;
 		case 'bibleref':
 			require_once 'bible_ref.class.php';
 			$br = new bible_ref($value);
+
 			return $br->toShortString();
 			break;
 		case 'phone':
@@ -734,40 +822,41 @@ function format_value($value, $params)
 
 function build_url($params)
 {
-    // $vars are from GET, unless the caller set $params['*']=null
-    if (isset($params['*']) && $params['*'] === null) {
-        $vars = [];
-    } else {
-        $vars = $_GET;
-    }
+	// $vars are from GET, unless the caller set $params['*']=null
+	if (isset($params['*']) && $params['*'] === null) {
+		$vars = [];
+	} else {
+		$vars = $_GET;
+	}
 
-    // Merge in provided parameters (null means remove)
-    foreach ($params as $key => $value) {
-        if (is_null($value)) {
-            unset($vars[$key]);
-        } else {
-            $vars[$key] = $value;
-        }
-    }
+	// Merge in provided parameters (null means remove)
+	foreach ($params as $key => $value) {
+		if (null === $value) {
+			unset($vars[$key]);
+		} else {
+			$vars[$key] = $value;
+		}
+	}
 
-    // Determine base path from current request
-    // Build query string
-    $query = http_build_query($vars);
-    $query = $query ? '?' . $query : '';
-    // Relative URL
-    return base_url() . $query;
+	// Determine base path from current request
+	// Build query string
+	$query = http_build_query($vars);
+	$query = $query ? '?'.$query : '';
+
+	// Relative URL
+	return base_url().$query;
 }
 
-function speed_log($bam=FALSE)
+function speed_log($bam = false)
 {
 	$fn = $bam ? 'bam' : 'error_log';
 	$bt = debug_backtrace();
 	if (!isset($GLOBALS['first_log_time'])) {
 		$GLOBALS['first_log_time'] = microtime(true);
-		$fn("SPEED_LOG: 0 - ".$bt[0]['file'].':'.$bt[0]['line']);
+		$fn('SPEED_LOG: 0 - '.$bt[0]['file'].':'.$bt[0]['line']);
 	} else {
-		$diff = number_format((microtime(true) - $GLOBALS['last_log_time']), 2);
-		$total = number_format((microtime(true) - $GLOBALS['first_log_time']), 2);
+		$diff = number_format(microtime(true) - $GLOBALS['last_log_time'], 2);
+		$total = number_format(microtime(true) - $GLOBALS['first_log_time'], 2);
 		$fn("SPEED_LOG: Diff=$diff  Total=$total  ".$bt[0]['file'].':'.$bt[0]['line']);
 	}
 	$GLOBALS['last_log_time'] = microtime(true);
@@ -778,7 +867,7 @@ function print_hidden_field($name, $value)
 	echo '<input type="hidden" name="'.ents($name).'" value="'.ents($value).'" />'."\n";
 }
 
-function print_hidden_fields($arr, $prefix='', $suffix='')
+function print_hidden_fields($arr, $prefix = '', $suffix = '')
 {
 	foreach ($arr as $id => $val) {
 		if (is_array($val)) {
@@ -794,6 +883,7 @@ function get_valid_phone_number_lengths($formats)
 	foreach (explode("\n", $formats) as $format) {
 		$lengths[substr_count($format, 'X')] = $format;
 	}
+
 	return array_keys($lengths);
 }
 
@@ -802,17 +892,20 @@ function get_phone_format_lengths($formats)
 	foreach (explode("\n", $formats) as $format) {
 		$lengths[] = strlen($format);
 	}
+
 	return array_unique($lengths);
 }
 
-
 function is_valid_phone_number($x, $formats)
 {
-	if (preg_match('/[A-Za-z]/', $x)) return false; // no letters allowed
+	if (preg_match('/[A-Za-z]/', $x)) {
+		return false;
+	} // no letters allowed
 	$x = preg_replace('/[^0-9]/', '', $x); // strip punctuation
 	foreach (explode("\n", $formats) as $format) {
 		$lengths[substr_count($format, 'X')] = $format;
 	}
+
 	return isset($lengths[strlen($x)]);
 }
 
@@ -826,84 +919,110 @@ function format_phone_number($x, $formats)
 	$x = preg_replace('/[^0-9]/', '', $x); // strip punctuation
 	foreach (explode("\n", $formats) as $format) {
 		// Use the *first* matching format of the correct length
-		if (!isset($lengths[substr_count($format, 'X')])) $lengths[substr_count($format, 'X')] = $format;
+		if (!isset($lengths[substr_count($format, 'X')])) {
+			$lengths[substr_count($format, 'X')] = $format;
+		}
 	}
 	$format = array_get($lengths, strlen($x));
 	if ($format) {
 		$res = '';
 		$j = 0;
-		for ($i=0; $i<strlen($format);$i++) {
+		for ($i = 0; $i < strlen($format); ++$i) {
 			if ($format[$i] == 'X') {
 				$res .= $x[$j];
-				$j++;
+				++$j;
 			} else {
 				$res .= $format[$i];
 			}
 		}
+
 		return $res;
 	} else {
-
 		return $x;
 	}
 }
 
 /**
  * Generates a mailto href that can be clicked to send an email.
- * Can be overridden by defining custom_email_href($to, $name, $bcc, $subject)
+ * Can be overridden by defining custom_email_href($to, $name, $bcc, $subject).
+ *
  * @param array|string $to
- * @param string|null $name	Only applicable if a single to-address is specified
- * @param array|string $bcc optional
- * @param string $subject optional
+ * @param string|null  $name    Only applicable if a single to-address is specified
+ * @param array|string $bcc     optional
+ * @param string       $subject optional
+ *
  * @return string
  */
-function get_email_href($to, $name=NULL, $bcc=NULL, $subject=NULL)
+function get_email_href($to, $name = null, $bcc = null, $subject = null)
 {
 	$sep = defined('MULTI_EMAIL_SEPARATOR') ? MULTI_EMAIL_SEPARATOR : ',';
-	if (!empty($to)) $to = implode($sep, (array)$to);
-	if (!empty($bcc)) $bcc = implode($sep, (array)$bcc);
-	if (empty($to)) $to = '';
-	if (empty($bcc)) $bcc = '';
+	if (!empty($to)) {
+		$to = implode($sep, (array) $to);
+	}
+	if (!empty($bcc)) {
+		$bcc = implode($sep, (array) $bcc);
+	}
+	if (empty($to)) {
+		$to = '';
+	}
+	if (empty($bcc)) {
+		$bcc = '';
+	}
 
-	if (function_exists('custom_email_href')) return custom_email_href($to, $name, $bcc, $subject);
+	if (function_exists('custom_email_href')) {
+		return custom_email_href($to, $name, $bcc, $subject);
+	}
 
 	// Chrome on mac with mac:mail as the mailto handler cannot cope with fullname in the address
-	$is_chrome_mac = (FALSE !== strpos(strtolower($_SERVER['HTTP_USER_AGENT']), 'chrome/'))
-						&& (FALSE !== strpos(strtolower($_SERVER['HTTP_USER_AGENT']), 'macintosh'));
+	$is_chrome_mac = str_contains(strtolower($_SERVER['HTTP_USER_AGENT']), 'chrome/')
+						&& str_contains(strtolower($_SERVER['HTTP_USER_AGENT']), 'macintosh');
 
 	$res = ents($to);
-	$extras = Array();
-	if ($bcc) $extras[] = 'bcc='.ents($bcc);
-	if ($subject) $extras[] = 'subject='.ents($subject);
-	if ($extras) $res .= '?'.implode('&', $extras);
+	$extras = [];
+	if ($bcc) {
+		$extras[] = 'bcc='.ents($bcc);
+	}
+	if ($subject) {
+		$extras[] = 'subject='.ents($subject);
+	}
+	if ($extras) {
+		$res .= '?'.implode('&', $extras);
+	}
+
 	return 'mailto:'.$res;
 }
 
 /**
  * Returns any additional attributes to be added to an email link, eg target=blank
- * Can be overridden by defining custom_email_extras()
+ * Can be overridden by defining custom_email_extras().
+ *
  * @return string
  */
 function email_link_extras()
 {
-	if (function_exists('custom_email_extras')) return custom_email_extras();
+	if (function_exists('custom_email_extras')) {
+		return custom_email_extras();
+	}
 }
 
 /**
  * Get a string that's as random as possible
- * From https://stackoverflow.com/questions/1182584/secure-random-number-generation-in-php
+ * From https://stackoverflow.com/questions/1182584/secure-random-number-generation-in-php.
  *
- * @param int $chars	Number of characters required
- * @param array $set	Optional array of valid chars. Defaults to a-zA-Z0-9
+ * @param int   $chars Number of characters required
+ * @param array $set   Optional array of valid chars. Defaults to a-zA-Z0-9
+ *
  * @return string
  */
-function generate_random_string($chars=16, $set=NULL)
+function generate_random_string($chars = 16, $set = null)
 {
 	if (defined('USE_POOR_RANDOMS')) {
 		$options = array_merge(range('a', 'b'), range('A', 'Z'), range(0, 9));
 		$res = '';
-		for ($i=0; $i < $chars; $i++) {
-			$res .= $options[rand(0, count($options)-1)];
+		for ($i = 0; $i < $chars; ++$i) {
+			$res .= $options[rand(0, count($options) - 1)];
 		}
+
 		return $res;
 	}
 
@@ -912,11 +1031,10 @@ function generate_random_string($chars=16, $set=NULL)
 	if (function_exists('openssl_random_pseudo_bytes')) {
 		$pr_bits = openssl_random_pseudo_bytes($chars);
 	} else {
-
 		// Unix/Linux platform?
-		$fp = @fopen('/dev/urandom','rb');
-		if ($fp !== FALSE) {
-			$pr_bits .= @fread($fp,$chars);
+		$fp = @fopen('/dev/urandom', 'r');
+		if ($fp !== false) {
+			$pr_bits .= @fread($fp, $chars);
 			@fclose($fp);
 		}
 
@@ -925,12 +1043,14 @@ function generate_random_string($chars=16, $set=NULL)
 			// https://msdn.microsoft.com/en-us/library/aa388176(VS.85).aspx
 			try {
 				$CAPI_Util = new COM('CAPICOM.Utilities.1');
-				$pr_bits .= $CAPI_Util->GetRandom($chars,0);
+				$pr_bits .= $CAPI_Util->GetRandom($chars, 0);
 
 				// if we ask for binary data PHP munges it, so we
 				// request base64 return value.  We squeeze out the
 				// redundancy and useless ==CRLF by hashing...
-				if ($pr_bits) { $pr_bits = md5($pr_bits,TRUE); }
+				if ($pr_bits) {
+					$pr_bits = md5($pr_bits, true);
+				}
 			} catch (Exception $ex) {
 				// echo 'Exception: ' . $ex->getMessage();
 			}
@@ -938,15 +1058,15 @@ function generate_random_string($chars=16, $set=NULL)
 	}
 
 	if (empty($pr_bits)) {
-		throw new \RuntimeException("Could not generate random string");
+		throw new RuntimeException('Could not generate random string');
 	}
 
 	if (strlen($pr_bits) < $chars) {
-		trigger_error("Generated random string not long enough (only ".strlen($pr_bits));
+		trigger_error('Generated random string not long enough (only '.strlen($pr_bits));
 	}
 
-	$validChars = $set ? $set : array_merge(range(0,9), range('A', 'Z'), range('a', 'z'));
-	for ($i=0; $i < strlen($pr_bits); $i++) {
+	$validChars = $set ?: array_merge(range(0, 9), range('A', 'Z'), range('a', 'z'));
+	for ($i = 0; $i < strlen($pr_bits); ++$i) {
 		$pr_bits[$i] = $validChars[ord($pr_bits[$i]) % count($validChars)];
 	}
 
@@ -956,20 +1076,21 @@ function generate_random_string($chars=16, $set=NULL)
 function jethro_password_hash($str)
 {
 	if (function_exists('password_hash')) {
-		return password_hash($str, PASSWORD_DEFAULT);
+		return password_hash($str, \PASSWORD_DEFAULT);
 	} else {
-		$salt = NULL;
-		if (defined('CRYPT_BLOWFISH') && CRYPT_BLOWFISH) {
+		$salt = null;
+		if (defined('CRYPT_BLOWFISH') && \CRYPT_BLOWFISH) {
 			$salt = '$2y$10$'.generate_random_string(22);
-		} else if (defined('CRYPT_SHA512') && CRYPT_SHA512) {
+		} elseif (defined('CRYPT_SHA512') && \CRYPT_SHA512) {
 			$salt = '$6$'.generate_random_string(16);
-		} else if (defined('CRYPT_SHA256') && CRYPT_SHA256) {
+		} elseif (defined('CRYPT_SHA256') && \CRYPT_SHA256) {
 			$salt = '$5$'.generate_random_string(16);
 		}
 		$res = crypt($str, $salt);
 		if (strlen($res) < 4) {
-			throw new \RuntimeException("Crypt function returned invalid result $res for salt $salt");
+			throw new RuntimeException("Crypt function returned invalid result $res for salt $salt");
 		}
+
 		return $res;
 	}
 }
@@ -979,25 +1100,26 @@ function jethro_password_verify($password, $hash)
 	if (function_exists('password_verify')) {
 		return password_verify($password, $hash);
 	} else {
-		return (crypt($password, $hash) == $hash);
+		return crypt($password, $hash) == $hash;
 	}
 }
 
 /**
  * Writes a CSV file.  Unlike php's native fputcsv, it encloses every non-empty cell with the enclosure
  * - not just the ones it thinks need it.
- * @param array $rows	data to put in the CSV
- * @param string $separator	optional
- * @param string $enclosure	optional
- * @param string $newLine	optional
+ *
+ * @param array  $rows      data to put in the CSV
+ * @param string $separator optional
+ * @param string $enclosure optional
+ * @param string $newLine   optional
  */
-function print_csv($rows, $separator=',', $enclosure='"', $newLine="\n")
+function print_csv($rows, $separator = ',', $enclosure = '"', $newLine = "\n")
 {
 	foreach ($rows as $row) {
-		$thisRow = Array();
+		$thisRow = [];
 		foreach ($row as $cell) {
-			if (($cell !== '') && ($cell !== NULL)) {
-				$thisRow[] = $enclosure.(str_replace($enclosure, $enclosure.$enclosure, $cell)).$enclosure;
+			if (($cell !== '') && ($cell !== null)) {
+				$thisRow[] = $enclosure.str_replace($enclosure, $enclosure.$enclosure, $cell).$enclosure;
 			} else {
 				$thisRow[] = '';
 			}
@@ -1010,42 +1132,45 @@ function print_csv($rows, $separator=',', $enclosure='"', $newLine="\n")
 // From https://stackoverflow.com/questions/13076480/php-get-actual-maximum-upload-size
 // Returns a file size limit in bytes based on the PHP upload_max_filesize
 // and post_max_size
-function file_upload_max_size() {
-  static $max_size = -1;
+function file_upload_max_size()
+{
+	static $max_size = -1;
 
-  if ($max_size < 0) {
-    // Start with post_max_size.
-    $post_max_size = parse_size(ini_get('post_max_size'));
-    if ($post_max_size > 0) {
-      $max_size = $post_max_size;
-    }
+	if ($max_size < 0) {
+		// Start with post_max_size.
+		$post_max_size = parse_size(ini_get('post_max_size'));
+		if ($post_max_size > 0) {
+			$max_size = $post_max_size;
+		}
 
-    // If upload_max_size is less, then reduce. Except if upload_max_size is
-    // zero, which indicates no limit.
-    $upload_max = parse_size(ini_get('upload_max_filesize'));
-    if ($upload_max > 0 && $upload_max < $max_size) {
-      $max_size = $upload_max;
-    }
-  }
-  return $max_size;
+		// If upload_max_size is less, then reduce. Except if upload_max_size is
+		// zero, which indicates no limit.
+		$upload_max = parse_size(ini_get('upload_max_filesize'));
+		if ($upload_max > 0 && $upload_max < $max_size) {
+			$max_size = $upload_max;
+		}
+	}
+
+	return $max_size;
 }
 
-function parse_size($size) {
-  $unit = preg_replace('/[^bkmgtpezy]/i', '', $size); // Remove the non-unit characters from the size.
-  $size = preg_replace('/[^0-9\.]/', '', $size); // Remove the non-numeric characters from the size.
-  if ($unit) {
-    // Find the position of the unit in the ordered string which is the power of magnitude to multiply a kilobyte by.
-    return round($size * pow(1024, stripos('bkmgtpezy', $unit[0])));
-  }
-  else {
-    return round($size);
-  }
+function parse_size($size)
+{
+	$unit = preg_replace('/[^bkmgtpezy]/i', '', $size); // Remove the non-unit characters from the size.
+	$size = preg_replace('/[^0-9\.]/', '', $size); // Remove the non-numeric characters from the size.
+	if ($unit) {
+		// Find the position of the unit in the ordered string which is the power of magnitude to multiply a kilobyte by.
+		return round($size * 1024 ** stripos('bkmgtpezy', $unit[0]));
+	} else {
+		return round($size);
+	}
 }
 
 function current_url(): string
 {
-    [$scheme, $host, $path] = _detect_url_parts();
-    return "$scheme://$host$path";
+	[$scheme, $host, $path] = _detect_url_parts();
+
+	return "$scheme://$host$path";
 }
 
 /**
@@ -1053,39 +1178,43 @@ function current_url(): string
  */
 function base_url(): string
 {
-    [$scheme, $host, $path] = _detect_url_parts();
-    $path = explode('?', $path, 2)[0]; // Remove query string
-    return "$scheme://$host$path";
+	[$scheme, $host, $path] = _detect_url_parts();
+	$path = explode('?', $path, 2)[0]; // Remove query string
+
+	return "$scheme://$host$path";
 }
 
 function _detect_url_parts(): array
 {
-    // Detect scheme (proxy-aware)
-    $scheme = $_SERVER['HTTP_X_FORWARDED_PROTO']
-        ?? (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http');
+	// Detect scheme (proxy-aware)
+	$scheme = $_SERVER['HTTP_X_FORWARDED_PROTO']
+		?? (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http');
 
-    // Detect host (proxy-aware)
-    $host = $_SERVER['HTTP_X_FORWARDED_HOST']
-        ?? $_SERVER['HTTP_HOST']
-        ?? ($_SERVER['SERVER_NAME']
-            . ((($scheme === 'http' && ($_SERVER['SERVER_PORT'] ?? 80) != 80)
-                || ($scheme === 'https' && ($_SERVER['SERVER_PORT'] ?? 443) != 443))
-                ? ':' . ($_SERVER['SERVER_PORT'] ?? '')
-                : '')
-        );
+	// Detect host (proxy-aware)
+	$host = $_SERVER['HTTP_X_FORWARDED_HOST']
+		?? $_SERVER['HTTP_HOST']
+		?? (
+			$_SERVER['SERVER_NAME']
+			.((($scheme === 'http' && ($_SERVER['SERVER_PORT'] ?? 80) != 80)
+				|| ($scheme === 'https' && ($_SERVER['SERVER_PORT'] ?? 443) != 443))
+				? ':'.($_SERVER['SERVER_PORT'] ?? '')
+				: '')
+		);
 
-    // Path + query (default to "/")
-    $path = $_SERVER['REQUEST_URI'] ?? '/';
+	// Path + query (default to "/")
+	$path = $_SERVER['REQUEST_URI'] ?? '/';
 
-    return [$scheme, $host, $path];
+	return [$scheme, $host, $path];
 }
 
 /**
  * Determines the base path of the current script's directory.
- * @return string The base path of the script, ending with a slash if empty.
+ *
+ * @return string the base path of the script, ending with a slash if empty
  */
 function get_base_path()
 {
-    $dir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
-    return $dir === '' ? '/' : $dir;
+	$dir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+
+	return $dir === '' ? '/' : $dir;
 }

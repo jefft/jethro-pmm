@@ -2,42 +2,40 @@
 
 class db_object
 {
+	public $id;
+	public $fields = [];
+	public $values = [];
 
-	public $id = NULL;
-	public $fields = Array();
-	public $values = Array();
+	protected $_old_values = [];
+	protected $_held_locks = [];
+	protected $_acquirable_locks = [];
 
-	protected $_old_values = Array();
-	protected $_held_locks = Array();
-	protected $_acquirable_locks = Array();
-
-	protected $_tmp = Array();
+	protected $_tmp = [];
 
 	protected $_load_permission_level = 0;
 	protected $_save_permission_level = 0;
 
+	// --        CREATING, LOADING AND SAVING        --//
 
-//--        CREATING, LOADING AND SAVING        --//
-
-	public function __construct($id=0)
+	public function __construct($id = 0)
 	{
 		if (!$this->checkPerm($this->_load_permission_level)) {
-			throw new \RuntimeException('Current user has insufficient permission level to load a '.get_class($this).' object');
+			throw new RuntimeException('Current user has insufficient permission level to load a '.static::class.' object');
 		}
 
-		$this->fields = Array();
+		$this->fields = [];
 		$parent_class = get_parent_class($this);
 		while ($parent_class != 'db_object') {
-			$new_fields = call_user_func(Array($parent_class, '_getFields'));
+			$new_fields = call_user_func([$parent_class, '_getFields']);
 			foreach ($new_fields as $i => $v) {
 				$new_fields[$i]['table_name'] = strtolower($parent_class);
 			}
 			$this->fields += $new_fields;
 			$parent_class = get_parent_class($parent_class);
 		}
-		$own_fields = call_user_func(Array(get_class($this), '_getFields'));
+		$own_fields = call_user_func([static::class, '_getFields']);
 		foreach ($own_fields as $i => $v) {
-			$own_fields[$i]['table_name'] = strtolower(get_class($this));
+			$own_fields[$i]['table_name'] = strtolower(static::class);
 		}
 		$this->fields = $own_fields + $this->fields;
 		if ($id) {
@@ -47,39 +45,47 @@ class db_object
 		}
 	}
 
-	public function getInitSQL($table_name=NULL)
+	public function getInitSQL($table_name = null)
 	{
 		return $this->_getInitSQL($table_name);
 	}
 
 	/* This helper allows grandchild classes access to the default getInitSQL function */
-	protected function _getInitSQL($table_name=NULL)
+	protected function _getInitSQL($table_name = null)
 	{
-		if (is_null($table_name)) $table_name = strtolower(get_class($this));
+		if (null === $table_name) {
+			$table_name = strtolower(static::class);
+		}
 		$indexes = '';
 		foreach ($this->_getUniqueKeys() as $name => $fields) {
-			foreach ($fields as $k => $v) $fields[$k] = "`$v`";
+			foreach ($fields as $k => $v) {
+				$fields[$k] = "`$v`";
+			}
 			$indexes .= ',
 				UNIQUE KEY `'.$name.'` ('.implode(', ', $fields).')';
 		}
 		foreach ($this->_getIndexes() as $name => $fields) {
-			foreach ($fields as $k => $v) $fields[$k] = "`$v`";
+			foreach ($fields as $k => $v) {
+				$fields[$k] = "`$v`";
+			}
 			$indexes .= '
 				INDEX `'.$name.'` ('.implode(', ', $fields).')';
 		}
 
-		$res = "
-			CREATE TABLE `".$table_name."` (
+		$res = '
+			CREATE TABLE `'.$table_name.'` (
 			  `id` int(11) NOT NULL auto_increment,
-				";
-		foreach (call_user_func(Array(get_class($this), '_getFields')) as $name => $details) {
+				';
+		foreach (call_user_func([static::class, '_getFields']) as $name => $details) {
 			$type = 'varchar(255)';
-			$default = array_get($details, 'default', FALSE);
+			$default = array_get($details, 'default', false);
 			$null_exp = array_get($details, 'allow_empty', 0) ? 'NULL' : 'NOT NULL';
 			switch ($details['type']) {
 				case 'date':
 					$type = 'date';
-					if (empty($default)) $default = FALSE;
+					if (empty($default)) {
+						$default = false;
+					}
 					break;
 				case 'datetime':
 					$type = 'datetime';
@@ -90,12 +96,12 @@ class db_object
 					break;
 				case 'html':
 					$type = 'text';
-					$default = FALSE; // text columns cannot have a default
+					$default = false; // text columns cannot have a default
 					break;
 				case 'text':
 					if (array_get($details, 'height', 1) != 1) {
 						$type = 'text';
-						$default = FALSE; // text columns cannot have a default
+						$default = false; // text columns cannot have a default
 					} else {
 						$type = 'varchar(255)';
 					}
@@ -104,7 +110,7 @@ class db_object
 					$type = 'char(19)';
 					break;
 				case 'int':
-					if (!is_null($len = array_get($details, 'fixed_length'))) {
+					if (null !== ($len = array_get($details, 'fixed_length'))) {
 						$type = 'varchar('.$len.')';
 					} else {
 						$type = 'int(11)';
@@ -117,7 +123,7 @@ class db_object
 					break;
 				case 'serialise':
 					$type = 'text';
-					$default = FALSE; // text columns cannot have a default
+					$default = false; // text columns cannot have a default
 					break;
 				case 'boolean':
 				case 'bool':
@@ -125,7 +131,7 @@ class db_object
 					$default = array_get($details, 'default', 0);
 			}
 
-			if ($default !== FALSE) {
+			if ($default !== false) {
 				switch ($default) {
 					case 'CURRENT_TIMESTAMP':
 					case 'NULL':
@@ -137,56 +143,57 @@ class db_object
 				$default = ' DEFAULT '.$default;
 			}
 
-			$res .= "`".$name."` ".$type." ".$null_exp.$default.",
-				";
+			$res .= '`'.$name.'` '.$type.' '.$null_exp.$default.',
+				';
 		}
-		$res .= "PRIMARY KEY (`id`)".$indexes."
-			) ENGINE=InnoDB DEFAULT CHARSET=utf8";
+		$res .= 'PRIMARY KEY (`id`)'.$indexes.'
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8';
+
 		return $res;
 	}
 
 	protected function _getIndexes()
 	{
-		return Array();
+		return [];
 	}
 
 	protected function _getUniqueKeys()
 	{
-		return Array();
+		return [];
 	}
 
 	/**
-	 * Get foreign keys to apply to this class's DB table
-	 * @return Array ([tablename.]columnName => referenceExpression) eg '`tagid`' => '`tagoption`(`id`) ON DELETE CASCADE'
+	 * Get foreign keys to apply to this class's DB table.
+	 *
+	 * @return array ([tablename.]columnName => referenceExpression) eg '`tagid`' => '`tagoption`(`id`) ON DELETE CASCADE'
 	 */
 	public function getForeignKeys()
 	{
-		return Array();
+		return [];
 	}
 
 	/**
-	 *
 	 * @return The SQL to run to create any database views used by this class
 	 */
 	public function getViewSQL()
 	{
-		return NULL;
+		return null;
 	}
 
 	public function create()
 	{
 		if (!$this->checkPerm($this->_save_permission_level)) {
-			throw new \RuntimeException('Current user has insufficient permission level to create a '.get_class($this).' object');
+			throw new RuntimeException('Current user has insufficient permission level to create a '.static::class.' object');
 		}
 
-		$GLOBALS['system']->setFriendlyErrors(TRUE);
+		$GLOBALS['system']->setFriendlyErrors(true);
 		if (!$this->readyToCreate()) {
-			return FALSE;
+			return false;
 		}
-		$GLOBALS['system']->setFriendlyErrors(FALSE);
+		$GLOBALS['system']->setFriendlyErrors(false);
 		if (isset($this->fields['creator']) && empty($this->values['creator'])) {
 			$userid = $GLOBALS['user_system']->getCurrentPerson('id');
-			if (!is_null($userid)) {
+			if (null !== $userid) {
 				$this->values['creator'] = $userid;
 			}
 		}
@@ -196,15 +203,15 @@ class db_object
 			if ($user) {
 				$created .= ' by '.$user['first_name'].' '.$user['last_name'].' (#'.$user['id'].')';
 			}
-			$this->values['history'] = Array(time() => $created);
+			$this->values['history'] = [time() => $created];
 		}
 
-		$parent_class =  strtolower(get_parent_class($this));
+		$parent_class = strtolower(get_parent_class($this));
 		if ($parent_class != 'db_object') {
 			$parent_obj = new $parent_class();
 			$parent_obj->populate(0, $this->values);
 			if (!$parent_obj->create()) {
-				return FALSE;
+				return false;
 			}
 			$this->id = $parent_obj->id;
 		}
@@ -214,17 +221,19 @@ class db_object
 
 	protected function _createFinal()
 	{
-		$db =& $GLOBALS['db'];
-		$flds = Array();
-		$vals = Array();
-		$our_fields = call_user_func(Array(get_class($this), '_getFields'));
+		$db = &$GLOBALS['db'];
+		$flds = [];
+		$vals = [];
+		$our_fields = call_user_func([static::class, '_getFields']);
 		foreach ($our_fields as $name => $details) {
-			if (array_get($details, 'readonly')) continue;
+			if (array_get($details, 'readonly')) {
+				continue;
+			}
 			$flds[] = "`$name`";
 			$v = array_get($this->values, $name, '');
-			if (($v === '') && (in_array($details['type'], Array('date', 'datetime', 'int', 'reference')))) {
+			if (($v === '') && in_array($details['type'], ['date', 'datetime', 'int', 'reference'], true)) {
 				// Mysql strict mode doesn't like blank strings being inserted into datetime cols
-				$v = NULL;
+				$v = null;
 			}
 			if ($details['type'] == 'serialise') {
 				$vals[] = $db->quote(serialize($v));
@@ -237,68 +246,69 @@ class db_object
 			// if this class doesn't extend db_object directly then ID is not an auto-increment field
 			// so we save it like the rest
 			array_unshift($flds, 'id');
-			array_unshift($vals, $db->quote((int)$this->id));
+			array_unshift($vals, $db->quote((int) $this->id));
 		}
 
 		$sql = 'INSERT INTO '.$this->_getInsertTableName().' ('.implode(', ', $flds).')
 				 VALUES ('.implode(', ', $vals).')';
 		$res = $db->query($sql);
-		if (empty($this->id)) $this->id = $db->lastInsertId();
-		$this->_old_values = Array();
-		return TRUE;
-	}
+		if (empty($this->id)) {
+			$this->id = $db->lastInsertId();
+		}
+		$this->_old_values = [];
 
+		return true;
+	}
 
 	public function createFromChild($child)
 	{
 		if (!$this->checkPerm($this->_save_permission_level)) {
-			throw new \RuntimeException('Current user has insufficient permission level to create a '.get_class($this).' object');
+			throw new RuntimeException('Current user has insufficient permission level to create a '.static::class.' object');
 		}
 		$this->populate($child->id, $child->values);
+
 		return $this->_createFinal();
 	}
 
-
 	protected function _getTableNames()
 	{
-		$res = strtolower(get_class($this));
+		$res = strtolower(static::class);
 		$parent_class = strtolower(get_parent_class($this));
 		while ($parent_class != 'db_object') {
-			$res  = '('.$res.' JOIN '.$parent_class.' on '.$res.'.id = '.$parent_class.'.id)';
+			$res = '('.$res.' JOIN '.$parent_class.' on '.$res.'.id = '.$parent_class.'.id)';
 			$parent_class = strtolower(get_parent_class($parent_class));
 		}
+
 		return $res;
 	}
-	
+
 	/*
 	 * Get the name of the table that objects should be INSERTed into.
 	 * This can be overridden if the normal table is actually a view.
 	 */
 	protected function _getInsertTableName()
 	{
-		return strtolower(get_class($this));
+		return strtolower(static::class);
 	}
 
 	/**
-	* Get the fields for this class only
-	*
-	* (Fields for parent classes are automatically added when instanting objects of this class
-	*
-	* @return array
-	* @access protected
-	*/
+	 * Get the fields for this class only.
+	 *
+	 * (Fields for parent classes are automatically added when instanting objects of this class
+	 *
+	 * @return array
+	 */
 	protected static function _getFields()
 	{
-		return Array();
+		return [];
 	}
-
 
 	public function load($id)
 	{
-		$db =& $GLOBALS['db'];
+		$db = &$GLOBALS['db'];
 		$sql = 'SELECT *
 				FROM '.strtolower($this->_getTableNames()).'
-				WHERE '.strtolower(get_class($this)).'.id = '.$db->quote($id) .'
+				WHERE '.strtolower(static::class).'.id = '.$db->quote($id).'
 				LIMIT 1';
 		$res = $db->queryRow($sql);
 		if (!empty($res)) {
@@ -308,17 +318,15 @@ class db_object
 		}
 		foreach ($this->fields as $name => $details) {
 			if (($details['type'] == 'serialise') && isset($this->values[$name])) {
-				if (is_string($this->values[$name]) && (trim($this->values[$name]) === "")) {
+				if (is_string($this->values[$name]) && (trim($this->values[$name]) === '')) {
 					error_log(__FILE__.':'.__LINE__.' - WARNING: Jethro found a blank string in the database for the serialised field '.$name.' and converted it to an empty array. This may indicate a database corruption that should be investigated.');
-					$this->values[$name] = array();
+					$this->values[$name] = [];
 				} else {
 					$this->values[$name] = unserialize($this->values[$name]);
 				}
-					
 			}
 		}
 	}
-
 
 	public function loadDefaults()
 	{
@@ -331,39 +339,39 @@ class db_object
 						$this->values[$id] = 0;
 						break;
 					case 'reference':
-						$this->values[$id] = NULL;
+						$this->values[$id] = null;
 				}
 			}
 		}
 	}
 
-
 	public function save()
 	{
 		if (!$this->checkPerm($this->_save_permission_level)) {
-			throw new \RuntimeException('Current user has insufficient permission level to save a '.get_class($this).' object');
+			throw new RuntimeException('Current user has insufficient permission level to save a '.static::class.' object');
 		}
-		$GLOBALS['system']->setFriendlyErrors(TRUE);
+		$GLOBALS['system']->setFriendlyErrors(true);
 		if (!$this->validateFields()) {
-			return FALSE;
+			return false;
 		}
-		$GLOBALS['system']->setFriendlyErrors(FALSE);
+		$GLOBALS['system']->setFriendlyErrors(false);
 
-		$acquiredLock = FALSE;
+		$acquiredLock = false;
 		if (!$this->haveLock()) {
 			if ($this->acquireLock()) {
-				$acquiredLock = TRUE;
+				$acquiredLock = true;
 			}
 		}
 		if (!$this->haveLock()) {
-			trigger_error('Cannot save values for '.get_class($this).' #'.$this->id.' because someone else has the lock', E_USER_NOTICE);
-			return FALSE;
+			trigger_error('Cannot save values for '.static::class.' #'.$this->id.' because someone else has the lock', \E_USER_NOTICE);
+
+			return false;
 		}
 
 		// Add to the history, unless it's been explicly set as a value (see Person::archiveAndClean())
 		if (isset($this->fields['history']) && empty($this->_old_values['history'])) {
 			if (!isset($this->values['history']) || !is_array($this->values['history'])) {
-				throw new \RuntimeException("History field is not an array - this should not be. Aborting.");
+				throw new RuntimeException('History field is not an array - this should not be. Aborting.');
 				exit;
 			}
 			$changes = $this->_getChanges();
@@ -375,7 +383,9 @@ class db_object
 			}
 		}
 
-		if (empty($this->_old_values)) return TRUE;
+		if (empty($this->_old_values)) {
+			return true;
+		}
 
 		// Set any last-changed fields
 		foreach ($this->_old_values as $i => $v) {
@@ -390,24 +400,28 @@ class db_object
 			$parent_obj = new $parent_class($this->id);
 			$parent_obj->populate($this->id, $this->values);
 			if (!$parent_obj->save()) {
-				return FALSE;
+				return false;
 			}
 		}
 
 		// Update the DB
-		$db =& $GLOBALS['db'];
-		$sets = Array();
+		$db = &$GLOBALS['db'];
+		$sets = [];
 		$our_fields = $this->_getFields();
 		foreach ($this->_old_values as $i => $v) {
-			if (!isset($our_fields[$i])) continue;
-			if (array_get($this->fields[$i], 'readonly')) continue;
+			if (!isset($our_fields[$i])) {
+				continue;
+			}
+			if (array_get($this->fields[$i], 'readonly')) {
+				continue;
+			}
 			$new_val = $this->values[$i];
 			if ($this->fields[$i]['type'] == 'serialise') {
 				$new_val = serialize($new_val);
 			}
-			if (($new_val === '') && (in_array($this->fields[$i]['type'], Array('date', 'datetime', 'int', 'reference')))) {
+			if (($new_val === '') && in_array($this->fields[$i]['type'], ['date', 'datetime', 'int', 'reference'], true)) {
 				// Mysql strict mode doesn't like blank strings being inserted into datetime cols
-				$new_val = NULL;
+				$new_val = null;
 			}
 			if (($this->fields[$i]['type'] == 'datetime') && ($new_val == 'CURRENT_TIMESTAMP')) {
 				// CURRENT_TIMESTAMP should not be quoted
@@ -418,44 +432,51 @@ class db_object
 			}
 		}
 		if (!empty($sets)) {
-			$sql = 'UPDATE '.strtolower(get_class($this)).'
+			$sql = 'UPDATE '.strtolower(static::class).'
 					SET '.implode("\n, ", $sets).'
 					WHERE id = '.$db->quote($this->id);
 			$res = $db->query($sql);
 		}
 
-		$this->_old_values = Array();
+		$this->_old_values = [];
 
-		if ($acquiredLock) $this->releaseLock();
+		if ($acquiredLock) {
+			$this->releaseLock();
+		}
 
-		return TRUE;
+		return true;
 	}
 
 	protected function _getChanges()
 	{
-		$changes = Array();
+		$changes = [];
 		foreach ($this->_old_values as $name => $old_val) {
-			if ($name == 'history') continue;
-			if ($name == 'password') continue;
-			if (!array_get($this->fields[$name], 'show_in_summary', TRUE)
-					&& !array_get($this->fields[$name], 'editable', TRUE)
+			if ($name == 'history') {
+				continue;
+			}
+			if ($name == 'password') {
+				continue;
+			}
+			if (!array_get($this->fields[$name], 'show_in_summary', true)
+					&& !array_get($this->fields[$name], 'editable', true)
 			) {
 				continue;
 			}
 			$changes[] = $this->getFieldLabel($name).' changed from "'.ents($this->getFormattedValue($name, $old_val)).'" to "'.ents($this->getFormattedValue($name)).'"';
 		}
+
 		return $changes;
 	}
 
 	public function reset()
 	{
-		$this->values = $this->_old_values = Array();
+		$this->values = $this->_old_values = [];
 		$this->id = 0;
 	}
 
 	public function populate($id, $values)
 	{
-		$this->_old_values = Array();
+		$this->_old_values = [];
 		$this->id = $id;
 		foreach ($this->fields as $fieldname => $details) {
 			if (empty($details['readonly']) && array_key_exists($fieldname, $values)) {
@@ -465,29 +486,32 @@ class db_object
 				$this->setValue($fieldname, $values[$fieldname]);
 			}
 		}
-		$this->_held_locks = Array();
-		$this->_acquirable_locks = Array();
+		$this->_held_locks = [];
+		$this->_acquirable_locks = [];
 	}
 
-	public function canDelete($trigger_messages=FALSE)
+	public function canDelete($trigger_messages = false)
 	{
-		return TRUE;
+		return true;
 	}
 
 	public function delete()
 	{
-		if (!$this->canDelete(TRUE)) return FALSE;
+		if (!$this->canDelete(true)) {
+			return false;
+		}
 
 		$GLOBALS['system']->doTransaction('begin');
-		$db =& $GLOBALS['db'];
-		$table_name = strtolower(get_class($this));
+		$db = &$GLOBALS['db'];
+		$table_name = strtolower(static::class);
 		while ($table_name != 'db_object') {
 			$sql = 'DELETE FROM '.$table_name.' WHERE id='.$db->quote($this->id);
 			$res = $db->query($sql);
 			$table_name = strtolower(get_parent_class($table_name));
 		}
 		$GLOBALS['system']->doTransaction('commit');
-		return TRUE;
+
+		return true;
 	}
 
 	public function hasField($fieldname)
@@ -495,27 +519,25 @@ class db_object
 		return isset($this->fields[$fieldname]);
 	}
 
-
-
-
-//--        GETTING AND SETTING FIELD VALUES        --//
-
+	// --        GETTING AND SETTING FIELD VALUES        --//
 
 	public function setValue($name, $value)
 	{
 		if (!isset($this->fields[$name])) {
-			trigger_error('Cannot set value for field '.ents($name).' - field does not exist', E_USER_WARNING);
-			return FALSE;
+			trigger_error('Cannot set value for field '.ents($name).' - field does not exist', \E_USER_WARNING);
+
+			return false;
 		}
 		if (array_get($this->fields[$name], 'readonly')) {
-			trigger_error('Cannot set value for readonly field "'.$name.'"', E_USER_WARNING);
+			trigger_error('Cannot set value for readonly field "'.$name.'"', \E_USER_WARNING);
+
 			return;
 		}
 		if (array_get($this->fields[$name], 'initial_cap')) {
 			$value = ucfirst($value ?? '');
 		}
 		// Force initial cap only if value is a single world
-		if (array_get($this->fields[$name], 'initial_cap_singleword') && (false === strpos($value, ' '))) {
+		if (array_get($this->fields[$name], 'initial_cap_singleword') && (!str_contains($value, ' '))) {
 			$value = ucfirst($value);
 		}
 		if (array_get($this->fields[$name], 'trim')) {
@@ -523,36 +545,40 @@ class db_object
 		}
 		if ($this->fields[$name]['type'] == 'select') {
 			if (!isset($this->fields[$name]['options'][$value]) && !(array_get($this->fields[$name], 'allow_empty', 1) && empty($value))) {
-				trigger_error(ents($value).' is not a valid value for field "'.$name.'", and has not been set', E_USER_NOTICE);
+				trigger_error(ents($value).' is not a valid value for field "'.$name.'", and has not been set', \E_USER_NOTICE);
+
 				return;
 			}
 		}
 		if (($this->fields[$name]['type'] == 'phone') && ($value != '')) {
 			if (!is_valid_phone_number($value, $this->fields[$name]['formats'])) {
-				trigger_error(ents($value).' is not a valid phone number for field "'.$name.'", and has not been set', E_USER_NOTICE);
+				trigger_error(ents($value).' is not a valid phone number for field "'.$name.'", and has not been set', \E_USER_NOTICE);
+
 				return;
 			}
 			$value = clean_phone_number($value);
 		}
-		if (!empty($this->fields[$name]['maxlength']) 
-				&& !is_null($value) 
+		if (!empty($this->fields[$name]['maxlength'])
+				&& null !== $value
 				&& (strlen($value) > $this->fields[$name]['maxlength'])
-			) {
+		) {
 			$value = substr($value, 0, $this->fields[$name]['maxlength']);
 		}
 		if (($this->fields[$name]['type'] == 'email') && ($value != '')) {
-			if (!filter_var($value, FILTER_VALIDATE_EMAIL)) {
-				trigger_error(ents($value).' is not a valid value for email field "'.$name.'" and has not been set', E_USER_NOTICE);
+			if (!filter_var($value, \FILTER_VALIDATE_EMAIL)) {
+				trigger_error(ents($value).' is not a valid value for email field "'.$name.'" and has not been set', \E_USER_NOTICE);
+
 				return;
 			}
 		}
 		if ($this->fields[$name]['type'] == 'int') {
 			if (!array_get($this->fields[$name], 'allow_empty', true) || ($value !== '')) {
-				$strval = (string)$value;
-				for ($i=0; $i < strlen($strval); $i++) {
+				$strval = (string) $value;
+				for ($i = 0; $i < strlen($strval); ++$i) {
 					$char = $strval[$i];
-					if ((int)$char != $char) {
-						trigger_error(ents($value).' is not a valid value for integer field "'.$name.'" and has not been set', E_USER_NOTICE);
+					if ((int) $char != $char) {
+						trigger_error(ents($value).' is not a valid value for integer field "'.$name.'" and has not been set', \E_USER_NOTICE);
+
 						return;
 					}
 				}
@@ -571,78 +597,84 @@ class db_object
 
 	public function __call($name, $arguments)
 	{
-		if (0 === strpos($name, 'get')) {
+		if (str_starts_with($name, 'get')) {
 			// If there is a reference field called "family" or "familyid", allow a call to ->getFamily()
 			// which returns the referenced object.
 			$propName = strtolower(substr($name, 3));
 			foreach ($this->fields as $fn => $f) {
 				if ($f['type'] == 'reference') {
 					$fnb = $fn;
-					if (substr($fnb, -2) == 'id') $fnb = substr($fnb, 0, -2);
+					if (substr($fnb, -2) == 'id') {
+						$fnb = substr($fnb, 0, -2);
+					}
 					if ($fnb == $propName) {
 						if ($idVal = $this->getValue($fn)) {
 							$classname = $f['references'];
+
 							return $GLOBALS['system']->getDBObject($classname, $idVal);
 						}
 					}
 				}
 			}
-			throw new \RuntimeException('Object has no property called '.$propName); exit;
+			throw new RuntimeException('Object has no property called '.$propName);
+			exit;
 		} else {
-			throw new \RuntimeException('Call to undefined method '.$name); exit;
+			throw new RuntimeException('Call to undefined method '.$name);
+			exit;
 		}
 	}
 
 	public function validateFields()
 	{
-		$res = TRUE;
+		$res = true;
 		foreach ($this->fields as $id => $details) {
 			$val = array_get($this->values, $id);
-			if (!array_get($details, 'allow_empty', true) && (is_null($val) || ($val === ''))) {
-				trigger_error($this->getFieldLabel($id).' is a required field for '.get_class($this).' and cannot be left empty', E_USER_NOTICE);
-				$res = FALSE;
+			if (!array_get($details, 'allow_empty', true) && (null === $val || ($val === ''))) {
+				trigger_error($this->getFieldLabel($id).' is a required field for '.static::class.' and cannot be left empty', \E_USER_NOTICE);
+				$res = false;
 			}
 
 			if (isset($details['max_length']) && (strlen($val) > $details['max_length'])) {
-				trigger_error('The value for '.array_get($details, 'label', $id).' is too long (maximum is '.$details['max_length'].' characters)', E_USER_NOTICE);
-				$res = FALSE;
+				trigger_error('The value for '.array_get($details, 'label', $id).' is too long (maximum is '.$details['max_length'].' characters)', \E_USER_NOTICE);
+				$res = false;
 			}
 
 			if (isset($details['fixed_length']) && !empty($val) && (strlen($val) != $details['fixed_length'])) {
-				trigger_error('The value for '.array_get($details, 'label', $id).' is not the correct length (must be exactly '.$details['fixed_length'].' characters)', E_USER_NOTICE);
-				$res = FALSE;
+				trigger_error('The value for '.array_get($details, 'label', $id).' is not the correct length (must be exactly '.$details['fixed_length'].' characters)', \E_USER_NOTICE);
+				$res = false;
 			}
 		}
+
 		return $res;
 	}
 
-
 	public function readyToCreate()
 	{
-		if (!$this->validateFields()) return FALSE;
+		if (!$this->validateFields()) {
+			return false;
+		}
 
 		// Check for unique key violations
 		foreach ($this->_getUniqueKeys() as $name => $cols) {
-			$params = Array();
+			$params = [];
 			foreach ($cols as $col) {
 				$params[$col] = $this->getValue($col);
 			}
 			if ($this->getInstancesData($params, 'AND')) {
-				$msgs = Array();
+				$msgs = [];
 				foreach ($params as $k => $v) {
 					$msgs[] = $this->getFieldLabel($k).' = '.$this->getFormattedValue($k);
 				}
-				trigger_error("There is already a ".get_class($this)." with ".implode(' and ', $msgs));
-				return FALSE;
+				trigger_error('There is already a '.static::class.' with '.implode(' and ', $msgs));
+
+				return false;
 			}
 		}
 
-		return TRUE;
+		return true;
 	}
 
-
-//--        INTERFACE PAINTING AND PROCESSING        --//
-
+	// --        INTERFACE PAINTING AND PROCESSING        --//
 
 	public function printSummary()
 	{
@@ -655,11 +687,12 @@ class db_object
 		<?php
 	}
 
-
 	protected function _printSummaryRows()
 	{
 		foreach ($this->fields as $name => $details) {
-			if (!array_get($details, 'show_in_summary', true)) continue;
+			if (!array_get($details, 'show_in_summary', true)) {
+				continue;
+			}
 			$c = '';
 			if (array_get($details, 'divider_before')) {
 				$c = ' class="divider-before"';
@@ -672,7 +705,7 @@ class db_object
 						echo $c;
 						$c = '';
 					}
-					?>
+				?>
 				>
 					<th colspan="2" class="center">
 						<h4><?php echo ents(array_get($details, 'heading_before')); ?></h4>
@@ -694,37 +727,42 @@ class db_object
 	}
 
 	/**
-	* Get the formatted value of a field
-	*
-	* This is used for HTML and non-HTML output so HTML should not be added
-	* - see printFieldValue below for that.
-	*/
-	public function getFormattedValue($name, $value=null)
+	 * Get the formatted value of a field.
+	 *
+	 * This is used for HTML and non-HTML output so HTML should not be added
+	 * - see printFieldValue below for that.
+	 */
+	public function getFormattedValue($name, $value = null)
 	{
 		if (!isset($this->fields[$name])) {
-			trigger_error('Cannot get value for field '.ents($name).' - field does not exist', E_USER_WARNING);
-			return NULL;
+			trigger_error('Cannot get value for field '.ents($name).' - field does not exist', \E_USER_WARNING);
+
+			return null;
 		}
-		if (is_null($value)) $value = array_get($this->values, $name, NULL);
+		if (null === $value) {
+			$value = array_get($this->values, $name, null);
+		}
 		$field = $this->fields[$name];
 
 		return format_value($value, $field);
 	}
 
-
 	/**
-	* Print the value of a field to the HTML interface
-	*
-	* Subclasses should add links and other HTML markup by overriding this
-	*/
-	public function printFieldValue($name, $value=NULL)
+	 * Print the value of a field to the HTML interface.
+	 *
+	 * Subclasses should add links and other HTML markup by overriding this
+	 */
+	public function printFieldValue($name, $value = null)
 	{
 		if (!isset($this->fields[$name])) {
-			trigger_error('Cannot get value for field '.ents($name).' - field does not exist', E_USER_WARNING);
-			return NULL;
+			trigger_error('Cannot get value for field '.ents($name).' - field does not exist', \E_USER_WARNING);
+
+			return null;
 		}
-		if (is_null($value)) $value = $this->getValue($name);
-		if (($name == 'history')) {
+		if (null === $value) {
+			$value = $this->getValue($name);
+		}
+		if ($name == 'history') {
 			?>
 			<table class="history table table-full-width table-striped">
 			<?php
@@ -745,9 +783,9 @@ class db_object
 			?>
 			</table>
 			<?php
-		} else if ($this->fields[$name]['type'] == 'bitmask') {
+		} elseif ($this->fields[$name]['type'] == 'bitmask') {
 			$percol = false;
-			if (!empty($this->fields[$name]['cols']) && (int)$this->fields[$name]['cols'] > 1) {
+			if (!empty($this->fields[$name]['cols']) && (int) $this->fields[$name]['cols'] > 1) {
 				$percol = ceil(count($this->fields[$name]['options']) / $this->fields[$name]['cols']);
 				?>
 				<div class="bitmask-boxes">
@@ -756,8 +794,10 @@ class db_object
 			}
 			$i = 0;
 			foreach ($this->fields[$name]['options'] as $k => $v) {
-				$checked_exp = (($value & (int)$k) == $k) ? 'checked="checked"' : '';
-				if (!array_get($this->fields[$name], 'show_unselected', TRUE) && empty($checked_exp)) continue;
+				$checked_exp = (($value & (int) $k) == $k) ? 'checked="checked"' : '';
+				if (!array_get($this->fields[$name], 'show_unselected', true) && empty($checked_exp)) {
+					continue;
+				}
 				?>
 				<label class="checkbox">
 					<input type="checkbox" disabled="disabled" name="<?php echo ents($name); ?>[]" value="<?php echo ents($k); ?>" id="<?php echo ents($name.'_'.$k); ?>" <?php echo $checked_exp; ?>>
@@ -776,7 +816,7 @@ class db_object
 				</div>
 				<?php
 			}
-		} else if (($this->fields[$name]['type'] == 'text')
+		} elseif (($this->fields[$name]['type'] == 'text')
 					&& (array_get($this->fields[$name], 'height', 1) > 1)) {
 			$res = nl2br(ents($this->getFormattedValue($name, $value)));
 			if (!empty($this->fields[$name]['add_links'])) {
@@ -784,21 +824,22 @@ class db_object
 				$res = linkUrlsInTrustedHtml($res, 'componentlink');
 			}
 			echo $res;
-		} else if ($this->fields[$name]['type'] == 'phone') {
+		} elseif ($this->fields[$name]['type'] == 'phone') {
 			echo '<a href="tel:'.$value.'">'.ents($this->getFormattedValue($name, $value)).'</a>';
-		} else if (($this->fields[$name]['type'] == 'email')) {
-			$personName = NULL;
-			if (isset($this->_fields['first_name'])) $personName = ($this->values[$name] == $value) ? $this->values['first_name'].' '.$this->values['last_name'] : '';
+		} elseif ($this->fields[$name]['type'] == 'email') {
+			$personName = null;
+			if (isset($this->_fields['first_name'])) {
+				$personName = ($this->values[$name] == $value) ? $this->values['first_name'].' '.$this->values['last_name'] : '';
+			}
 			echo '<a href="'.get_email_href($value, $personName).'" '.email_link_extras().'>'.ents($value).'</a>';
-		} else if (($this->fields[$name]['type'] == 'html')) {
+		} elseif ($this->fields[$name]['type'] == 'html') {
 			echo $this->getFormattedValue($name, $value);
 		} else {
 			echo ents($this->getFormattedValue($name, $value));
 		}
 	}
 
-
-	public function printForm($prefix='', $fields=NULL)
+	public function printForm($prefix = '', $fields = null)
 	{
 		?>
 		<div class="form-horizontal">
@@ -810,14 +851,20 @@ class db_object
 				<?php
 			}
 
-			if (!is_null($fields) && !in_array($name, $fields)) continue;
-			if (array_get($details, 'readonly')) continue;
-			if (!array_get($details, 'editable', true)) continue;
+			if (null !== $fields && !in_array($name, $fields, true)) {
+				continue;
+			}
+			if (array_get($details, 'readonly')) {
+				continue;
+			}
+			if (!array_get($details, 'editable', true)) {
+				continue;
+			}
 			?>
 <div class="control-group" id="field-<?php echo $name; ?>">
 
 			<?php
-			if (strlen(strval(array_get($details, 'heading_before')))) {
+			if (strlen((string) array_get($details, 'heading_before'))) {
 				?>
 					<h4><?php echo ents($details['heading_before']); ?></h4>
 				<?php
@@ -831,7 +878,7 @@ class db_object
 			if (!empty($this->fields[$name]['note'])) {
 				echo '<p class="help-inline">'.$this->fields[$name]['note'].'</p>';
 			}
-		?>
+			?>
 	</div>
 </div>
 			<?php
@@ -842,68 +889,76 @@ class db_object
 
 	}
 
-
 	public function getFieldLabel($id)
 	{
-		if (empty($id)) return;
+		if (empty($id)) {
+			return;
+		}
 		if (!isset($this->fields[$id])) {
 			return ucwords($id);
-			//trigger_error('No such field '.$id);
-			//return;
+			// trigger_error('No such field '.$id);
+			// return;
 		}
-		return array_get($this->fields[$id], 'label', _(ucwords(str_replace('_', ' ', $id))));
 
+		return array_get($this->fields[$id], 'label', _(ucwords(str_replace('_', ' ', $id))));
 	}
 
-	public function processForm($prefix='', $fields=NULL)
+	public function processForm($prefix = '', $fields = null)
 	{
-		$GLOBALS['system']->setFriendlyErrors(TRUE);
+		$GLOBALS['system']->setFriendlyErrors(true);
 		foreach ($this->fields as $name => $details) {
-			if (!is_null($fields) && !in_array($name, $fields)) continue;
-			if (array_get($details, 'readonly')) continue;
-			if (!array_get($details, 'editable', true)) continue;
+			if (null !== $fields && !in_array($name, $fields, true)) {
+				continue;
+			}
+			if (array_get($details, 'readonly')) {
+				continue;
+			}
+			if (!array_get($details, 'editable', true)) {
+				continue;
+			}
 			$this->processFieldInterface($name, $prefix);
 		}
-		$GLOBALS['system']->setFriendlyErrors(FALSE);
+		$GLOBALS['system']->setFriendlyErrors(false);
 	}
 
-	public function printFieldInterface($name, $prefix='')
+	public function printFieldInterface($name, $prefix = '')
 	{
 		$value = array_get($this->values, $name);
-		if (((int)$this->id >0)&& !$this->haveLock()) {
+		if (((int) $this->id > 0) && !$this->haveLock()) {
 			echo $value;
 		} else {
 			print_widget($prefix.$name, $this->fields[$name], $value);
 		}
 	}
 
-	public function processFieldInterface($name, $prefix='')
+	public function processFieldInterface($name, $prefix = '')
 	{
 		if (!$this->id || $this->haveLock()) {
 			$value = process_widget($prefix.$name, $this->fields[$name]);
-			if ($value !== NULL) {
+			if ($value !== null) {
 				if (($this->fields[$name]['type'] == 'reference') && ($value === 0)) {
 					// process_widget returns 0 when the user selects the 'empty' option
 					// but we want to save NULL to the db.
-					$value = NULL;
+					$value = null;
 				}
 				$this->setValue($name, $value);
 			}
 		} else {
-			trigger_error("Could not save value for object #".$this->id." because we do not hold the lock");
+			trigger_error('Could not save value for object #'.$this->id.' because we do not hold the lock');
 		}
 	}
 
-
-//--        PERMISSIONS AND LOCKING        --//
+	// --        PERMISSIONS AND LOCKING        --//
 
 	protected function checkPerm($perm)
 	{
-		if ($perm == 0) return TRUE;
+		if ($perm == 0) {
+			return true;
+		}
 		if ($GLOBALS['user_system']->getCurrentUser('id')) {
 			return $GLOBALS['user_system']->havePerm($perm);
 		} else {
-			return TRUE;
+			return true;
 		}
 	}
 
@@ -911,67 +966,82 @@ class db_object
 	{
 		// this is to work around older config that had the word "minutes" in the config.
 		$lockLength = LOCK_LENGTH;
-		if (FALSE === strpos($lockLength, ' ')) $lockLength .= ' minutes';
+		if (!str_contains($lockLength, ' ')) {
+			$lockLength .= ' minutes';
+		}
+
 		return $lockLength;
 	}
 
-	public function haveLock($type='')
+	public function haveLock($type = '')
 	{
-		if (!empty($GLOBALS['JETHRO_INSTALLING'])) return TRUE;
+		if (!empty($GLOBALS['JETHRO_INSTALLING'])) {
+			return true;
+		}
 		if (!isset($this->_held_locks[$type])) {
-			$db =& $GLOBALS['db'];
+			$db = &$GLOBALS['db'];
 			$sql = 'SELECT COUNT(*)
 					FROM  db_object_lock
-					WHERE object_type = '.$db->quote(strtolower(get_class($this))).'
+					WHERE object_type = '.$db->quote(strtolower(static::class)).'
 						AND objectid = '.$db->quote($this->id).'
 						AND lock_type = '.$db->quote($type).'
 						AND userid = '.$GLOBALS['user_system']->getCurrentPerson('id').'
 						AND expires > NOW()';
 			$this->_held_locks[$type] = $db->queryOne($sql);
 		}
+
 		return $this->_held_locks[$type];
 	}
 
-	public function canAcquireLock($type='')
+	public function canAcquireLock($type = '')
 	{
-		if (!empty($GLOBALS['JETHRO_INSTALLING'])) return TRUE;
+		if (!empty($GLOBALS['JETHRO_INSTALLING'])) {
+			return true;
+		}
 		if (!isset($this->_acquirable_locks[$type])) {
-			$db =& $GLOBALS['db'];
+			$db = &$GLOBALS['db'];
 			$sql = 'SELECT userid
 					FROM  db_object_lock
-					WHERE object_type = '.$db->quote(strtolower(get_class($this))).'
+					WHERE object_type = '.$db->quote(strtolower(static::class)).'
 						AND lock_type = '.$db->quote($type).'
 						AND objectid = '.$db->quote($this->id).'
 						AND expires > NOW()';
 			$res = $db->queryOne($sql);
 			if ($res == $GLOBALS['user_system']->getCurrentPerson('id')) {
-				$this->_acquirable_locks[$type] = TRUE; // already got it, what the heck
-				$this->_held_locks[$type] = TRUE;
+				$this->_acquirable_locks[$type] = true; // already got it, what the heck
+				$this->_held_locks[$type] = true;
 			} else {
 				$this->_acquirable_locks[$type] = empty($res); // if nobody else has it, we can get it
 			}
 		}
+
 		return $this->_acquirable_locks[$type];
 	}
 
-	public function acquireLock($type='')
+	public function acquireLock($type = '')
 	{
-		if (!intval($this->id)) return TRUE;
-		if ($this->haveLock($type)) return TRUE;
-		if (!$this->canAcquireLock($type)) return FALSE;
+		if (!(int) $this->id) {
+			return true;
+		}
+		if ($this->haveLock($type)) {
+			return true;
+		}
+		if (!$this->canAcquireLock($type)) {
+			return false;
+		}
 		$bits = explode(' ', self::getLockLength());
 		$mins = reset($bits);
-		$db =& $GLOBALS['db'];
+		$db = &$GLOBALS['db'];
 		$sql = 'INSERT INTO db_object_lock (objectid, object_type, lock_type, userid, expires)
 				VALUES (
 					'.$db->quote($this->id).',
-					'.$db->quote(strtolower(get_class($this))).',
+					'.$db->quote(strtolower(static::class)).',
 					'.$db->quote($type).',
 					'.$db->quote($GLOBALS['user_system']->getCurrentPerson('id')).',
 					NOW() + INTERVAL '.$db->quote($mins).' MINUTE)';
 		$res = $db->query($sql);
-		$this->_held_locks[$type] = TRUE;
-		$this->_acquirable_locks[$type] = TRUE;
+		$this->_held_locks[$type] = true;
+		$this->_acquirable_locks[$type] = true;
 
 		if (rand(10, 100) == 100) {
 			$sql = 'DELETE FROM db_object_lock
@@ -979,33 +1049,38 @@ class db_object
 			$res = $db->query($sql);
 		}
 
-		return TRUE;
+		return true;
 	}
 
-    /**
-     * Get the id and name of the $type lock holder.
-     * If the user lacks permission to see the lock holder's details, first_name and last_name will be null.
-     *  @return array{userid: int, expires: string, first_name: ?string, last_name: ?string}
-     */
-    public function getLockHolder($type='') : array
-    {
-		if (!empty($GLOBALS['JETHRO_INSTALLING'])) return -1;
-        $db =& $GLOBALS['db'];
-			$sql = 'SELECT userid, expires, first_name, last_name
+	/**
+	 * Get the id and name of the $type lock holder.
+	 * If the user lacks permission to see the lock holder's details, first_name and last_name will be null.
+	 *
+	 * @return array{userid: int, expires: string, first_name: ?string, last_name: ?string}
+	 */
+	public function getLockHolder($type = ''): array
+	{
+		if (!empty($GLOBALS['JETHRO_INSTALLING'])) {
+			return -1;
+		}
+		$db = &$GLOBALS['db'];
+		$sql = 'SELECT userid, expires, first_name, last_name
 					FROM  db_object_lock
 					LEFT JOIN person p ON p.id=db_object_lock.userid
-					WHERE object_type = '.$db->quote(strtolower(get_class($this))).'
+					WHERE object_type = '.$db->quote(strtolower(static::class)).'
 						AND lock_type = '.$db->quote($type).'
 						AND objectid = '.$db->quote($this->id).'
 						AND expires > NOW()';
-			$res = $db->queryRow($sql);
-            return $res;
-    }
+		$res = $db->queryRow($sql);
+
+		return $res;
+	}
 
 	/**
 	 * Release all locks held by the specified user.
-	 * (Called at logout)
-	 * @param int $userid	ID of user whose locks are to be released
+	 * (Called at logout).
+	 *
+	 * @param int $userid ID of user whose locks are to be released
 	 */
 	public static function releaseAllLocks($userid)
 	{
@@ -1019,57 +1094,63 @@ class db_object
 		}
 	}
 
-
-	public function releaseLock($type='')
+	public function releaseLock($type = '')
 	{
-		$db =& $GLOBALS['db'];
+		$db = &$GLOBALS['db'];
 		$sql = 'DELETE FROM db_object_lock
 				WHERE userid = '.$db->quote($GLOBALS['user_system']->getCurrentPerson('id')).'
 					AND objectid = '.$db->quote($this->id).'
 					AND lock_type = '.$db->quote($type).'
-					AND object_type = '.$db->quote(strtolower(get_class($this)));
+					AND object_type = '.$db->quote(strtolower(static::class));
 		$res = $db->query($sql);
-		$this->_held_locks[$type] = FALSE;
-		$this->_acquirable_locks[$type] = NULL;
+		$this->_held_locks[$type] = false;
+		$this->_acquirable_locks[$type] = null;
 	}
 
-
-//--        GLOBAL        --//
-
+	// --        GLOBAL        --//
 
 	/**
-	 * Get an array of SQL query components for fetching rows from this object-type's table
-	 * @param array $params Logical parameters for filtering results, fieldname => value
-	 *						Fieldname can be prefixed as follows to indicate comparison operators:
-	 *						>  >=  < <= (comparison operators)
-	 *						!   (not equal)
-	 *						(   ("in", with value as an array of values)
-	 *						_   (WORDBEGIN)
-	 * @param string $logic - 'AND' or "or" (default)
-	 * @param type $order  Field to order results by
+	 * Get an array of SQL query components for fetching rows from this object-type's table.
+	 *
+	 * @param array  $params Logical parameters for filtering results, fieldname => value
+	 *                       Fieldname can be prefixed as follows to indicate comparison operators:
+	 *                       >  >=  < <= (comparison operators)
+	 *                       !   (not equal)
+	 *                       (   ("in", with value as an array of values)
+	 *                       _   (WORDBEGIN)
+	 * @param string $logic  - 'AND' or "or" (default)
+	 * @param type   $order  Field to order results by
+	 *
 	 * @return array
 	 */
 	public function getInstancesQueryComps($params, $logic, $order)
 	{
-		$db =& $GLOBALS['db'];
-		if ($logic != 'OR') $logic = 'AND';
-		$res = Array();
-		$res['select'] = Array(strtolower(get_class($this)).'.id');
+		$db = &$GLOBALS['db'];
+		if ($logic != 'OR') {
+			$logic = 'AND';
+		}
+		$res = [];
+		$res['select'] = [strtolower(static::class).'.id'];
 		foreach ($this->fields as $fieldname => $details) {
-			if ($details['type'] == 'serialise') continue;
+			if ($details['type'] == 'serialise') {
+				continue;
+			}
 			$fieldname = $details['table_name'].'.'.$fieldname;
 			$res['select'][] = $fieldname;
 		}
 		$res['from'] = $this->_getTableNames();
-		$wheres = Array();
+		$wheres = [];
 		foreach ($params as $field => $val) {
-			switch (TRUE) {
-				case ($val === NULL):
-					$operator = 'IS'; break;
-				case (is_array($val)):
-					$operator = 'IN'; break;
-				case ((FALSE !== strpos($val, '%')) || (FALSE !== strpos($val, '?'))):
-					$operator = 'LIKE'; break;
+			switch (true) {
+				case $val === null:
+					$operator = 'IS';
+					break;
+				case is_array($val):
+					$operator = 'IN';
+					break;
+				case   str_contains($val, '%') || (str_contains($val, '?')):
+					$operator = 'LIKE';
+					break;
 				default:
 					$operator = '=';
 			}
@@ -1087,18 +1168,18 @@ class db_object
 					$operator .= '=';
 					$field = substr($field, 1);
 				}
-			} else if ($field[0] == '>') {
+			} elseif ($field[0] == '>') {
 				$operator = '>';
 				$field = substr($field, 1);
 				if ($field[0] == '=') {
 					$operator .= '=';
 					$field = substr($field, 1);
 				}
-			} else if ($field[0] == '-') {
+			} elseif ($field[0] == '-') {
 				$operator = 'BETWEEN';
 				$field = substr($field, 1);
-			} else if ($field[0] == '(') {
-				if ($val === Array()) {
+			} elseif ($field[0] == '(') {
+				if ($val === []) {
 					// We're checking if the value is a member of an empty set.
 					$prefix .= '/* empty set check for '.$field.' */ ';
 					$field = '1';
@@ -1108,27 +1189,27 @@ class db_object
 					$operator = 'IN';
 					$field = substr($field, 1);
 				}
-			} else if ($field[0] == '_') {
+			} elseif ($field[0] == '_') {
 				// beginning-of-word match
 				$operator = 'WORDBEGIN';
 				$field = substr($field, 1);
-			} else if ($val === NULL) {
+			} elseif ($val === null) {
 				$operator = 'IS';
 			}
 			$raw_field = $field;
 			if ($field == 'id') {
-				$field = strtolower(get_class($this)).'.'.$field;
-			} else if (isset($this->fields[$field])) {
+				$field = strtolower(static::class).'.'.$field;
+			} elseif (isset($this->fields[$field])) {
 				$field = $this->fields[$field]['table_name'].'.'.$field;
 			}
 			if (isset($this->fields[$raw_field]) && $this->fields[$raw_field]['type'] == 'text') {
 				$field = 'LOWER('.$field.')';
 			}
 			if ($operator == 'BETWEEN') {
-				if ($val[1] === NULL) {
+				if ($val[1] === null) {
 					$operator = '>=';
 					$val = $val[0];
-				} else if ($val[0] === NULL) {
+				} elseif ($val[0] === null) {
 					$operator = '<=';
 					$val = $val[1];
 				}
@@ -1136,20 +1217,20 @@ class db_object
 			if ($operator == 'IN') {
 				if (is_array($val)) {
 					if (empty($val)) {
-					    $val = 'NULL';
+						$val = 'NULL';
 					} else {
-					    if (in_array(NULL, $val)) {
-						    $prefix  .= '((';
-						    $suffix = ') OR ('.$field.' IS NULL))';
-					    }
-					    $val = implode(',', array_map(Array($GLOBALS['db'], 'quote'), $val));
+						if (in_array(null, $val, true)) {
+							$prefix .= '((';
+							$suffix = ') OR ('.$field.' IS NULL))';
+						}
+						$val = implode(',', array_map([$GLOBALS['db'], 'quote'], $val));
 					}
 				}
 				$val = '('.$val.')'; // If val wasn't an array we dont quote it coz it's a subquery
 				$wheres[] = '('.$prefix.$field.' '.$operator.' '.$val.$suffix.')';
-			} else if ($operator == 'WORDBEGIN') {
+			} elseif ($operator == 'WORDBEGIN') {
 				$wheres[] = '(('.$field.' LIKE '.$GLOBALS['db']->quote($val.'%').') OR ('.$field.' LIKE '.$GLOBALS['db']->quote('% '.$val.'%').'))';
-			} else if ((is_array($val) && !empty($val))) {
+			} elseif (is_array($val) && !empty($val)) {
 				if ($operator == 'BETWEEN') {
 					$field_details = array_get($this->fields, $field);
 					if ($field_details && ($field_details['type'] == 'datetime') && (strlen($val[0]) == 10)) {
@@ -1160,9 +1241,9 @@ class db_object
 					}
 					$wheres[] = '('.$field.' '.$operator.' '.$db->quote($val[0]).' AND '.$db->quote($val[1]).')';
 				} else {
-					$sub_wheres = Array();
+					$sub_wheres = [];
 					foreach ($val as $v) {
-						$operator = ((FALSE === strpos($v, '%')) && (FALSE === strpos($v, '?'))) ? '=' : 'LIKE';
+						$operator = ((!str_contains($v, '%')) && (!str_contains($v, '?'))) ? '=' : 'LIKE';
 						if (isset($this->fields[$raw_field]) && $this->fields[$raw_field]['type'] == 'text') {
 							$v = strtolower($v);
 						}
@@ -1174,7 +1255,7 @@ class db_object
 				if (isset($this->fields[$raw_field]) && $this->fields[$raw_field]['type'] == 'text') {
 					$val = strtolower($val);
 				}
-				if ((is_array($val) && empty($val))) {
+				if (is_array($val) && empty($val)) {
 					$val = '';
 				}
 				$wheres[] = '('.$prefix.$field.' '.$operator.' '.$db->quote($val).$suffix.')';
@@ -1190,13 +1271,14 @@ class db_object
 				$res['order_by'] = $order; // good luck...
 			}
 		}
-		return $res;
 
+		return $res;
 	}
 
-	public function getInstancesData($params, $logic='OR', $order='')
+	public function getInstancesData($params, $logic = 'OR', $order = '')
 	{
 		$query_bits = $this->getInstancesQueryComps($params, $logic, $order);
+
 		return $this->_getInstancesData($query_bits);
 	}
 
@@ -1206,7 +1288,7 @@ class db_object
 		$sql = 'SELECT '.implode(', ', $query_bits['select']).'
 				FROM '.$query_bits['from'];
 		if (!empty($query_bits['where'])) {
-				$sql .= '
+			$sql .= '
 					WHERE '.$query_bits['where'];
 		}
 		if (!empty($query_bits['group_by'])) {
@@ -1219,32 +1301,37 @@ class db_object
 		}
 
 		$res = $db->queryAll($sql, null, null, true, true); // 5th param forces array even if one col
-		return $res;
 
-	}//end getInstances()
+		return $res;
+	}// end getInstances()
 
 	public function toString()
 	{
 		if (array_key_exists('name', $this->fields)) {
 			return $this->getValue('name');
-		} else if (array_key_exists('title', $this->fields)) {
+		} elseif (array_key_exists('title', $this->fields)) {
 			return $this->getvalue('title');
 		} else {
-			return get_class($this).' #'.$this->id;
+			return static::class.' #'.$this->id;
 		}
 	}
 
 	public function findMatchingValue($field, $val)
 	{
 		$val = strtolower($val);
-		if ($this->fields[$field]['type'] != 'select') return null;
-		foreach ($this->fields[$field]['options'] as $k => $v) {
-			if ($val == strtolower($k) || $val == strtolower($v)) return $k;
+		if ($this->fields[$field]['type'] != 'select') {
+			return null;
 		}
+		foreach ($this->fields[$field]['options'] as $k => $v) {
+			if ($val == strtolower($k) || $val == strtolower($v)) {
+				return $k;
+			}
+		}
+
 		return null;
 	}
 
-	public function fromCsvRow($row, $overwriteExistingValues=TRUE)
+	public function fromCsvRow($row, $overwriteExistingValues = true)
 	{
 		foreach ($this->fields as $fieldname => $field) {
 			if (isset($row[$fieldname])) {
@@ -1252,13 +1339,13 @@ class db_object
 				if ($field['type'] == 'select') {
 					if ($val) {
 						$newval = $this->findMatchingValue($fieldname, $val);
-						if (is_null($newval)) {
+						if (null === $newval) {
 							trigger_error("\"$val\" is not a valid option for $fieldname");
 							continue;
 						} else {
 							$val = $newval;
 						}
-					} else if (!$this->id) {
+					} elseif (!$this->id) {
 						$val = array_get($field, 'default', key($field['options']));
 					}
 				}
@@ -1272,6 +1359,4 @@ class db_object
 		}
 		$this->validateFields();
 	}
-
-
-}//end class
+}// end class

@@ -16,12 +16,12 @@ class View_Persons__Reports extends View
 			$this->_query = new Person_Query($_REQUEST['queryid']);
 			if (!empty($_GET['groupid'])) {
 				$params = $this->_query->getValue('params');
-				$params['include_groups'] = Array($_GET['groupid']);
+				$params['include_groups'] = [$_GET['groupid']];
 				$this->_query->setValue('params', $params);
 			}
 		}
 		if ($this->_query && !empty($_REQUEST['delete'])) {
-			$can_delete = FALSE;
+			$can_delete = false;
 			if (($this->_query->getValue('creator') == $GLOBALS['user_system']->getCurrentUser('id')) || $GLOBALS['user_system']->havePerm(PERM_SYSADMIN)) {
 				$can_delete = true;
 			} else {
@@ -44,7 +44,7 @@ class View_Persons__Reports extends View
 				$this->_query->create();
 			}
 
-			redirect($_REQUEST['view'], Array('queryid' => !empty($_REQUEST['return']) ? NULL : $this->_query->id));
+			redirect($_REQUEST['view'], ['queryid' => !empty($_REQUEST['return']) ? null : $this->_query->id]);
 		}
 	}
 
@@ -74,21 +74,21 @@ class View_Persons__Reports extends View
 		if (!empty($_REQUEST['configure'])) {
 			// PRINT THE FORM TO CONFIGURE THE REPORT
 			?>
-			<form method="post" class="form-horizontal" action="<?php echo build_url(Array('configure' => NULL)); ?>">
+			<form method="post" class="form-horizontal" action="<?php echo build_url(['configure' => null]); ?>">
 				<input type="hidden" name="query_submitted" value="1" />
 				<?php
 				$this->_query->acquireLock();
-				$this->_query->printForm();
-				?>
+			$this->_query->printForm();
+			?>
 				<h3>&nbsp</h3>
-				<input type="submit" class="btn" value="<?php echo _('Save and view results');?>" />
-				<input type="submit" class="btn" name="return" value="<?php echo _('Save and return to report list');?>" />
-				<a class="btn" href="?view=<?php echo ents($_REQUEST['view']); ?>"><?php echo _('Cancel and return to report list');?></a>
+				<input type="submit" class="btn" value="<?php echo _('Save and view results'); ?>" />
+				<input type="submit" class="btn" name="return" value="<?php echo _('Save and return to report list'); ?>" />
+				<a class="btn" href="?view=<?php echo ents($_REQUEST['view']); ?>"><?php echo _('Cancel and return to report list'); ?></a>
 
 			</form>
 			<?php
 
-		} else if (!empty($this->_query->id)) {
+		} elseif (!empty($this->_query->id)) {
 			// SHOW QUERY RESULTS
 			?>
 			<?php
@@ -98,37 +98,36 @@ class View_Persons__Reports extends View
 			<hr />
 			<div class="row-fluid no-print">
 				<div class="span4">
-					<a href="?view=<?php echo ents($_REQUEST['view']); ?>"><i class="icon-chevron-left"></i><?php echo _('Back to list of reports');?></a>
+					<a href="?view=<?php echo ents($_REQUEST['view']); ?>"><i class="icon-chevron-left"></i><?php echo _('Back to list of reports'); ?></a>
 				</div>
 				<div class="span4 align-centre">
-					<a href="?view=<?php echo ents($_REQUEST['view']); ?>&queryid=<?php echo $this->_query->id; ?>&configure=1"><i class="icon-wrench"></i><?php echo _('Reconfigure this report');?></a>
+					<a href="?view=<?php echo ents($_REQUEST['view']); ?>&queryid=<?php echo $this->_query->id; ?>&configure=1"><i class="icon-wrench"></i><?php echo _('Reconfigure this report'); ?></a>
 				</div>
 				<div class="span4 align-right hidden-phone">
-					<a href="?call=report_csv&queryid=<?php echo $this->_query->id; ?>"><i class="icon-download-alt"></i><?php echo _('Download CSV');?></a>
+					<a href="?call=report_csv&queryid=<?php echo $this->_query->id; ?>"><i class="icon-download-alt"></i><?php echo _('Download CSV'); ?></a>
 				</div>
 			</div>
 			<?php
-			
-		} else if (!empty($_REQUEST['queryid']) && is_numeric($_REQUEST['queryid'])) {
+
+		} elseif (!empty($_REQUEST['queryid']) && is_numeric($_REQUEST['queryid'])) {
 			// THEY ASKED FOR A QUERY BUT THEY CAN'T HAVE IT
 			print_message('The requested report does not exist, or you do not have permission to view it', 'error');
-			return;
 
-		} else if (!empty($_REQUEST['custom_report'])) {
+			return;
+		} elseif (!empty($_REQUEST['custom_report'])) {
 			$this->_executeCustomReport($_REQUEST['custom_report']);
-			
 		} else {
 			// PRINT THE LIST OF SAVED REPORTS
 			?>
 			<p>
-				<a href="<?php echo build_url(Array('*' => NULL, 'view' => $_REQUEST['view'], 'queryid' => 0, 'configure' => 1)); ?>"><i class="icon-plus-sign"></i><?php echo _('Create a new report');?></a>
+				<a href="<?php echo build_url(['*' => null, 'view' => $_REQUEST['view'], 'queryid' => 0, 'configure' => 1]); ?>"><i class="icon-plus-sign"></i><?php echo _('Create a new report'); ?></a>
 			</p>
 
 			<?php
-			$saved_reports = $GLOBALS['system']->getDBObjectData('person_query', Array('(owner' => Array(NULL, $GLOBALS['user_system']->getCurrentUser('id'))), 'OR', 'name');
+			$saved_reports = $GLOBALS['system']->getDBObjectData('person_query', ['(owner' => [null, $GLOBALS['user_system']->getCurrentUser('id')]], 'OR', 'name');
 			if (empty($saved_reports) && empty($_SESSION['saved_query'])) {
 				?>
-				<p><i><?php echo _('There are not yet any reports saved in the system');?></i></p>
+				<p><i><?php echo _('There are not yet any reports saved in the system'); ?></i></p>
 				<?php
 			} else {
 				?>
@@ -137,16 +136,16 @@ class View_Persons__Reports extends View
 					<thead>
 						<tr>
 							<th class="hidden-phone">ID</th>
-							<th><?php echo _('Report Name');?></th>
-							<th><?php echo _('Visible To');?></th>
+							<th><?php echo _('Report Name'); ?></th>
+							<th><?php echo _('Visible To'); ?></th>
 						<?php
 						if (!SizeDetector::isNarrow()) {
 							?>
-							<th><?php echo _('Actions');?></th>
+							<th><?php echo _('Actions'); ?></th>
 							<th></th>
 							<?php
 						}
-						?>
+				?>
 						</tr>
 					</thead>
 					<tbody>
@@ -158,18 +157,18 @@ class View_Persons__Reports extends View
 							<td class="hidden-phone">-</td>
 							<td>
 								<a href="?view=<?php echo ents($_REQUEST['view']); ?>&queryid=TEMP">
-									<i><?php echo _('Last ad-hoc report');?></i>
+									<i><?php echo _('Last ad-hoc report'); ?></i>
 								</a>
 							</td>
 						} else {
 							?>
 							<tr>
 								<td class="hidden-phone">-</td>
-								<td><i><?php echo _('Last ad-hoc report');?></i></td>
+								<td><i><?php echo _('Last ad-hoc report'); ?></i></td>
 								<td>-</td>
 								<td class="action-cell">
-									<a href="?view=<?php echo ents($_REQUEST['view']); ?>&queryid=TEMP"><i class="icon-list"></i><?php echo _('View');?></a> &nbsp;
-									<a href="?view=<?php echo ents($_REQUEST['view']); ?>&queryid=TEMP&configure=1"><i class="icon-wrench"></i><?php echo _('Configure');?></a> &nbsp;
+									<a href="?view=<?php echo ents($_REQUEST['view']); ?>&queryid=TEMP"><i class="icon-list"></i><?php echo _('View'); ?></a> &nbsp;
+									<a href="?view=<?php echo ents($_REQUEST['view']); ?>&queryid=TEMP&configure=1"><i class="icon-wrench"></i><?php echo _('Configure'); ?></a> &nbsp;
 								</td>
 								<td></td>
 							</tr>
@@ -177,54 +176,58 @@ class View_Persons__Reports extends View
 						}
 					}
 
-					$staff_members = $GLOBALS['system']->getDBObjectData('staff_member');
-					$current_user_id = $GLOBALS['user_system']->getCurrentUser('id');
-					foreach ($saved_reports as $id => $details) {
-						?>
+				$staff_members = $GLOBALS['system']->getDBObjectData('staff_member');
+				$current_user_id = $GLOBALS['user_system']->getCurrentUser('id');
+				foreach ($saved_reports as $id => $details) {
+					?>
 						<tr>
-							<td class="narrow hidden-phone"><?php echo (int)$id; ?></td>
+							<td class="narrow hidden-phone"><?php echo (int) $id; ?></td>
 							<td>
 								<?php
-								if (SizeDetector::isNarrow()) echo '<a href="?view='.ents($_REQUEST['view']).'&queryid='.(int)$id.'">';
-								echo $details['name'];
-								if (SizeDetector::isNarrow()) echo '</a>';
-								?>
+							if (SizeDetector::isNarrow()) {
+								echo '<a href="?view='.ents($_REQUEST['view']).'&queryid='.(int) $id.'">';
+							}
+					echo $details['name'];
+					if (SizeDetector::isNarrow()) {
+						echo '</a>';
+					}
+					?>
 							</td>
-							<td><?php echo ($details['owner'] === NULL) ? _('Everyone') : _('Only Me'); ?></td>
+							<td><?php echo ($details['owner'] === null) ? _('Everyone') : _('Only Me'); ?></td>
 						<?php
 						if (!SizeDetector::isNarrow()) {
 							?>
 							<td class="action-cell narrow">
-								<a href="?view=<?php echo ents($_REQUEST['view']); ?>&queryid=<?php echo $id; ?>"><i class="icon-list"></i><?php echo _('View');?></a> &nbsp;
+								<a href="?view=<?php echo ents($_REQUEST['view']); ?>&queryid=<?php echo $id; ?>"><i class="icon-list"></i><?php echo _('View'); ?></a> &nbsp;
 							<?php
 							if (strlen($details['mailchimp_list_id'])) {
 								?>
-								<a href="?view=_send_mc_campaign&reportid=<?php echo (int)$id; ?>"><i class="icon-email">@</i>Send campaign</a>
+								<a href="?view=_send_mc_campaign&reportid=<?php echo (int) $id; ?>"><i class="icon-email">@</i>Send campaign</a>
 								<?php
 							} else {
 								?>
-								<a target="_append" href="?call=email&print_modal=1&queryid=<?php echo $id; ?>"><i class="icon-email">@</i><?php echo _('Email');?></a>
+								<a target="_append" href="?call=email&print_modal=1&queryid=<?php echo $id; ?>"><i class="icon-email">@</i><?php echo _('Email'); ?></a>
 								<?php
 							}
 							?>
 							</td>
 							<td class="action-cell narrow">
-								<a href="?view=<?php echo ents($_REQUEST['view']); ?>&queryid=<?php echo $id; ?>&configure=1"><i class="icon-wrench"></i><?php echo _('Configure');?></a> &nbsp;
+								<a href="?view=<?php echo ents($_REQUEST['view']); ?>&queryid=<?php echo $id; ?>&configure=1"><i class="icon-wrench"></i><?php echo _('Configure'); ?></a> &nbsp;
 							<?php
 							if ($GLOBALS['user_system']->havePerm(PERM_MANAGEREPORTS)) {
 								?>
-								<a href="?view=<?php echo ents($_REQUEST['view']); ?>&queryid=<?php echo $id; ?>&delete=1" data-method="post" class=" double-confirm-title" title="Delete this report"><i class="icon-trash"></i><?php echo _('Delete');?></a>
+								<a href="?view=<?php echo ents($_REQUEST['view']); ?>&queryid=<?php echo $id; ?>&delete=1" data-method="post" class=" double-confirm-title" title="Delete this report"><i class="icon-trash"></i><?php echo _('Delete'); ?></a>
 								<?php
 							}
 							?>
 							</td>
 							<?php
 						}
-						?>
+					?>
 						</tr>
 						<?php
-					}
-					?>
+				}
+				?>
 					</tbody>
 				</table>
 				</form>
@@ -238,14 +241,16 @@ class View_Persons__Reports extends View
 	private function _listCustomReports()
 	{
 		$files = $this->_getCustomReports();
-		if (empty($files)) return;
-		
+		if (empty($files)) {
+			return;
+		}
+
 		?>
 		<h3>Custom Reports</h3>
 		<ul>
 		<?php
 		foreach ($files as $fn => $title) {
-			echo '<li><a href="'.build_url(Array('custom_report' => $fn)).'">'.ents($title).'</a></li>';
+			echo '<li><a href="'.build_url(['custom_report' => $fn]).'">'.ents($title).'</a></li>';
 		}
 		?>
 		</ul>
@@ -256,32 +261,38 @@ class View_Persons__Reports extends View
 	{
 		$reports = $this->_getCustomReports();
 		if (!isset($reports[$file])) {
-			trigger_error("Invalid custom report filename");
+			trigger_error('Invalid custom report filename');
+
 			return;
 		}
 		$fn = $this->_getCustomReportsDir().'/'.$file;
 		if (!is_readable($fn)) {
-				trigger_error("Custom report SQL file is not readable");
-				return;
+			trigger_error('Custom report SQL file is not readable');
+
+			return;
 		}
 
 		echo '<h2>'.ents($reports[$file]).'</h2>';
 		$fp = fopen($fn, 'r');
 		if (!$fp) {
-				trigger_error("Could not open custom report SQL file");
-				return;
+			trigger_error('Could not open custom report SQL file');
+
+			return;
 		}
 		$sql = fread($fp, 99999);
 		fclose($fp);
 
 		$sql = trim($sql);
-		if (0 !== strpos(strtoupper($sql), 'SELECT')) {
-			trigger_error("Custom report does not seem to start with SELECT; aborting");
+		if (!str_starts_with(strtoupper($sql), 'SELECT')) {
+			trigger_error('Custom report does not seem to start with SELECT; aborting');
+
 			return;
 		}
 
 		$res = $GLOBALS['db']->queryAll($sql);
-		if (empty($res)) return;
+		if (empty($res)) {
+			return;
+		}
 
 		?>
 		<table class="table table-bordered table-condensed table-auto-width">
@@ -289,12 +300,12 @@ class View_Persons__Reports extends View
 				<tr>
 				<?php
 				$headers = array_keys($res[0]);
-				foreach ($headers as $h) {
-					?>
+		foreach ($headers as $h) {
+			?>
 					<th><?php echo ents($h); ?></th>
 					<?php
-				}
-				?>
+		}
+		?>
 			</thead>
 			<tbody>
 			<?php
@@ -309,7 +320,7 @@ class View_Persons__Reports extends View
 				</tr>
 				<?php
 			}
-			?>
+		?>
 			</tbody>
 			<tfoot>
 				<tr>
@@ -326,28 +337,29 @@ class View_Persons__Reports extends View
 		<?php
 	}
 
-
 	private function _getCustomReports()
 	{
 		$dir = $this->_getCustomReportsDir();
-		if (!is_dir($dir)) return Array();
+		if (!is_dir($dir)) {
+			return [];
+		}
 
 		$files = glob($dir.'/*.sql');
-		if (empty($files)) return Array();
+		if (empty($files)) {
+			return [];
+		}
 
 		foreach ($files as $f) {
 			$f = basename($f);
 			$title = substr(ucwords(str_replace('_', ' ', $f)), 0, -4);
 			$res[$f] = $title;
 		}
-		return $res;
 
+		return $res;
 	}
 
 	private function _getCustomReportsDir()
 	{
 		return ifdef('CUSTOM_REPORTS_DIR', JETHRO_ROOT.'/custom_reports');
 	}
-
 }
-

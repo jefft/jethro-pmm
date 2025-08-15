@@ -1,4 +1,5 @@
 <?php
+
 require_once 'abstract_view_edit_object.class.php';
 class View__Edit_Person extends Abstract_View_Edit_Object
 {

@@ -24,10 +24,10 @@
  * @package jethro-pmm
  */
 
-define('THIS_DIR', str_replace('\\', '/', dirname(__FILE__)));
+define('THIS_DIR', str_replace('\\', '/', __DIR__));
 define('JETHRO_ROOT', preg_replace('#/public$#', '', THIS_DIR));
 define('TEMPLATE_DIR', THIS_DIR.'/templates/');
-set_include_path(get_include_path().PATH_SEPARATOR.dirname(THIS_DIR));
+set_include_path(get_include_path().\PATH_SEPARATOR.dirname(THIS_DIR));
 
 // Load configuration
 require_once dirname(THIS_DIR).'/conf.php';
@@ -48,7 +48,7 @@ $GLOBALS['system'] = System_Controller::get(THIS_DIR);
 // Check if public access is enabled
 // But wave through roster_ical requests, which are access-checked later.
 if ((ifdef('PUBLIC_AREA_ENABLED', 0) == 0) && (array_get($_GET, 'call') != 'roster_ical')) {
-	header("HTTP/1.0 403 Forbidden");
+	header('HTTP/1.0 403 Forbidden');
 	?>
 	<p>The public area is not enabled for this Jethro System.  You may like to view the <a href="/members">members area<a>
 	<?php

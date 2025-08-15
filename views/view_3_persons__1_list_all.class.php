@@ -10,15 +10,15 @@ class View_Persons__List_All extends View
 		if (!empty($_REQUEST['search'])) {
 			$this->_person_data = Person::getPersonsBySearch($_REQUEST['search']);
 
-			if ((count($this->_person_data) == 1)) {
+			if (count($this->_person_data) == 1) {
 				add_message('One matching person found');
-				redirect('persons', Array('name' => NULL, 'personid' => key($this->_person_data)));
+				redirect('persons', ['name' => null, 'personid' => key($this->_person_data)]);
 			}
 
 			// Put all the archived ones last
-			$archiveds = Array();
+			$archiveds = [];
 			foreach ($this->_person_data as $k => $v) {
-				if (in_array($v['status'], Person_Status::getArchivedIDs())) {
+				if (in_array($v['status'], Person_Status::getArchivedIDs(), true)) {
 					$archiveds[$k] = $v;
 					unset($this->_person_data[$k]);
 				}
@@ -27,8 +27,7 @@ class View_Persons__List_All extends View
 				$this->_person_data[$k] = $v;
 			}
 		} else {
-
-			$params = Array();
+			$params = [];
 			if (empty($_REQUEST['show_archived'])) {
 				$params['!(status'] = Person_Status::getArchivedIDs();
 			}
@@ -36,18 +35,17 @@ class View_Persons__List_All extends View
 				$_SESSION['total_persons'] = $GLOBALS['db']->queryOne('SELECT count(*) from person');
 			}
 			if (!empty($_REQUEST['slice_size'])) {
-				$this->_paginator = new Paginator((float)$_REQUEST['slice_size'], (int)$_REQUEST['slice_num']);
+				$this->_paginator = new Paginator((float) $_REQUEST['slice_size'], (int) $_REQUEST['slice_num']);
 				$params['-SUBSTRING(person.last_name, 1, 1)'] = $this->_paginator->getCurrentSliceStartEnd();
-			} else if ($_SESSION['total_persons'] > CHUNK_SIZE) {
+			} elseif ($_SESSION['total_persons'] > CHUNK_SIZE) {
 				$num_chunks = ceil($_SESSION['total_persons'] / CHUNK_SIZE);
 				$this->_paginator = new Paginator(26 / $num_chunks, 1);
 				$params['-SUBSTRING(person.last_name, 1, 1)'] = $this->_paginator->getCurrentSliceStartEnd();
 			}
-			$this->_person_data = ($GLOBALS['system']->getDBObjectData('person', $params, 'AND', 'last_name'));
+			$this->_person_data = $GLOBALS['system']->getDBObjectData('person', $params, 'AND', 'last_name');
 		}
 	}
 
-	
 	function getTitle()
 	{
 		if (!empty($_REQUEST['search'])) {
@@ -57,7 +55,6 @@ class View_Persons__List_All extends View
 		}
 	}
 
-	
 	function printView()
 	{
 		?>
@@ -74,10 +71,10 @@ class View_Persons__List_All extends View
 			<?php
 			if (!empty($_REQUEST['search'])) {
 				?>
-				<a class="btn" href="<?php echo build_url(Array('search'=>NULL));?>"><i class="icon-remove"></i></a>
+				<a class="btn" href="<?php echo build_url(['search' => null]); ?>"><i class="icon-remove"></i></a>
 				<?php
 			}
-			?>
+		?>
 			</span>
 		</form>
 		<?php
@@ -86,38 +83,37 @@ class View_Persons__List_All extends View
 				$this->_paginator->printPageNav();
 			}
 			if (empty($_REQUEST['show_archived'])) {
-				echo '<p class="pull-right"><i class="icon-eye-open"></i> <a class="soft" href="'.build_url(Array('show_archived' => 1)).'">Include Archived</a></p>';
+				echo '<p class="pull-right"><i class="icon-eye-open"></i> <a class="soft" href="'.build_url(['show_archived' => 1]).'">Include Archived</a></p>';
 			} else {
-				echo '<p class="pull-right"><i class="icon-eye-close"></i> <a class="soft" href="'.build_url(Array('show_archived' => NULL)).'">Exclude Archived</a></p>';
+				echo '<p class="pull-right"><i class="icon-eye-close"></i> <a class="soft" href="'.build_url(['show_archived' => null]).'">Exclude Archived</a></p>';
 			}
 		}
 
 		$GLOBALS['system']->includeDBClass('person');
-		$persons =& $this->_person_data;
+		$persons = &$this->_person_data;
 		if (empty($persons)) {
 			if ($this->_paginator) {
 				?>
-				<p><strong><?php echo _('No persons in this range');?></strong></p>
+				<p><strong><?php echo _('No persons in this range'); ?></strong></p>
 				<?php
-			} else if (!empty($_REQUEST['search'])) {
+			} elseif (!empty($_REQUEST['search'])) {
 				?>
-				<p><strong><?php echo _('No matching families were found')?></strong></p>			
+				<p><strong><?php echo _('No matching families were found'); ?></strong></p>			
 				<?php
 			} else {
 				?>
-				<p><strong><?php echo _('No persons were found');?></strong></p>
-				<a href="<?php echo build_url(Array('show_archived' => 1)); ?>"><?php echo _('Include Archived Persons');?></a>
+				<p><strong><?php echo _('No persons were found'); ?></strong></p>
+				<a href="<?php echo build_url(['show_archived' => 1]); ?>"><?php echo _('Include Archived Persons'); ?></a>
 				<?php
 			}
-			 
 		} else {
 			if ($this->_paginator) {
 				echo '<p><strong>'.count($persons)._(' persons in this range').'</strong></p>';
-			} else if (!empty($_REQUEST['search'])) {
+			} elseif (!empty($_REQUEST['search'])) {
 				?>
-				<p><strong><?php echo count($persons).' '._('matching persons found').':';?></strong></p>			
+				<p><strong><?php echo count($persons).' '._('matching persons found').':'; ?></strong></p>			
 				<?php
-			} else  {
+			} else {
 				echo '<p><strong>'.count($persons)._(' persons in total').'</strong></p>';
 			}
 		}
@@ -125,8 +121,8 @@ class View_Persons__List_All extends View
 		</div>
 		<?php
 		if (!empty($persons)) {
-			$special_fields = Array('congregation');
-			include dirname(dirname(__FILE__)).'/templates/person_list.template.php';
+			$special_fields = ['congregation'];
+			include dirname(__DIR__).'/templates/person_list.template.php';
 		}
 	}
 }

@@ -24,10 +24,10 @@
  * @package jethro-pmm
  */
 
-define('THIS_DIR', str_replace('\\', '/', dirname(__FILE__)));
+define('THIS_DIR', str_replace('\\', '/', __DIR__));
 define('JETHRO_ROOT', preg_replace('#/members$#', '', THIS_DIR));
 define('TEMPLATE_DIR', THIS_DIR.'/templates/');
-set_include_path(get_include_path().PATH_SEPARATOR.dirname(THIS_DIR));
+set_include_path(get_include_path().\PATH_SEPARATOR.dirname(THIS_DIR));
 
 // Load configuration
 require_once dirname(THIS_DIR).'/conf.php';
@@ -52,7 +52,7 @@ require_once THIS_DIR.'/include/member_user_system.class.php';
 $GLOBALS['user_system'] = new Member_User_System();
 $GLOBALS['user_system']->run();
 
-if ($GLOBALS['user_system']->getCurrentMember() != NULL) {
+if ($GLOBALS['user_system']->getCurrentMember() != null) {
 	require_once 'include/system_controller.class.php';
 	$GLOBALS['system'] = System_Controller::get(THIS_DIR);
 	System_Controller::get()->run();

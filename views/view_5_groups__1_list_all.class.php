@@ -1,9 +1,9 @@
 <?php
 class View_Groups__List_All extends View
 {
-	var $_group = NULL;
-	var $_group_data = NULL;
-	var $_category_data = NULL;
+	var $_group;
+	var $_group_data;
+	var $_category_data;
 
 	function getTitle()
 	{
@@ -16,29 +16,31 @@ class View_Groups__List_All extends View
 
 	function processView()
 	{
-		$this->_category_data = $GLOBALS['system']->getDBObjectData('person_group_category', Array(), 'OR', 'name');
+		$this->_category_data = $GLOBALS['system']->getDBObjectData('person_group_category', [], 'OR', 'name');
 		if (!empty($_REQUEST['search'])) {
-			$this->_group_data = $GLOBALS['system']->getDBObjectData('person_group', Array('name' => array_get($_REQUEST, 'search', '')), 'OR', 'name');
+			$this->_group_data = $GLOBALS['system']->getDBObjectData('person_group', ['name' => array_get($_REQUEST, 'search', '')], 'OR', 'name');
 			if (empty($this->_group_data)) {
-				$this->_group_data = $GLOBALS['system']->getDBObjectData('person_group', Array('name' => '%'.array_get($_REQUEST, 'search', '').'%'), 'OR', 'name');
+				$this->_group_data = $GLOBALS['system']->getDBObjectData('person_group', ['name' => '%'.array_get($_REQUEST, 'search', '').'%'], 'OR', 'name');
 			}
 			if (count($this->_group_data) == 1) {
-				add_message("One group found");
-				redirect('groups', Array('groupid' => key($this->_group_data), 'name' => NULL)); // exits
+				add_message('One group found');
+				redirect('groups', ['groupid' => key($this->_group_data), 'name' => null]); // exits
 			}
 		} else {
-			$conds = empty($_REQUEST['show_archived'])? Array('is_archived' => 0) : Array();
+			$conds = empty($_REQUEST['show_archived']) ? ['is_archived' => 0] : [];
 			$this->_group_data = $GLOBALS['system']->getDBObjectData('person_group', $conds, 'OR', 'categoryid, name');
 		}
 	}
 
-	function _printCats($parentid=0)
+	function _printCats($parentid = 0)
 	{
 		foreach ($this->_category_data as $cid => $cat) {
-			if ($cat['parent_category'] != $parentid) continue;
+			if ($cat['parent_category'] != $parentid) {
+				continue;
+			}
 			?>
 			<h3><?php echo ents($cat['name']); ?></h3>
-			<?php 
+			<?php
 			$this->_printGroupsForCategory($cid);
 			?>
 			<div class="indent-left">
@@ -52,9 +54,11 @@ class View_Groups__List_All extends View
 
 	function _printGroupsForCategory($cid)
 	{
-		$my_groups = Array();
-		foreach($this->_group_data as $gid => $group) {
-			if ($group['categoryid'] == $cid) $my_groups[$gid] = $group;
+		$my_groups = [];
+		foreach ($this->_group_data as $gid => $group) {
+			if ($group['categoryid'] == $cid) {
+				$my_groups[$gid] = $group;
+			}
 		}
 		if (!empty($my_groups)) {
 			?>
@@ -62,15 +66,15 @@ class View_Groups__List_All extends View
 				<thead>
 					<tr>
 						<th class="narrow">ID</th>
-						<th><?php echo _('Name');?></th>
-						<th class="narrow"><?php echo _('Members');?></th>
+						<th><?php echo _('Name'); ?></th>
+						<th class="narrow"><?php echo _('Members'); ?></th>
 					<?php
 					if ($GLOBALS['user_system']->havePerm(PERM_EDITGROUP)) {
 						?>
 						<th></th>
 						<?php
 					}
-					?>
+			?>
 					</tr>
 				</thead>
 				<tbody>
@@ -86,11 +90,11 @@ class View_Groups__List_All extends View
 					if ($GLOBALS['user_system']->havePerm(PERM_EDITGROUP)) {
 						?>
 						<td class="narrow action-cell">
-							<a href="?view=_edit_group&groupid=<?php echo $gid; ?>&back_to=groups__list_all"><i class="icon-wrench"></i><?php echo _('Edit');?></a>
+							<a href="?view=_edit_group&groupid=<?php echo $gid; ?>&back_to=groups__list_all"><i class="icon-wrench"></i><?php echo _('Edit'); ?></a>
 							<form class="min" method="post" action="?view=_edit_group&groupid=<?php echo $gid; ?>">
 								<input type="hidden" name="action" value="delete" />
 								<button type="submit" class="btn-link double-confirm-title"title="Delete this group">
-									<i class="icon-trash"></i><?php echo _('Delete');?>
+									<i class="icon-trash"></i><?php echo _('Delete'); ?>
 								</button>
 							</form>
 						</td>
@@ -100,15 +104,13 @@ class View_Groups__List_All extends View
 					</tr>
 					<?php
 				}
-				?>
+			?>
 				</tbody>
 			</table>
 			<?php
 		}
 	}
-			
-				
-	
+
 	function printView()
 	{
 		// Search form - show top right if not yet searching
@@ -123,10 +125,10 @@ class View_Groups__List_All extends View
 			<?php
 			if (!empty($_REQUEST['search'])) {
 				?>
-				<a class="btn" href="<?php echo build_url(Array('search'=>NULL));?>"><i class="icon-remove"></i></a>
+				<a class="btn" href="<?php echo build_url(['search' => null]); ?>"><i class="icon-remove"></i></a>
 				<?php
 			}
-			?>
+		?>
 			</span>
 		</form>
 		<?php
@@ -135,22 +137,22 @@ class View_Groups__List_All extends View
 			<?php
 			if (empty($_REQUEST['show_archived'])) {
 				?>
-				<a class="soft pull-right hidden-phone" href="<?php echo build_url(Array('show_archived' => 1)); ?>"><i class="icon-eye-open"></i><?php echo _('Include Archived')?></a>
+				<a class="soft pull-right hidden-phone" href="<?php echo build_url(['show_archived' => 1]); ?>"><i class="icon-eye-open"></i><?php echo _('Include Archived'); ?></a>
 				<?php
 			} else {
 				?>
-				<a class="soft pull-right hidden-phone" href="<?php echo build_url(Array('show_archived' => 0)); ?>"><i class="icon-eye-close"></i><?php echo _('Exclude Archived')?></a>
+				<a class="soft pull-right hidden-phone" href="<?php echo build_url(['show_archived' => 0]); ?>"><i class="icon-eye-close"></i><?php echo _('Exclude Archived'); ?></a>
 				<?php
 			}
 
 			if ($GLOBALS['user_system']->havePerm(PERM_EDITGROUP)) {
 				?>
-				<a href="?view=groups__add"><i class="icon-plus-sign"></i><?php echo _('Add a new group');?></a>
+				<a href="?view=groups__add"><i class="icon-plus-sign"></i><?php echo _('Add a new group'); ?></a>
 				<?php
 			}
 			?>
 			<?php
-		} else if (empty($this->_group_data)) {
+		} elseif (empty($this->_group_data)) {
 			?>
 			<p><strong>No matching groups were found</strong></p>
 			<?php
@@ -164,17 +166,17 @@ class View_Groups__List_All extends View
 		<div>
 			<?php
 			$cats = $this->_category_data; // + Array(0 => Array('name' => 'Uncategorised Groups'));
-			$this->_printCats();
-			foreach ($this->_group_data as $g) {
-				if ($g['categoryid'] == 0) {
-					?>
-					<h3><?php echo _('Uncategorised Groups');?></h3>
-					<?php 
-					$this->_printGroupsForCategory(0);
-					break;
-				}
+		$this->_printCats();
+		foreach ($this->_group_data as $g) {
+			if ($g['categoryid'] == 0) {
+				?>
+					<h3><?php echo _('Uncategorised Groups'); ?></h3>
+					<?php
+				$this->_printGroupsForCategory(0);
+				break;
 			}
-			?>
+		}
+		?>
 		</div>
 		<?php
 

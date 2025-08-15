@@ -1,11 +1,12 @@
 <?php
+
 class Call_Sample_Import extends Call
 {
 	function run()
 	{
 		$fp = fopen('php://output', 'w');
 		header('Content-type: application/force-download');
-		header("Content-Type: application/download");
+		header('Content-Type: application/download');
 		header('Content-type: text/csv');
 		header('Content-Disposition: attachment; filename="jethro_sample_import.csv"');
 		$GLOBALS['system']->includeDBClass('family');
@@ -19,25 +20,28 @@ class Call_Sample_Import extends Call
 		foreach ($congs as $id => $detail) {
 			$congs[$id] = $detail['name'];
 		}
-		$statuses = Person_Status::getActive(FALSE);
+		$statuses = Person_Status::getActive(false);
 		$first_status = reset($statuses);
 		$first_status = $first_status['label'];
 		$last_status = end($statuses);
 		$last_status = $last_status['label'];
-		$age_brackets = $GLOBALS['system']->getDBObjectData('age_bracket', Array(), 'OR', 'rank');
+		$age_brackets = $GLOBALS['system']->getDBObjectData('age_bracket', [], 'OR', 'rank');
 		$default_age_bracket = '';
 		$child_age_bracket = '';
 		foreach ($age_brackets as $id => $details) {
-			if ($details['is_default']) $default_age_bracket = $details['label'];
-			if (!$details['is_adult']) $child_age_bracket = $details['label'];
+			if ($details['is_default']) {
+				$default_age_bracket = $details['label'];
+			}
+			if (!$details['is_adult']) {
+				$child_age_bracket = $details['label'];
+			}
 		}
 		$mobile_length = jreset(get_valid_phone_number_lengths(MOBILE_TEL_FORMATS));
 		$home_length = jreset(get_valid_phone_number_lengths(HOME_TEL_FORMATS));
 		$work_length = jreset(get_valid_phone_number_lengths(WORK_TEL_FORMATS));
 
-
-		$data = Array(
-			Array(
+		$data = [
+			[
 				'family_name' => 'Luther',
 				'last_name' => 'Luther',
 				'first_name' => 'Martin',
@@ -46,17 +50,17 @@ class Call_Sample_Import extends Call
 				'gender' => 'male',
 				'age_bracket' => $default_age_bracket,
 				'email' => 'mluther@wittenberg.edu.de',
-				'mobile_tel' => '04'.str_repeat(rand(0,9), $mobile_length-2),
-				'work_tel' => str_repeat(rand(1,9),$work_length),
-				'home_tel' => str_repeat(rand(1,9),$home_length),
+				'mobile_tel' => '04'.str_repeat(rand(0, 9), $mobile_length - 2),
+				'work_tel' => str_repeat(rand(1, 9), $work_length),
+				'home_tel' => str_repeat(rand(1, 9), $home_length),
 				'address_street' => 'Collegienstraße 54',
 				'address_suburb' => 'Wittenberg',
 				'address_state' => ifdef('ADDRESS_STATE_DEFAULT', ''),
 				'address_postcode' => '1234',
 				'note' => 'Founding member',
-				'groups' => Array('Preaching volunteers', 'Gutter cleaning roster', 'Beer Appreciation Group'),
-			),
-			Array(
+				'groups' => ['Preaching volunteers', 'Gutter cleaning roster', 'Beer Appreciation Group'],
+			],
+			[
 				'family_name' => 'Luther',
 				'last_name' => 'von Bora',
 				'first_name' => 'Katherine',
@@ -65,7 +69,7 @@ class Call_Sample_Import extends Call
 				'gender' => 'female',
 				'age_bracket' => $default_age_bracket,
 				'email' => 'katievb1517@gmail.com',
-				'mobile_tel' => '04'.str_repeat(rand(0,9), $mobile_length-2),
+				'mobile_tel' => '04'.str_repeat(rand(0, 9), $mobile_length - 2),
 				'work_tel' => '',
 				'home_tel' => '',
 				'address_street' => '',
@@ -73,9 +77,9 @@ class Call_Sample_Import extends Call
 				'address_state' => '',
 				'address_postcode' => '',
 				'note' => 'NB ex-nun',
-				'groups' => Array('Hospitality team', 'Womens Guild')
-			),
-			Array(
+				'groups' => ['Hospitality team', 'Womens Guild'],
+			],
+			[
 				'family_name' => 'Luther',
 				'last_name' => 'Luther',
 				'first_name' => 'Hans',
@@ -92,8 +96,8 @@ class Call_Sample_Import extends Call
 				'address_state' => '',
 				'address_postcode' => '',
 				'note' => '',
-			),
-			Array(
+			],
+			[
 				'family_name' => 'Luther',
 				'last_name' => 'Luther',
 				'first_name' => 'Elizabeth',
@@ -110,8 +114,8 @@ class Call_Sample_Import extends Call
 				'address_state' => '',
 				'address_postcode' => '',
 				'note' => '',
-			),
-			Array(
+			],
+			[
 				'family_name' => 'Calvin',
 				'last_name' => 'Calvin',
 				'first_name' => 'John',
@@ -120,16 +124,16 @@ class Call_Sample_Import extends Call
 				'gender' => 'male',
 				'age_bracket' => $default_age_bracket,
 				'email' => 'jcalvin@geneva.gov.ch',
-				'mobile_tel' => '04'.str_repeat(rand(0,9), $mobile_length-2),
-				'work_tel' => str_repeat(rand(0,9),$work_length),
-				'home_tel' => str_repeat(rand(0,9),$home_length),
+				'mobile_tel' => '04'.str_repeat(rand(0, 9), $mobile_length - 2),
+				'work_tel' => str_repeat(rand(0, 9), $work_length),
+				'home_tel' => str_repeat(rand(0, 9), $home_length),
 				'address_street' => 'Rue des Chanoines 1',
 				'address_suburb' => 'Geneva',
 				'address_state' => ifdef('ADDRESS_STATE_DEFAULT', ''),
 				'address_postcode' => '1234',
 				'note' => 'Not as reformed as you think',
-			),
-			Array(
+			],
+			[
 				'family_name' => 'Calvin',
 				'last_name' => 'de Bure',
 				'first_name' => 'Idelette',
@@ -138,7 +142,7 @@ class Call_Sample_Import extends Call
 				'gender' => 'female',
 				'age_bracket' => $default_age_bracket,
 				'email' => 'idelette1540@hotmail.com',
-				'mobile_tel' => '04'.str_repeat(rand(0,9), $mobile_length-2),
+				'mobile_tel' => '04'.str_repeat(rand(0, 9), $mobile_length - 2),
 				'work_tel' => '',
 				'home_tel' => '',
 				'address_street' => '',
@@ -146,8 +150,8 @@ class Call_Sample_Import extends Call
 				'address_state' => '',
 				'address_postcode' => '',
 				'note' => 'Kids from previous marriage',
-			)
-		);
+			],
+		];
 		$custom_fields = Person::getCustomFields();
 		foreach ($custom_fields as $field) {
 			switch ($field['type']) {
@@ -162,7 +166,7 @@ class Call_Sample_Import extends Call
 					break;
 				case 'date':
 					foreach ($data as $k => &$row) {
-						$row[$field['name']] = date('Y-m-d', strtotime('-'.rand(1,100).' month'));
+						$row[$field['name']] = date('Y-m-d', strtotime('-'.rand(1, 100).' month'));
 					}
 					break;
 				default:
@@ -173,18 +177,14 @@ class Call_Sample_Import extends Call
 		}
 		unset($row);
 		foreach ($data as $row) {
-			$out = Array();
+			$out = [];
 			foreach (array_flip($header) as $key => $i) {
 				$out[] = array_get($row, $key, '');
 			}
-			foreach (Array_get($row, 'groups', Array()) as $g) {
+			foreach (Array_get($row, 'groups', []) as $g) {
 				$out[] = $g;
 			}
 			fputcsv($fp, $out);
 		}
-
-
-
-
 	}
 }

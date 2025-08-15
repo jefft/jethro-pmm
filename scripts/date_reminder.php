@@ -1,8 +1,9 @@
 <?php
+
 /**
  * This script can be used to send emails and SMS messages to people who have a custom date value
  * X days from now, for example to remind them to renew a certification.
- * 
+ *
  * It can also send a summary of the reminders sent, to people in the same congregation
  * with a certain person status.
  *
@@ -11,11 +12,10 @@
  *
  * @see date_reminder_sample.ini for config file format.
  */
-
- if ((php_sapi_name() !== 'cli') && !defined('STDIN')) {
-	echo "This script must be run from the command line";
+if ((\PHP_SAPI !== 'cli') && !defined('STDIN')) {
+	echo 'This script must be run from the command line';
 	exit;
- }
+}
 
 if (empty($_SERVER['argv'][1]) || !is_readable($_SERVER['argv'][1])) {
 	echo "You must specify an ini file as the first argument \n";
@@ -24,11 +24,11 @@ if (empty($_SERVER['argv'][1]) || !is_readable($_SERVER['argv'][1])) {
 }
 ini_set('display_errors', 1);
 $ini = parse_ini_file($_SERVER['argv'][1]);
-define('JETHRO_ROOT', dirname(dirname(__FILE__)));
-set_include_path(get_include_path().PATH_SEPARATOR.JETHRO_ROOT);
+define('JETHRO_ROOT', dirname(__DIR__));
+set_include_path(get_include_path().\PATH_SEPARATOR.JETHRO_ROOT);
 if (!is_readable(JETHRO_ROOT.'/conf.php')) {
-	throw new \RuntimeException('Jethro configuration file not found.  You need to copy conf.php.sample to conf.php and edit it before Jethro can run');
-	exit();
+	throw new RuntimeException('Jethro configuration file not found.  You need to copy conf.php.sample to conf.php and edit it before Jethro can run');
+	exit;
 }
 require_once JETHRO_ROOT.'/conf.php';
 define('DB_MODE', 'private');
@@ -38,28 +38,28 @@ require_once JETHRO_ROOT.'/include/system_controller.class.php';
 $GLOBALS['user_system'] = new User_System();
 $GLOBALS['user_system']->setCLIScript();
 $GLOBALS['system'] = System_Controller::get();
-//error_reporting(E_ALL);
+// error_reporting(E_ALL);
 
 $expiryDate = date('Y-m-d', strtotime($ini['REMINDER_OFFSET'].' day'));
 $SQL = 'SELECT p.*';
 if (!empty($ini['SUMMARY_RECIPIENT_STATUS'])) {
 	$SQL .= ', GROUP_CONCAT(supervisor.email SEPARATOR ";") as supervisor, GROUP_CONCAT(CONCAT(supervisor.first_name, " ", supervisor.last_name) SEPARATOR ", ") as supervisor_name ';
-} else if (!empty($ini['SUMMARY_RECIPIENT_EMAIL'])) {
+} elseif (!empty($ini['SUMMARY_RECIPIENT_EMAIL'])) {
 	$SQL .= ', '.$GLOBALS['db']->quote($ini['SUMMARY_RECIPIENT_EMAIL']).' as supervisor, '.$GLOBALS['db']->quote($ini['SUMMARY_RECIPIENT_EMAIL']).' as supervisor_name ';
 }
 $SQL .= '
 		FROM _person p
-		JOIN custom_field_value cfv ON cfv.personid = p.id AND cfv.fieldid = '.(int)$ini['CUSTOM_FIELD_ID'];
+		JOIN custom_field_value cfv ON cfv.personid = p.id AND cfv.fieldid = '.(int) $ini['CUSTOM_FIELD_ID'];
 if (!empty($ini['SUMMARY_RECIPIENT_STATUS'])) {
 	$map = array_flip(Person::getStatusOptions());
 	if (!isset($map[$ini['SUMMARY_RECIPIENT_STATUS']])) {
-		throw new \RuntimeException($ini['SUMMARY_RECIPIENT_STATUS'].' is not a valid status in this system');
+		throw new RuntimeException($ini['SUMMARY_RECIPIENT_STATUS'].' is not a valid status in this system');
 	}
 	$SQL .= '
 			LEFT JOIN _person supervisor ON (
 				LENGTH(supervisor.email) > 0
 				AND supervisor.congregationid = p.congregationid
-				AND supervisor.status = '.$GLOBALS['db']->quote((string)$map[$ini['SUMMARY_RECIPIENT_STATUS']]).'
+				AND supervisor.status = '.$GLOBALS['db']->quote((string) $map[$ini['SUMMARY_RECIPIENT_STATUS']]).'
 			)';
 }
 $SQL .= '
@@ -69,38 +69,38 @@ $SQL .= '
 $res = $GLOBALS['db']->queryAll($SQL);
 
 if (empty($res) && !empty($ini['VERBOSE'])) {
-	echo "No persons found with custom field ".$ini['CUSTOM_FIELD_ID'].' '.$ini['REMINDER_OFFSET']." days from now \n";
+	echo 'No persons found with custom field '.$ini['CUSTOM_FIELD_ID'].' '.$ini['REMINDER_OFFSET']." days from now \n";
 }
 
 if (!empty($ini['SMS_MESSAGE'])) {
-	
 	if (!empty($ini['SMS_FROM'])) {
 		define('OVERRIDE_USER_MOBILE', $ini['SMS_FROM']);
 	}
 	require_once JETHRO_ROOT.'/include/sms_sender.class.php';
 	if (!ifdef('SMS_HTTP_URL')) {
-		trigger_error("You have specified an SMS message in ".$_SERVER['argv'][1].' but this Jethro system does not have an SMS gateway configured. No SMS messages will be sent.');
+		trigger_error('You have specified an SMS message in '.$_SERVER['argv'][1].' but this Jethro system does not have an SMS gateway configured. No SMS messages will be sent.');
 		$ini['SMS_MESSAGE'] = '';
 	}
 }
 require_once JETHRO_ROOT.'/include/emailer.class.php';
 
 // Send individual reminders and collate summary info
-$summaries = Array();
-$supervisor_names = Array();
+$summaries = [];
+$supervisor_names = [];
 foreach ($res as $person) {
-	if (empty($person['first_name'])) continue; // no matches = empty row
+	if (empty($person['first_name'])) {
+		continue;
+	} // no matches = empty row
 	$sentSomething = send_reminder($person, $expiryDate);
 	if (!empty($person['supervisor'])) {
 		$summaryEntry = $person['first_name'].' '.$person['last_name'];
 		$summaryEntry .= ' ('.format_date($expiryDate).') ';
 		if (!$sentSomething) {
-			$summaryEntry .= " (NO CONTACT DETAILS)";
+			$summaryEntry .= ' (NO CONTACT DETAILS)';
 		}
 		$summaries[$person['supervisor']][$person['id']] = $summaryEntry;
 		$supervisor_names[$person['supervisor']] = $person['supervisor_name'];
 	}
-	
 }
 
 // Send summaries
@@ -111,7 +111,7 @@ foreach ($summaries as $supervisors => $remindees) {
 
 	$message = Emailer::newMessage()
 	  ->setSubject($ini['SUMMARY_SUBJECT'])
-	  ->setFrom(array($ini['FROM_ADDRESS'] => $ini['FROM_NAME']))
+	  ->setFrom([$ini['FROM_ADDRESS'] => $ini['FROM_NAME']])
 	  ->setBody($content)
 	  ->addPart($html, 'text/html');
 	if (!empty($ini['OVERRIDE_RECIPIENT'])) {
@@ -122,83 +122,91 @@ foreach ($summaries as $supervisors => $remindees) {
 	$res = Emailer::send($message);
 	if (!$res) {
 		echo "Failed to send summary email to $supervisors \n";
-	} else if (!empty($ini['VERBOSE'])) {
-		echo "Sent summary to ".$supervisors."\n";
+	} elseif (!empty($ini['VERBOSE'])) {
+		echo 'Sent summary to '.$supervisors."\n";
 	}
-	
 }
-
 
 function send_reminder($person, $expiryDate)
 {
 	global $ini;
-	
-	$sentSomething = FALSE;
+
+	$sentSomething = false;
 	if (!empty($ini['EMAIL_BODY'])) {
 		if (strlen($person['email'])) {
 			$toEmail = $person['email'];
-			if (!empty($ini['OVERRIDE_RECIPIENT'])) $toEmail = $ini['OVERRIDE_RECIPIENT'];
+			if (!empty($ini['OVERRIDE_RECIPIENT'])) {
+				$toEmail = $ini['OVERRIDE_RECIPIENT'];
+			}
 
 			$content = replace_keywords($ini['EMAIL_BODY'], $person, $expiryDate);
 			$html = nl2br($content);
 
 			$message = Emailer::newMessage()
 			  ->setSubject(replace_keywords($ini['SUBJECT'], $person, $expiryDate))
-			  ->setFrom(array($ini['FROM_ADDRESS'] => $ini['FROM_NAME']))
-			  ->setTo(array($toEmail => $person['first_name'].' '.$person['last_name']))
+			  ->setFrom([$ini['FROM_ADDRESS'] => $ini['FROM_NAME']])
+			  ->setTo([$toEmail => $person['first_name'].' '.$person['last_name']])
 			  ->setBody($content)
 			  ->addPart($html, 'text/html');
 
 			$res = Emailer::send($message);
 			if (!$res) {
 				echo "Failed to send email to $toEmail \n";
-			} else if (!empty($ini['VERBOSE'])) {
-				echo "Sent email reminder to ".$person['first_name'].' '.$person['last_name'].' '.$toEmail;
+			} elseif (!empty($ini['VERBOSE'])) {
+				echo 'Sent email reminder to '.$person['first_name'].' '.$person['last_name'].' '.$toEmail;
 				echo "\n";
 			}
-			$sentSomething = TRUE;
+			$sentSomething = true;
 		} else {
-			if (!empty($ini['VERBOSE'])) echo $person['first_name'].' '.$person['last_name']." has no email address and will not be sent an email \n";
+			if (!empty($ini['VERBOSE'])) {
+				echo $person['first_name'].' '.$person['last_name']." has no email address and will not be sent an email \n";
+			}
 		}
 	}
 	if (!empty($ini['SMS_MESSAGE'])) {
-
 		if (strlen($person['mobile_tel'])) {
 			$toNumber = $person['mobile_tel'];
-			if (!empty($ini['OVERRIDE_RECIPIENT_SMS'])) $toNumber = $person['mobile_tel'] = $ini['OVERRIDE_RECIPIENT_SMS'];
+			if (!empty($ini['OVERRIDE_RECIPIENT_SMS'])) {
+				$toNumber = $person['mobile_tel'] = $ini['OVERRIDE_RECIPIENT_SMS'];
+			}
 			$message = replace_keywords($ini['SMS_MESSAGE'], $person, $expiryDate);
-			$res = SMS_Sender::sendMessage($message, Array($person), FALSE);
+			$res = SMS_Sender::sendMessage($message, [$person], false);
 			if (!$res['executed'] || (count($res['successes']) != 1)) {
-				echo "Failed to send SMS to ".$toNumber."\n";
+				echo 'Failed to send SMS to '.$toNumber."\n";
 			} else {
-				$sentSomething = TRUE;
+				$sentSomething = true;
 				if (!empty($ini['VERBOSE'])) {
-					echo "Sent SMS reminder to ".$person['first_name'].' '.$person['last_name'].' '.$toNumber."\n";
+					echo 'Sent SMS reminder to '.$person['first_name'].' '.$person['last_name'].' '.$toNumber."\n";
 				}
 			}
 		} else {
-			if (!empty($ini['VERBOSE'])) echo $person['first_name'].' '.$person['last_name']." has no mobile number and will not be sent an SMS \n";
+			if (!empty($ini['VERBOSE'])) {
+				echo $person['first_name'].' '.$person['last_name']." has no mobile number and will not be sent an SMS \n";
+			}
 		}
 	}
-	
+
 	if (!empty($ini['VERBOSE']) && !$sentSomething) {
 		echo $person['first_name'].' '.$person['last_name']." was not sent any notification \n";
 	}
-	
+
 	return $sentSomething;
 }
 
 function replace_keywords($content, $person, $expiryDate)
 {
-	static $dummy = NULL;
-	if (!$dummy) $dummy = new Person();
+	static $dummy = null;
+	if (!$dummy) {
+		$dummy = new Person();
+	}
 	$dummy->populate($person['id'], $person);
-	foreach($person as $k => $v) {
+	foreach ($person as $k => $v) {
 		$keyword = '%'.strtoupper($k).'%';
-		if (FALSE !== strpos($content, $keyword)) {
+		if (str_contains($content, $keyword)) {
 			$content = str_replace($keyword, $dummy->getFormattedValue($k), $content);
 		}
 	}
 	$content = str_replace('%EXPIRYDATE%', format_date($expiryDate), $content);
+
 	return $content;
 }

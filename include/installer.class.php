@@ -5,27 +5,26 @@ require_once 'db_objects/congregation.class.php';
 
 class Installer
 {
-	var $initial_person_fields = Array('first_name', 'last_name', 'gender', 'username', 'password', 'email');
-	var $person = NULL;
-	var $family = NULL;
-	var $user = NULL;
-	var $congregations = Array();
+	var $initial_person_fields = ['first_name', 'last_name', 'gender', 'username', 'password', 'email'];
+	var $person;
+	var $family;
+	var $user;
+	var $congregations = [];
 
 	function run()
 	{
 		if ($GLOBALS['db']->hasTables() || $GLOBALS['db']->hasFunctions()) {
 			trigger_error('MySQL database is not empty. Installer is aborting');
-			exit();
+			exit;
 		}
 		include 'templates/installer.template.php';
 	}
 
-
 	function printBody()
 	{
-		require_once dirname(__FILE__).'/system_controller.class.php';
+		require_once __DIR__.'/system_controller.class.php';
 		$GLOBALS['system'] = $GLOBALS['system'] = System_Controller::get();
-		set_error_handler(Array($GLOBALS['system'], '_handleError'));
+		set_error_handler([$GLOBALS['system'], '_handleError']);
 
 		// the first time we call initInitialEntities is just to check for errors
 		if ($this->readyToInstall() && $this->initInitialEntities()) {
@@ -46,80 +45,88 @@ class Installer
 	function readyToInstall()
 	{
 		if (empty($_POST)) {
-			return FALSE;
+			return false;
 		}
 
 		if ($GLOBALS['db']->hasTables() || $GLOBALS['db']->hasFunctions()) {
 			print_message('MySQL database is not empty. Installer is aborting');
-			return FALSE;
+
+			return false;
 		}
 
 		foreach ($this->initial_person_fields as $field) {
 			if (isset($_POST['install_'.$field]) && empty($_POST['install_'.$field])) {
 				print_message('You must enter a value for '.$field.' to proceed', 'error');
-				return FALSE;
+
+				return false;
 			}
 		}
 
 		// if we get to here, all person details were supplied
 		if (empty($_POST['congregation_name'])) {
 			print_message('You must enter at least one congregation name to proceed', 'error');
-			return FALSE;
+
+			return false;
 		}
-		$cong_found = FALSE;
+		$cong_found = false;
 		foreach ($_POST['congregation_name'] as $cname) {
 			if (!empty($cname)) {
-				$cong_found = TRUE;
+				$cong_found = true;
 				break;
 			}
 		}
 		if (!$cong_found) {
 			print_message('You must enter at least one congregation name to proceed', 'error');
-			return FALSE;
+
+			return false;
 		}
 
 		if (empty($_REQUEST['system_name'])) {
-			print_message("You must enter a system name", 'error');
+			print_message('You must enter a system name', 'error');
 		}
 
-		return TRUE;
+		return true;
 	}
 
-
-
-	function initDB($printOnly=FALSE)
+	function initDB($printOnly = false)
 	{
-		$allSQL = Array();
+		$allSQL = [];
 		ini_set('max_execution_time', 120);
-		$filenames = glob(dirname(dirname(__FILE__)).'/db_objects/*.class.php');
+		$filenames = glob(dirname(__DIR__).'/db_objects/*.class.php');
 
-		$fks  = Array();
-		$views = Array();
+		$fks = [];
+		$views = [];
 
 		sort($filenames);
 		foreach ($filenames as $filename) {
 			$filename = basename($filename);
 			$classname = str_replace('.class.php', '', $filename);
-			require_once dirname(dirname(__FILE__)).'/db_objects/'.$filename;
-			$data_obj = new $classname;
+			require_once dirname(__DIR__).'/db_objects/'.$filename;
+			$data_obj = new $classname();
 			if (method_exists($data_obj, 'getInitSQL')) {
 				$sql = $data_obj->getInitSQL();
 				if (!empty($sql)) {
-					if (!is_array($sql)) $sql = Array($sql);
+					if (!is_array($sql)) {
+						$sql = [$sql];
+					}
 					foreach ($sql as $s) {
 						$allSQL[] = $s;
 					}
 				}
 
 				$f = $data_obj->getForeignKeys();
-				if ($f) $fks[$classname] = $f;
+				if ($f) {
+					$fks[$classname] = $f;
+				}
 
 				$v = $data_obj->getViewSQL();
-				if ($v) $views[$classname] = $v;
+				if ($v) {
+					$views[$classname] = $v;
+				}
 			}
 		}
 
-		$sql = Array(
+		$sql = [
 			"CREATE TABLE `db_object_lock` (
 			  `objectid` int(11) NOT NULL default '0',
 			  `userid` int(11) NOT NULL default '0',
@@ -131,23 +138,23 @@ class Installer
 			  KEY `object_type` (`object_type`)
 			) ENGINE=InnoDB ;",
 
-			"CREATE FUNCTION getCurrentUserID() RETURNS INTEGER NO SQL RETURN @current_user_id;",
+			'CREATE FUNCTION getCurrentUserID() RETURNS INTEGER NO SQL RETURN @current_user_id;',
 
-			"CREATE TABLE account_group_restriction (
+			'CREATE TABLE account_group_restriction (
 			   personid INTEGER NOT NULL,
 			   groupid INTEGER NOT NULL,
 			   PRIMARY KEY (personid, groupid),
 			   CONSTRAINT account_group_restriction_personid FOREIGN KEY (personid) REFERENCES staff_member(id),
 			   CONSTRAINT account_group_restriction_groupid FOREIGN KEY (groupid) REFERENCES _person_group(id)
-			) engine=innodb;",
+			) engine=innodb;',
 
-			"CREATE TABLE account_congregation_restriction (
+			'CREATE TABLE account_congregation_restriction (
 			   personid INTEGER NOT NULL,
 			   congregationid INTEGER NOT NULL,
 			   PRIMARY KEY (personid, congregationid),
 			   CONSTRAINT account_congregation_restriction_personid FOREIGN KEY (personid) REFERENCES staff_member(id),
 			   CONSTRAINT account_group_restriction_congregationid FOREIGN KEY (congregationid) REFERENCES congregation(id)
-			) engine=innodb;",
+			) engine=innodb;',
 
 			'CREATE VIEW member AS
 			SELECT mp.id, mp.first_name, mp.last_name, mp.gender, mp.age_bracketid, mp.congregationid,
@@ -183,7 +190,7 @@ class Installer
 				/* archived persons can only see themselves, not any family members */
 			;',
 
-			"CREATE TABLE setting (
+			'CREATE TABLE setting (
 				`rank`  int(11) unsigned,
 				heading VARCHAR(255) DEFAULT NULL,
 				symbol VARCHAR(255) NOT NULL,
@@ -191,9 +198,9 @@ class Installer
 				type VARCHAR(255) NOT NULL,
 				value VARCHAR(255) NOT NULL,
 				CONSTRAINT UNIQUE KEY `setting_symbol` (`symbol`)
-			  );",
+			  );',
 
-			"SET @rank = 1;	",
+			'SET @rank = 1;	',
 
 			"INSERT INTO setting (`rank`, heading, symbol, note, type, value)
 			 VALUES
@@ -286,16 +293,16 @@ class Installer
 			(@rank:=@rank+5, '',                         'SMS_INTERNATIONAL_PREFIX','Used for converting local to international numbers. eg +61','text',''),
 			(@rank:=@rank+5, '',                         'SMS_SAVE_TO_NOTE_BY_DEFAULT','Whether to save each sent SMS as a person note by default','bool',''),
 			(@rank:=@rank+5, '',                         'SMS_SAVE_TO_NOTE_SUBJECT','','text','SMS Sent'),
-			(@rank:=@rank+5, '',                         'SMS_SEND_LOGFILE','File on the server to save a log of sent SMS messages','text',''); "
-		);
+			(@rank:=@rank+5, '',                         'SMS_SEND_LOGFILE','File on the server to save a log of sent SMS messages','text',''); ",
+		];
 		foreach ($sql as $s) {
 			$allSQL[] = $s;
 		}
 
 		foreach ($fks as $table => $keys) {
 			foreach ($keys as $from => $to) {
-				if (FALSE !== strpos($from, '.')) {
-					list($table, $from) = explode('.', $from);
+				if (str_contains($from, '.')) {
+					[$table, $from] = explode('.', $from);
 				}
 				$name = $table.$from;
 				$SQL = 'ALTER TABLE '.$table.'
@@ -311,16 +318,19 @@ class Installer
 
 		// RUN ALL THE SQL WE'VE ACCUMULATED
 		if ($printOnly) {
-			foreach ($allSQL as $s) bam(str_replace("\t", "  ", trim($s)));
+			foreach ($allSQL as $s) {
+				bam(str_replace("\t", '  ', trim($s)));
+			}
+
 			return;
 		}
-		$sql_so_far = Array();
+		$sql_so_far = [];
 		foreach ($allSQL as $sql) {
 			$sql_so_far[] = $sql;
 			try {
 				$GLOBALS['db']->query($sql);
 			} catch (Exception $e) {
-				trigger_error("Error during install.  Bad query is at the bottom of the list below.");
+				trigger_error('Error during install.  Bad query is at the bottom of the list below.');
 				bam($e->getMessage());
 				bam($sql_so_far);
 				exit;
@@ -341,25 +351,28 @@ class Installer
 					}
 					fclose($fp);
 				} else {
-					trigger_error("Unknown locale ".$_REQUEST['locale']);
+					trigger_error('Unknown locale '.$_REQUEST['locale']);
 				}
 			} else {
-				trigger_error("Bad locale ".$_REQUEST['locale']);
+				trigger_error('Bad locale '.$_REQUEST['locale']);
 			}
 		}
 	}
 
-
 	function initInitialEntities()
 	{
-		$this->congregations = Array();
+		$this->congregations = [];
 		foreach ($_POST['congregation_name'] as $cname) {
-			if (empty($cname)) continue;
+			if (empty($cname)) {
+				continue;
+			}
 			$c = new Congregation();
 			$c->setValue('name', $cname);
 			$c->setValue('long_name', $cname);
 			$this->congregations[] = $c;
-			if (!$c->validateFields()) return FALSE;
+			if (!$c->validateFields()) {
+				return false;
+			}
 		}
 
 		$this->user = new Staff_Member();
@@ -370,22 +383,27 @@ class Installer
 		$this->user->setValue('congregationid', 1); // will be overwritten with a real one later
 		$this->user->setValue('status', 0); // ditto
 		$this->user->setValue('permissions', PERM_SYSADMIN);
-		if (!$this->user->validateFields()) return FALSE;
+		if (!$this->user->validateFields()) {
+			return false;
+		}
 
 		$this->family = new Family();
 		$this->family->setValue('family_name', $this->user->getValue('last_name'));
 		$this->family->setValue('creator', 0);
-		if (!$this->family->validateFields()) return FALSE;
+		if (!$this->family->validateFields()) {
+			return false;
+		}
 
-		return TRUE;
+		return true;
 	}
 
 	function createInitialEntities()
 	{
-		$cong_ids = Array();
+		$cong_ids = [];
 		foreach ($this->congregations as $cong) {
 			if (!$cong->create()) {
 				$this->reportFailure();
+
 				return;
 			}
 			$cong_ids[] = $cong->id;
@@ -393,6 +411,7 @@ class Installer
 
 		if (!$this->family->create()) {
 			$this->reportFailure();
+
 			return;
 		}
 
@@ -402,9 +421,9 @@ class Installer
 		$this->user->setValue('creator', 0);
 		if (!$this->user->create()) {
 			$this->reportFailure();
+
 			return;
 		}
-
 
 		$this->user->setValue('creator', $this->user->id);
 		$this->user->save();
@@ -415,10 +434,9 @@ class Installer
 
 	function reportFailure()
 	{
-		echo "<p style=\"color: red\">An error has occurred.  Your Jethro system has not installed successfully.  You will need to drop and re-create the mysql database before trying again.</p>";
+		echo '<p style="color: red">An error has occurred.  Your Jethro system has not installed successfully.  You will need to drop and re-create the mysql database before trying again.</p>';
 		exit;
 	}
-
 
 	function printForm()
 	{
@@ -434,29 +452,29 @@ class Installer
 				<tr>
 					<th>System Name</th>
 					<td>
-						<?php print_widget('system_name', Array(
+						<?php print_widget('system_name', [
 							'type' => 'text',
 							'maxlength' => 30,
 							'placeholder' => 'eg. St Demo\'s Davidsville',
-						), '');
-						?>
+						], '');
+		?>
 					</td>
 				</tr>
 				<tr>
 					<th>Default Settings</th>
 					<td>
 						<?php
-						$options = Array();
-						chdir(JETHRO_ROOT.'/locale/settings/');
-						foreach (glob('*.csv') as $f) {
-							$f = str_replace('.csv', '', $f);
-							$options[$f] = ucfirst($f);
-						}
-						print_widget('locale', Array(
-							'type' => 'select',
-							'options' => $options,
-						), 'Australia');
-						?>
+		$options = [];
+		chdir(JETHRO_ROOT.'/locale/settings/');
+		foreach (glob('*.csv') as $f) {
+			$f = str_replace('.csv', '', $f);
+			$options[$f] = ucfirst($f);
+		}
+		print_widget('locale', [
+			'type' => 'select',
+			'options' => $options,
+		], 'Australia');
+		?>
 					</td>
 				</tr>
 			</table>
@@ -469,16 +487,16 @@ class Installer
 			<table>
 			<?php
 			$sm = new Staff_Member();
-			$sm->setValue('username', ifdef('PREFILL_USERNAME'));
-			foreach ($this->initial_person_fields as $fieldname) {
-				?>
+		$sm->setValue('username', ifdef('PREFILL_USERNAME'));
+		foreach ($this->initial_person_fields as $fieldname) {
+			?>
 				<tr>
 					<th><?php echo $sm->getFieldLabel($fieldname); ?></th>
 					<td><?php $sm->printFieldInterface($fieldname, 'install_'); ?></td>
 				</tr>
 				<?php
-			}
-			?>
+		}
+		?>
 			</table>
 
 			<h3>Congregations</h3>

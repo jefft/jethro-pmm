@@ -1,7 +1,7 @@
 <?php
 class View_Display_Roster extends View
 {
-	var $_roster_view = null;
+	var $_roster_view;
 
 	function processView()
 	{
@@ -10,9 +10,9 @@ class View_Display_Roster extends View
 					&& strlen(PUBLIC_ROSTER_SECRET)
 					&& (array_get($_REQUEST, 'secret') != PUBLIC_ROSTER_SECRET)
 			) {
-				add_message("Sorry, this roster URL is not valid because it does not contain the secret key.  Please contact your church administrator for assistance.", 'error');
+				add_message('Sorry, this roster URL is not valid because it does not contain the secret key.  Please contact your church administrator for assistance.', 'error');
 			} else {
-				$this->_roster_view = $GLOBALS['system']->getDBObject('roster_view', (int)$_REQUEST['roster_view']);
+				$this->_roster_view = $GLOBALS['system']->getDBObject('roster_view', (int) $_REQUEST['roster_view']);
 			}
 		}
 	}
@@ -29,32 +29,29 @@ class View_Display_Roster extends View
 	function printView()
 	{
 		if ($this->_roster_view) {
-			$end_date = NULL;
+			$end_date = null;
 			if (!empty($_REQUEST['weeks'])) {
-				$end_date = date('Y-m-d', strtotime('+'.(((int)$_REQUEST['weeks']*7)+1).' days'));
+				$end_date = date('Y-m-d', strtotime('+'.(((int) $_REQUEST['weeks'] * 7) + 1).' days'));
 			}
-			$this->_roster_view->printView(NULL, $end_date, FALSE, TRUE);
-		} else if (defined('PUBLIC_ROSTER_SECRET')
+			$this->_roster_view->printView(null, $end_date, false, true);
+		} elseif (defined('PUBLIC_ROSTER_SECRET')
 					&& strlen(PUBLIC_ROSTER_SECRET)
 					&& (array_get($_REQUEST, 'secret') != PUBLIC_ROSTER_SECRET)) {
-			print_message("Please contact your church administrator to get the private URLs for viewing rosters");
+			print_message('Please contact your church administrator to get the private URLs for viewing rosters');
 			exit;
 		} else {
-
 			?>
 			<ul>
 			<?php
-			$views = $GLOBALS['system']->getDBObjectData('roster_view', Array('visibility' => 'public'), 'AND', 'name');
+			$views = $GLOBALS['system']->getDBObjectData('roster_view', ['visibility' => 'public'], 'AND', 'name');
 			foreach ($views as $id => $detail) {
 				?>
-				<li><a href="<?php echo build_url(Array('roster_view' => $id)); ?>"><?php echo ents($detail['name']); ?></a></li>
+				<li><a href="<?php echo build_url(['roster_view' => $id]); ?>"><?php echo ents($detail['name']); ?></a></li>
 				<?php
 			}
 			?>
 			</ul>
 			<?php
 		}
-
 	}
-
 }

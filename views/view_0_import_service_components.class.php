@@ -2,8 +2,8 @@
 require_once 'abstract_view_add_object.class.php';
 class View__Import_Service_Components extends View
 {
-	private $errors = Array();
-	private $category = null;
+	private $errors = [];
+	private $category;
 	protected $_captured_errors;
 
 	static function getMenuPermissionLevel()
@@ -21,42 +21,43 @@ class View__Import_Service_Components extends View
 			$comp = new Service_Component();
 			$fp = fopen($_FILES['datafile']['tmp_name'], 'r');
 			if (!$fp) {
-				trigger_error("Your data file could not be read.  Please check the file and try again");
+				trigger_error('Your data file could not be read.  Please check the file and try again');
+
 				return;
 			}
-			$toprow = fgetcsv($fp, 0, ",", '"');
+			$toprow = fgetcsv($fp, 0, ',', '"');
 			$rowNum = 1;
 			$all_ccli = Service_Component::getAllByCCLINumber();
-			while ($row = fgetcsv($fp, 0, ",", '"')) {
-				$comp->populate(0, Array());
+			while ($row = fgetcsv($fp, 0, ',', '"')) {
+				$comp->populate(0, []);
 				$this->_captureErrors();
-				$data = Array();
+				$data = [];
 				foreach ($row as $k => $v) {
 					$data[strtolower($toprow[$k])] = $v;
 				}
 				if (isset($data['content'])) {
 					$c = trim($data['content']);
-					$c = str_replace("\r", "", $c);
-					$c = str_replace("\n\n", "</p><p>", $c);
-					$c = str_replace("\n", "<br />", $c);
+					$c = str_replace("\r", '', $c);
+					$c = str_replace("\n\n", '</p><p>', $c);
+					$c = str_replace("\n", '<br />', $c);
 					$data['content_html'] = '<p>'.$c.'</p>';
 					unset($data['content']);
 				}
 				if (isset($data['show_in_handout'])) {
 					$val = $data['show_in_handout'];
-					$map = Array(
-							'y' => 'full',
-							'n' => 0,
-							'yes' => 'full',
-							'no' => 0,
-						  );
+					$map = [
+						'y' => 'full',
+						'n' => 0,
+						'yes' => 'full',
+						'no' => 0,
+					];
 					$val = array_get($map, strtolower($val), $val);
-					if (!in_array($val, Array('0', 'title', 'full'))) {
+					if (!in_array($val, ['0', 'title', 'full'], true)) {
 						$val = '0';
 					}
 					$data['show_in_handout'] = $val;
 				}
-	
+
 				if (!empty($_REQUEST['dupe-match'])
 					&& !empty($data['ccli_number'])
 					&& isset($all_ccli[$data['ccli_number']])
@@ -67,9 +68,8 @@ class View__Import_Service_Components extends View
 						$comp->addCongregation($congid);
 					}
 					$comp->save();
-
 				} else {
-					$data['categoryid'] = (int)$_REQUEST['categoryid'];
+					$data['categoryid'] = (int) $_REQUEST['categoryid'];
 					$comp->fromCSVRow($data);
 					if ($errors = $this->_getErrors()) {
 						$this->errors[$rowNum] = $errors;
@@ -80,14 +80,14 @@ class View__Import_Service_Components extends View
 						$comp->create();
 					}
 				}
-				$rowNum++;
+				++$rowNum;
 			}
 			if (empty($this->errors)) {
 				$GLOBALS['system']->doTransaction('COMMIT');
-				add_message(($rowNum-1).' rows imported successfully');
+				add_message(($rowNum - 1).' rows imported successfully');
 				redirect('services__component_library'); // exits
 			} else {
-				add_message("Errors were found in the CSV file.  Import has not been performed.  Please correct the errors and try again", 'error');
+				add_message('Errors were found in the CSV file.  Import has not been performed.  Please correct the errors and try again', 'error');
 				$GLOBALS['system']->doTransaction('ROLLBACK');
 			}
 			fclose($fp);
@@ -108,7 +108,7 @@ class View__Import_Service_Components extends View
 				echo '<ul><li>'.implode('</li></li>', $errors).'</li></ul>';
 			}
 		}
-		
+
 		?>
 
 		<form method="post" enctype="multipart/form-data">
@@ -128,16 +128,20 @@ class View__Import_Service_Components extends View
 					</label>
 					<div class="controls">
 						<?php
-						print_widget('congregationids', Array(
-									'type'				=> 'reference',
-									'references'		=> 'congregation',
-									'show_id'			=> FALSE,
-									'order_by'			=> 'meeting_time',
-									'allow_empty'		=> false,
-									'allow_multiple'	=> true,
-									'filter'			=> function($x) {$y = $x->getValue("meeting_time"); return !empty($y);},
-							), Array());
-						?>
+						print_widget('congregationids', [
+							'type' => 'reference',
+							'references' => 'congregation',
+							'show_id' => false,
+							'order_by' => 'meeting_time',
+							'allow_empty' => false,
+							'allow_multiple' => true,
+							'filter' => function ($x) {
+								$y = $x->getValue('meeting_time');
+
+								return !empty($y);
+							},
+						], []);
+		?>
 					</div>
 				</div>
 				<div class="control-group">
@@ -153,7 +157,7 @@ class View__Import_Service_Components extends View
 				</div>
 				<div class="control-group">
 					<div class="controls">
-						<input type="hidden" name="categoryid" value="<?php echo (int)$this->category->id; ?>" />
+						<input type="hidden" name="categoryid" value="<?php echo (int) $this->category->id; ?>" />
 						<input type="submit" class="btn" value="Import" />
 					</div>
 				</div>
@@ -164,13 +168,13 @@ class View__Import_Service_Components extends View
 
 	function _captureErrors()
 	{
-		$this->_captured_errors = Array();
-		set_error_handler(Array($this, '_handleError'));
+		$this->_captured_errors = [];
+		set_error_handler([$this, '_handleError']);
 	}
 
 	function _handleError($errno, $errstr, $errfile, $errline)
 	{
-		if (in_array($errno, array(E_USER_NOTICE, E_USER_WARNING, E_NOTICE, E_WARNING))) {
+		if (in_array($errno, [\E_USER_NOTICE, \E_USER_WARNING, \E_NOTICE, \E_WARNING], true)) {
 			if (JETHRO_VERSION == 'DEV') {
 				$errstr .= ' (Line '.$errline.' of '.$errfile.')';
 			}
@@ -181,8 +185,9 @@ class View__Import_Service_Components extends View
 	function _getErrors()
 	{
 		$res = $this->_captured_errors;
-		$this->_captured_errors = Array();
+		$this->_captured_errors = [];
 		restore_error_handler();
+
 		return $res;
 	}
 }

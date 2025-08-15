@@ -1,4 +1,5 @@
 <?php
+
 require_once 'abstract_view_add_object.class.php';
 class View__Add_Group_Category extends Abstract_View_Add_Object
 {
@@ -13,5 +14,4 @@ class View__Add_Group_Category extends Abstract_View_Add_Object
 	{
 		return PERM_MANAGEGROUPCATS;
 	}
-	
 }

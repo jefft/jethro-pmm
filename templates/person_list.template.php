@@ -14,8 +14,8 @@ $GLOBALS['system']->includeDBClass('person');
 $dummy_person = new Person();
 
 if (!isset($special_fields)) {
-	$special_fields = Array();
-	if(!isset($include_special_fields) || $include_special_fields) {
+	$special_fields = [];
+	if (!isset($include_special_fields) || $include_special_fields) {
 		if (!empty($persons)) {
 			$first_row = reset($persons);
 			foreach ($first_row as $i => $v) {
@@ -26,9 +26,13 @@ if (!isset($special_fields)) {
 		}
 	}
 }
-if (empty($callbacks)) $callbacks = Array();
+if (empty($callbacks)) {
+	$callbacks = [];
+}
 
-if (!isset($show_actions)) $show_actions = TRUE;
+if (!isset($show_actions)) {
+	$show_actions = true;
+}
 
 if ($show_actions) {
 	?>
@@ -36,7 +40,9 @@ if ($show_actions) {
 	<?php
 }
 ?>
-<table class="table table-hover table-striped table-condensed <?php if (empty($callbacks)) echo 'clickable-rows'; ?>">
+<table class="table table-hover table-striped table-condensed <?php if (empty($callbacks)) {
+	echo 'clickable-rows';
+} ?>">
 	<thead>
 		<?php include 'person_list_header_footer.template.php'; ?>
 	</thead>
@@ -44,7 +50,7 @@ if ($show_actions) {
 	<?php
 	foreach ($persons as $id => $details) {
 		$dummy_person->populate($id, $details);
-		$tr_class = in_array($details['status'], Person_Status::getArchivedIDs()) ? ' class="archived"' : '';
+		$tr_class = in_array($details['status'], Person_Status::getArchivedIDs(), true) ? ' class="archived"' : '';
 		?>
 		<tr data-personid="<?php echo $id; ?>" <?php echo $tr_class; ?>>
 		<?php if (SizeDetector::isWide()) {
@@ -65,7 +71,7 @@ if ($show_actions) {
 					} else {
 						echo array_get($details, $field, '');
 					}
-					?>
+				?>
 					</td>
 				<?php
 			}
@@ -76,47 +82,49 @@ if ($show_actions) {
 			<td><?php $dummy_person->printFieldValue('gender'); ?></td>
 			<?php
 				include_once 'include/size_detector.class.php';
-				if (!SizeDetector::isNarrow()) {
+		if (!SizeDetector::isNarrow()) {
 			?>
 			<td><?php $dummy_person->printFieldvalue('mobile_tel'); ?></td>
 			<?php
-			}
-				if (defined('PERSON_LIST_SHOW_GROUPS') && PERSON_LIST_SHOW_GROUPS) {
-				?>
+		}
+		if (defined('PERSON_LIST_SHOW_GROUPS') && PERSON_LIST_SHOW_GROUPS) {
+			?>
 					<td>
 				  	  <?php
-				  	  	$gstr = '';
-				  	  	foreach (Person_Group::getGroups($id) as $gid => $gdetail) {
-				  	  		if (strlen($gstr)) $gstr .= ', ';
-				  	  		$gstr = $gstr . $gdetail['name'];
-				  	  	}
-						if (strlen($gstr)) {
-							?>
+					$gstr = '';
+			foreach (Person_Group::getGroups($id) as $gid => $gdetail) {
+				if (strlen($gstr)) {
+					$gstr .= ', ';
+				}
+				$gstr .= $gdetail['name'];
+			}
+			if (strlen($gstr)) {
+				?>
 							<a title="<?php echo ents($gstr); ?>" href="?view=persons&personid=<?php echo $id; ?>#groups">
-								<?php echo ents(substr($gstr, 0, 45)) . '...' ; ?>
+								<?php echo ents(substr($gstr, 0, 45)).'...'; ?>
 							</a>
 							<?php
-						}
-						?>
+			}
+			?>
 				  	</td>
 				 <?php
-				 }
-				 ?>
+		}
+		?>
 		<?php
 		if ($show_actions) {
-
 			?>
 			<td class="narrow action-cell">
-				<a <?php echo $link_class; ?> href="?view=persons&personid=<?php echo $id; echo $view_tab ?>"><i class="icon-user"></i><?php echo _('View')?></a> &nbsp;
+				<a <?php echo $link_class; ?> href="?view=persons&personid=<?php echo $id;
+			echo $view_tab; ?>"><i class="icon-user"></i><?php echo _('View'); ?></a> &nbsp;
 			<?php
 			if ($GLOBALS['user_system']->havePerm(PERM_EDITPERSON) && !SizeDetector::isNarrow()) {
 				?>
-				<a <?php echo $link_class; ?> href="?view=_edit_person&personid=<?php echo $id; ?>"><i class="icon-wrench"></i><?php echo _('Edit')?></a> &nbsp;
+				<a <?php echo $link_class; ?> href="?view=_edit_person&personid=<?php echo $id; ?>"><i class="icon-wrench"></i><?php echo _('Edit'); ?></a> &nbsp;
 				<?php
 			}
 			if ($GLOBALS['user_system']->havePerm(PERM_EDITNOTE) && !SizeDetector::isNarrow()) {
 				?>
-				<a <?php echo $link_class; ?> href="?view=_add_note_to_person&personid=<?php echo $id; ?>"><i class="icon-pencil"></i><?php echo _('Add Note')?></a>
+				<a <?php echo $link_class; ?> href="?view=_add_note_to_person&personid=<?php echo $id; ?>"><i class="icon-pencil"></i><?php echo _('Add Note'); ?></a>
 				<?php
 			}
 			?>
@@ -128,7 +136,7 @@ if ($show_actions) {
 		</tr>
 		<?php
 	}
-	?>
+?>
 	</tbody>
 <?php
 // Add a footer when there is enough rows to justify it.

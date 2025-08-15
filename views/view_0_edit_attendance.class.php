@@ -11,13 +11,14 @@ class View__Edit_Attendance extends View
 
 	function processView()
 	{
-		$this->_person = new Person((int)$_REQUEST['personid']);
-		if ((int)$_REQUEST['groupid']) $this->_group = new Person_Group((int)$_REQUEST['groupid']);
+		$this->_person = new Person((int) $_REQUEST['personid']);
+		if ((int) $_REQUEST['groupid']) {
+			$this->_group = new Person_Group((int) $_REQUEST['groupid']);
+		}
 
 		if (!empty($_POST['attendances'])) {
 			$this->_person->saveAttendance($_POST['attendances'], $_REQUEST['groupid']);
-			redirect('persons', Array('personid' => $this->_person->id), 'attendance');
-
+			redirect('persons', ['personid' => $this->_person->id], 'attendance');
 		}
 	}
 
@@ -30,11 +31,10 @@ class View__Edit_Attendance extends View
 		}
 	}
 
-
 	function printView()
 	{
 		$attendances = $this->_person->getAttendance($_REQUEST['startdate'], $_REQUEST['enddate'], $_REQUEST['groupid']);
-		$map = Array(1 => 'present', '0' => 'absent', '' => 'unknown')
+		$map = [1 => 'present', '0' => 'absent', '' => 'unknown'];
 		?>
 		<form method="post">
 			<table class="table table-bordered table-condensed table-auto-width">
@@ -44,33 +44,33 @@ class View__Edit_Attendance extends View
 					foreach ($attendances as $att) {
 						?>
 						<th>
-							<?php echo format_date($att['date'], FALSE); ?>
+							<?php echo format_date($att['date'], false); ?>
 						</th>
 						<?php
 					}
-					?>
+		?>
 					</tr>
 				</thead>
 				<tbody>
 					<tr>
 					<?php
-					foreach ($attendances as $att) {
-						?>
+		foreach ($attendances as $att) {
+			?>
 						<td>
 							<?php print_widget(
-									'attendances['.$att['date'].']',
-									Array(
-										'options' => Array('present' => 'Present', 'unknown' => '?', 'absent' => 'Absent'),
-										'type' => 'select',
-										'style' => 'colour-buttons',
-										'class' => 'vertical',
-									),
-									$map[$att['present']]
+								'attendances['.$att['date'].']',
+								[
+									'options' => ['present' => 'Present', 'unknown' => '?', 'absent' => 'Absent'],
+									'type' => 'select',
+									'style' => 'colour-buttons',
+									'class' => 'vertical',
+								],
+								$map[$att['present']],
 							); ?>
 						</td>
 						<?php
-					}
-					?>
+		}
+		?>
 					</tr>
 				</tbody>
 			</table>

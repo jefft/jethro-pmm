@@ -1,4 +1,5 @@
 <?php
+
 class Call_Search_Service_Components_Json extends Call
 {
 	function run()

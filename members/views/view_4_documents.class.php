@@ -6,11 +6,11 @@ class View_Documents extends View
 		// Only make it visible if the config is set
 		return strlen(ifdef('MEMBER_FILES_DIRS', '')) ? 'DOCUMENTS' : '-1';
 	}
-	
+
 	function processView()
 	{
 	}
-	
+
 	function getTitle()
 	{
 		return 'Documents';
@@ -52,5 +52,4 @@ class View_Documents extends View
 			}
 		}
 	}
-
 }

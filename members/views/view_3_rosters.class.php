@@ -6,12 +6,12 @@ class View_Rosters extends View
 		return 'ROSTERS&SERVICES';
 	}
 
-	var $_roster_view = null;
+	var $_roster_view;
 
 	function processView()
 	{
 		if (!empty($_REQUEST['roster_view'])) {
-			$this->_roster_view = $GLOBALS['system']->getDBObject('roster_view', (int)$_REQUEST['roster_view']);
+			$this->_roster_view = $GLOBALS['system']->getDBObject('roster_view', (int) $_REQUEST['roster_view']);
 		}
 	}
 
@@ -27,15 +27,15 @@ class View_Rosters extends View
 	function printView()
 	{
 		if ($this->_roster_view) {
-			$this->_roster_view->printView(NULL, NULL, FALSE, TRUE);
+			$this->_roster_view->printView(null, null, false, true);
 		} else {
 			?>
 			<ul>
 			<?php
-			$views = $GLOBALS['system']->getDBObjectData('roster_view', Array('!visibility' => ''), 'AND', 'name');
+			$views = $GLOBALS['system']->getDBObjectData('roster_view', ['!visibility' => ''], 'AND', 'name');
 			foreach ($views as $id => $detail) {
 				?>
-				<li><a href="<?php echo build_url(Array('roster_view' => $id)); ?>"><?php echo ents($detail['name']); ?></a></li>
+				<li><a href="<?php echo build_url(['roster_view' => $id]); ?>"><?php echo ents($detail['name']); ?></a></li>
 				<?php
 			}
 			?>
@@ -53,10 +53,10 @@ class View_Rosters extends View
 			?>
 			<h3>Planned absences for <?php $family->printFieldValue('family_name'); ?> family</h3>
 			<?php
-			$params = Array(
+			$params = [
 				'>=end_date' => date('Y-m-d'),
 				'(personid' => array_keys($fmembers),
-			);
+			];
 			$absences = $GLOBALS['system']->getDBObjectData('planned_absence', $params, 'AND', 'start_date');
 			if ($absences) {
 				?>
@@ -88,7 +88,7 @@ class View_Rosters extends View
 						</tr>
 						<?php
 					}
-					?>
+				?>
 					</tbody>
 				</table>
 				<?php

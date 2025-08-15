@@ -40,19 +40,19 @@
 							<?php
 							if ($GLOBALS['user_system']->getCurrentRestrictions()) {
 								?>
-								<li class="restrictions" title=""<?php echo _('This user account can only see persons in certain congregations or groups')?>"> <?php echo _('Restrictions in effect')?> </li>
+								<li class="restrictions" title=""<?php echo _('This user account can only see persons in certain congregations or groups'); ?>"> <?php echo _('Restrictions in effect'); ?> </li>
 								<?php
 							}
-							?>
-								<li><a href="?view=_edit_me"><?php echo _('Edit me')?></a></li>
-								<li><a href="./?logout=1" data-method="post"><?php echo _('Log out')?></a></li>
+	?>
+								<li><a href="?view=_edit_me"><?php echo _('Edit me'); ?></a></li>
+								<li><a href="./?logout=1" data-method="post"><?php echo _('Log out'); ?></a></li>
 							<?php
-							if (MEMBER_LOGIN_ENABLED) {
-								?>
-								<li><a href="./members"><?php echo _('Go to members area')?></a></li>
+	if (MEMBER_LOGIN_ENABLED) {
+		?>
+								<li><a href="./members"><?php echo _('Go to members area'); ?></a></li>
 								<?php
-							}
-							?>
+	}
+	?>
 							</ul>
 						</span>
 					</div>
@@ -63,13 +63,13 @@
 				<form method="get" class="form-horizontal global-search no-print pull-right">
 					<input type="hidden" name="view" value="_mixed_search" />
 					<span class="input-append fullwidth">
-						<input type="text" name="search" class="no-autofocus" enterkeyhint="Search" placeholder="<?php echo _('Search');?>..." />
+						<input type="text" name="search" class="no-autofocus" enterkeyhint="Search" placeholder="<?php echo _('Search'); ?>..." />
 						<button type="submit" class="btn"><i class="icon-search"></i></button>
 					</span>
 				</form>
 				<?php
 			}
-			?>
+	?>
 
 				<!-- logo and system name -->
 				<h1>
@@ -86,17 +86,17 @@
 							<a href="#" class="dropdown-toggle" data-toggle="dropdown"><b>User:</b> <?php echo $GLOBALS['user_system']->getCurrentUser('first_name').' '.$GLOBALS['user_system']->getCurrentUser('last_name'); ?> <i class="caret"></i></a>
 							<ul class="dropdown-menu">
 								<li><a href="?view=persons&personid=<?php echo $GLOBALS['user_system']->getCurrentUser('id'); ?>"><?php echo _('View my details'); ?></a</li>
-								<li><a href="?view=_edit_me"><?php echo _('Edit my account')?></a></li>
+								<li><a href="?view=_edit_me"><?php echo _('Edit my account'); ?></a></li>
 								<li>
-									<a href="./?logout=1" data-method="post"><?php echo _('Log out')?></a>
+									<a href="./?logout=1" data-method="post"><?php echo _('Log out'); ?></a>
 								</li>
 							<?php
-							if (MEMBER_LOGIN_ENABLED) {
-								?>
-								<li><a href="./members"><?php echo _('Go to members area')?></a></li>
+					if (MEMBER_LOGIN_ENABLED) {
+						?>
+								<li><a href="./members"><?php echo _('Go to members area'); ?></a></li>
 								<?php
-							}
-							?>
+					}
+	?>
 							</ul>
 						</li>
 					<?php $GLOBALS['system']->printNavigation(); ?>
@@ -110,12 +110,12 @@
 
 			dump_messages();
 
-			if ($title = $GLOBALS['system']->getPageHeading()) {
-				echo '<h1>'.ents($title).'</h1>';
-			}
+	if ($title = $GLOBALS['system']->getPageHeading()) {
+		echo '<h1>'.ents($title).'</h1>';
+	}
 
-			$GLOBALS['system']->printBody();
-			?>
+	$GLOBALS['system']->printBody();
+	?>
 		</div>
 	</div>
 	</div>

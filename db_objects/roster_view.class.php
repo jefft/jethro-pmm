@@ -4,32 +4,34 @@ include_once 'include/bible_ref.class.php';
 include_once 'db_objects/service.class.php';
 class roster_view extends db_object
 {
-	private $_members = Array();
-	private $_members_to_set = Array();
+	private $_members = [];
+	private $_members_to_set = [];
 
-	protected $_load_permission_level = NULL;
+	protected $_load_permission_level;
 	protected $_save_permission_level = PERM_MANAGEROSTERS;
 
 	const hiddenPersonLabel = '(Hidden)';
 
 	/**
-	* Get all the congregations related to this view
-	*/
+	 * Get all the congregations related to this view.
+	 */
 	function getCongregations()
 	{
-		$res = Array();
+		$res = [];
 		foreach ($this->_members as $member) {
-			if ($member['congregationid']) $res[] = $member['congregationid'];
+			if ($member['congregationid']) {
+				$res[] = $member['congregationid'];
+			}
 		}
 		$res = array_unique($res);
 		if (empty($res)) {
 			// this view must be only non-congregational roles, so we will use all congregations
-			$congs = $GLOBALS['system']->getDBObjectData('congregation', Array('!meeting_time' => ''));
+			$congs = $GLOBALS['system']->getDBObjectData('congregation', ['!meeting_time' => '']);
 			$res = array_keys($congs);
 		}
+
 		return $res;
 	}
-
 
 	function load($id)
 	{
@@ -38,16 +40,16 @@ class roster_view extends db_object
 		// Enforce visibility
 		switch ($this->getValue('visibility')) {
 			case '':
-				if (!$GLOBALS['user_system']->getCurrentUser('id') && (PHP_SAPI != 'cli')) {
-					header($_SERVER["SERVER_PROTOCOL"]." 401 Not Authorised");
+				if (!$GLOBALS['user_system']->getCurrentUser('id') && (\PHP_SAPI != 'cli')) {
+					header($_SERVER['SERVER_PROTOCOL'].' 401 Not Authorised');
 					print_message("Roster view #{$this->id} is only available to logged in operators", 'error');
 					exit;
 				}
 				break;
 			case 'members':
 				// Make sure either a user or a member is logged in
-				 if (!$GLOBALS['user_system']->getCurrentPerson('id') && (PHP_SAPI != 'cli')) {
-					header($_SERVER["SERVER_PROTOCOL"]." 401 Not Authorised");
+				if (!$GLOBALS['user_system']->getCurrentPerson('id') && (\PHP_SAPI != 'cli')) {
+					header($_SERVER['SERVER_PROTOCOL'].' 401 Not Authorised');
 					print_message("Roster view #{$this->id} is only available to logged in members", 'error');
 					exit;
 				}
@@ -62,7 +64,7 @@ class roster_view extends db_object
 							roster_role rr
 							LEFT JOIN congregation rrc ON rr.congregationid = rrc.id
 						) ON rvrm.roster_role_id = rr.id
-					WHERE rvrm.roster_view_id = '.(int)$this->id.'
+					WHERE rvrm.roster_view_id = '.(int) $this->id.'
 				)
 				UNION
 				(
@@ -70,7 +72,7 @@ class roster_view extends db_object
 					FROM
 					roster_view_service_field rvdi
 						JOIN congregation dic ON rvdi.congregationid = dic.id
-					WHERE rvdi.roster_view_id = '.(int)$this->id.'
+					WHERE rvdi.roster_view_id = '.(int) $this->id.'
 				)
 
 				ORDER BY order_num';
@@ -84,43 +86,46 @@ class roster_view extends db_object
 
 	function getRoleIds()
 	{
-		$res = Array();
+		$res = [];
 		foreach ($this->_members as $member) {
-			if ($member['role_id']) $res[] = $member['role_id'];
+			if ($member['role_id']) {
+				$res[] = $member['role_id'];
+			}
 		}
+
 		return $res;
 	}
 
 	protected static function _getFields()
 	{
+		$fields = [
+			'name' => [
+				'type' => 'text',
+				'width' => 80,
+				'maxlength' => 128,
+				'initial_cap' => true,
+				'allow_empty' => false,
+			],
+			'visibility' => [
+				'type' => 'select',
+				'options' => ['' => 'Private', 'members' => 'Show in members area', 'public' => 'Show in public area'],
+				'default' => 0,
+				'note' => 'Whether this roster view is visible in the <a href="'.BASE_PATH.'/public/">public area</a> and/or to church members via the <a href="'.BASE_PATH.'/members/">members area</a>',
+			],
+			'show_on_run_sheet' => [
+				'type' => 'select',
+				'options' => [0 => 'No', 1 => 'Yes, including empty roles', 2 => 'Yes, without empty roles'],
+				'default' => 0,
+				'note' => 'Whether to display this view\'s allocations at the top of applicable service run sheets',
+			],
+		];
 
-		$fields = Array(
-			'name'			=> Array(
-									'type'		=> 'text',
-									'width'		=> 80,
-									'maxlength'	=> 128,
-									'initial_cap'	=> TRUE,
-									'allow_empty'	=> FALSE,
-								   ),
-			'visibility'		=> Array(
-									'type'		=> 'select',
-									'options'	=> Array('' => 'Private', 'members' => 'Show in members area', 'public' => 'Show in public area'),
-									'default'	=> 0,
-									'note' => 'Whether this roster view is visible in the <a href="'.BASE_PATH.'/public/">public area</a> and/or to church members via the <a href="'.BASE_PATH.'/members/">members area</a>',
-								),
-			'show_on_run_sheet' => Array(
-									'type'	=> 'select',
-									'options' => Array(0 => 'No', 1 => 'Yes, including empty roles', 2 => 'Yes, without empty roles'),
-									'default' => 0,
-									'note' => 'Whether to display this view\'s allocations at the top of applicable service run sheets',
-									),
-		);
 		return $fields;
 	}
 
-	function printForm($prefix='', $fields=NULL)
+	function printForm($prefix = '', $fields = null)
 	{
-		$this->fields['members'] = Array(); // fake field for interface purposes
+		$this->fields['members'] = []; // fake field for interface purposes
 		if ($this->id) {
 			$url = BASE_PATH.'/public/?view=display_roster&roster_view='.$this->id;
 			if (defined('PUBLIC_ROSTER_SECRET') && strlen(PUBLIC_ROSTER_SECRET)) {
@@ -131,11 +136,11 @@ class roster_view extends db_object
 		unset($this->fields['members']);
 	}
 
-	function printFieldInterface($name, $prefix='')
+	function printFieldInterface($name, $prefix = '')
 	{
 		switch ($name) {
 			case 'members':
-				$all_roles = $GLOBALS['system']->getDbObjectData('roster_role', Array('active' => 1), 'OR', 'roster_role.congregationid, roster_role.title');
+				$all_roles = $GLOBALS['system']->getDbObjectData('roster_role', ['active' => 1], 'OR', 'roster_role.congregationid, roster_role.title');
 				?>
 				<script>
 					$(window).load(function() {
@@ -152,19 +157,18 @@ class roster_view extends db_object
 				</script>
 				<table class="no-padding middle expandable">
 				<?php
-				$members_to_print = $this->_members + Array(-1 => Array(
+				$members_to_print = $this->_members + [-1 => [
 					'role_id' => 0,
 					'role_title' => '',
-					'service_field' => NULL,
-					'congregationid' => NULL,
-				));
+					'service_field' => null,
+					'congregationid' => null,
+				]];
 				foreach ($members_to_print as $order_num => $member_details) {
+					$role_selected_html = null === $member_details['role_id'] ? '' : 'selected="selected"';
+					$field_selected_html = null === $member_details['service_field'] ? '' : 'selected="selected"';
 
-					$role_selected_html = is_null($member_details['role_id']) ? '' : 'selected="selected"';
-					$field_selected_html = is_null($member_details['service_field']) ? '' : 'selected="selected"';
-
-					$role_enabled_html = is_null($member_details['role_id']) ? 'disabled="disabled" style="display: none"' : '';
-					$field_enabled_html = is_null($member_details['service_field']) ? 'disabled="disabled" style="display: none"' : '';
+					$role_enabled_html = null === $member_details['role_id'] ? 'disabled="disabled" style="display: none"' : '';
+					$field_enabled_html = null === $member_details['service_field'] ? 'disabled="disabled" style="display: none"' : '';
 
 					?>
 					<tr>
@@ -181,40 +185,44 @@ class roster_view extends db_object
 							<option value=""></option>
 							<?php
 							$last_cong = '';
-							foreach ($all_roles as $id => $details) {
-								if ($details['congregation_name'] != $last_cong) {
-									if ($last_cong) echo '</optgroup>';
-									?>
-									<optgroup label="<?php echo ents($details['congregation_name']); ?>">
-									<?php
-									$last_cong = $details['congregation_name'];
-								}
-								?>
-								<option value="role-<?php echo $id; ?>"<?php if ($id == $member_details['role_id']) echo 'selected="selected" '; ?>><?php echo ents($details['congregation_name'].' '.$details['title']); ?></option>
-								<?php
+					foreach ($all_roles as $id => $details) {
+						if ($details['congregation_name'] != $last_cong) {
+							if ($last_cong) {
+								echo '</optgroup>';
 							}
 							?>
+									<optgroup label="<?php echo ents($details['congregation_name']); ?>">
+									<?php
+							$last_cong = $details['congregation_name'];
+						}
+						?>
+								<option value="role-<?php echo $id; ?>"<?php if ($id == $member_details['role_id']) {
+									echo 'selected="selected" ';
+								} ?>><?php echo ents($details['congregation_name'].' '.$details['title']); ?></option>
+								<?php
+					}
+					?>
 							</optgroup>
 							</select>
 
 							<select name="members[]" class="view-members-service_field" <?php echo $field_enabled_html; ?>>
 							<option value=""></option>
 							<?php
-							foreach ($GLOBALS['system']->getDBObjectData('congregation', Array('!meeting_time' => ''), 'AND', 'meeting_time') as $congid => $cong_details) {
-								?>
+					foreach ($GLOBALS['system']->getDBObjectData('congregation', ['!meeting_time' => ''], 'AND', 'meeting_time') as $congid => $cong_details) {
+						?>
 								<optgroup label="<?php echo ents($cong_details['name']); ?>">
 								<?php
-								foreach (Service::getDisplayFields() as $k => $v) {
-									$selected = (($member_details['congregationid'] == $congid) && ($member_details['service_field'] == $k)) ? 'selected="selected"' : '';
-									?>
+						foreach (Service::getDisplayFields() as $k => $v) {
+							$selected = (($member_details['congregationid'] == $congid) && ($member_details['service_field'] == $k)) ? 'selected="selected"' : '';
+							?>
 									<option value="service-<?php echo $congid.'-'.$k; ?>" <?php echo $selected; ?>><?php echo ents($cong_details['name'].' '.$v); ?></option>
 									<?php
-								}
-								?>
+						}
+						?>
 								</optgroup>
 								<?php
-							}
-							?>
+					}
+					?>
 							</select>
 						</td>
 						<td class="nowrap">
@@ -236,19 +244,19 @@ class roster_view extends db_object
 		}
 	}
 
-	function processForm($prefix='', $fields=NULL)
+	function processForm($prefix = '', $fields = null)
 	{
-		$this->fields['members'] = Array();
+		$this->fields['members'] = [];
 		parent::processForm($prefix, $fields);
 		unset($this->fields['members']);
 	}
 
-	function processFieldInterface($name, $prefix='')
+	function processFieldInterface($name, $prefix = '')
 	{
 		switch ($name) {
 			case 'members':
-				$this->_members = Array();
-				$this->_members_to_set = array_get($_POST, $prefix.$name, Array());
+				$this->_members = [];
+				$this->_members_to_set = array_get($_POST, $prefix.$name, []);
 				break;
 			default:
 				return parent::processFieldInterface($name, $prefix);
@@ -259,6 +267,7 @@ class roster_view extends db_object
 	{
 		$res = parent::save();
 		$this->_saveMemberRoles();
+
 		return $res;
 	}
 
@@ -266,27 +275,30 @@ class roster_view extends db_object
 	{
 		$res = parent::create();
 		$this->_saveMemberRoles();
+
 		return $res;
 	}
 
 	function _saveMemberRoles()
 	{
 		if (!empty($this->_members_to_set)) {
-			$sql = 'DELETE FROM roster_view_role_membership WHERE roster_view_id = '.(int)$this->id;
+			$sql = 'DELETE FROM roster_view_role_membership WHERE roster_view_id = '.(int) $this->id;
 			$q = $GLOBALS['db']->query($sql);
-			$sql = 'DELETE FROM roster_view_service_field WHERE roster_view_id = '.(int)$this->id;
+			$sql = 'DELETE FROM roster_view_service_field WHERE roster_view_id = '.(int) $this->id;
 			$q = $GLOBALS['db']->query($sql);
 
-			$role_inserts = Array();
-			$field_inserts = Array();
+			$role_inserts = [];
+			$field_inserts = [];
 
 			foreach ($this->_members_to_set as $order => $detail) {
-				if (empty($detail)) continue;
+				if (empty($detail)) {
+					continue;
+				}
 				$bits = explode('-', $detail);
 				if ($bits[0] == 'role') {
-					$role_inserts[$bits[1]] = '('.(int)$this->id.', '.(int)$bits[1].', '.(int)$order.')';
+					$role_inserts[$bits[1]] = '('.(int) $this->id.', '.(int) $bits[1].', '.(int) $order.')';
 				} else {
-					$field_inserts[$bits[1].'-'.$bits[2]] = '('.(int)$this->id.', '.(int)$bits[1].', '.$GLOBALS['db']->quote($bits[2]).', '.(int)$order.')';
+					$field_inserts[$bits[1].'-'.$bits[2]] = '('.(int) $this->id.', '.(int) $bits[1].', '.$GLOBALS['db']->quote($bits[2]).', '.(int) $order.')';
 				}
 			}
 
@@ -302,7 +314,7 @@ class roster_view extends db_object
 				$q = $GLOBALS['db']->query($sql);
 			}
 
-			$this->_members_to_set = Array();
+			$this->_members_to_set = [];
 			$this->load($this->id);
 		}
 	}
@@ -311,7 +323,6 @@ class roster_view extends db_object
 	{
 		return $this->getValue('name');
 	}
-
 
 	function getInstancesQueryComps($params, $logic, $order)
 	{
@@ -342,16 +353,22 @@ class roster_view extends db_object
 							GROUP BY roster_view_id
 						) m
 						RIGHT OUTER JOIN roster_view on m.roster_view_id = roster_view.id';
+
 		return $res;
 	}
-
 
 	private function getAssignments($start_date, $end_date)
 	{
 		$roleids = $this->getRoleIds();
-		if (empty($roleids)) return Array();
-		if (empty($start_date)) $start_date = date('Y-m-d');
-		if (empty($end_date)) $end_date = date('Y-m-d', strtotime('+1 year'));
+		if (empty($roleids)) {
+			return [];
+		}
+		if (empty($start_date)) {
+			$start_date = date('Y-m-d');
+		}
+		if (empty($end_date)) {
+			$end_date = date('Y-m-d', strtotime('+1 year'));
+		}
 
 		// Normally any assignments involving a person the current user cannot see
 		// will be shown as "Hidden".  BUT if this roster is public, we might as well
@@ -375,13 +392,13 @@ class roster_view extends db_object
 				LEFT JOIN planned_absence pa 
 					ON ((pa.personid = rra.personid)
 						AND (rra.assignment_date BETWEEN pa.start_date and pa.end_date))
-				WHERE roster_role_id IN ('.implode(', ', array_map(Array($GLOBALS['db'], 'quote'), $roleids)).')
+				WHERE roster_role_id IN ('.implode(', ', array_map([$GLOBALS['db'], 'quote'], $roleids)).')
 				AND assignment_date BETWEEN '.$GLOBALS['db']->quote($start_date).' AND '.$GLOBALS['db']->quote($end_date).'
 				ORDER BY assignment_date, roster_role_id, `rank`, privateassignee.last_name, privateassignee.first_name';
 		$rows = $GLOBALS['db']->queryAll($sql);
-		$res = Array();
+		$res = [];
 		foreach ($rows as $row) {
-			$res[$row['assignment_date']][$row['roster_role_id']][$row['rank']] = Array(
+			$res[$row['assignment_date']][$row['roster_role_id']][$row['rank']] = [
 				'personid' => $row['personid'],
 				'name' => $row['assignee'],
 				'email' => $row['email'],
@@ -391,51 +408,63 @@ class roster_view extends db_object
 				'assigneehidden' => $row['assigneehidden'],
 				'absence_comment' => $row['absence_comment'],
 				'absenceid' => $row['absenceid'],
-			);
+			];
 		}
+
 		return $res;
 	}
 
 	function getAssignees($start_date, $end_date)
 	{
 		$roleids = $this->getRoleIds();
-		if (empty($roleids)) return Array();
-		if (is_null($start_date)) $start_date = date('Y-m-d');
-		if (is_null($end_date)) $end_date = date('Y-m-d', strtotime('+1 year'));
+		if (empty($roleids)) {
+			return [];
+		}
+		if (null === $start_date) {
+			$start_date = date('Y-m-d');
+		}
+		if (null === $end_date) {
+			$end_date = date('Y-m-d', strtotime('+1 year'));
+		}
 		$sql = 'SELECT person.id, person.first_name, person.last_name, person.email, person.mobile_tel
 				FROM roster_role_assignment rr JOIN person ON rr.personid = person.id
-				WHERE roster_role_id IN ('.implode(', ', array_map(Array($GLOBALS['db'], 'quote'), $roleids)).')
+				WHERE roster_role_id IN ('.implode(', ', array_map([$GLOBALS['db'], 'quote'], $roleids)).')
 				AND assignment_date BETWEEN '.$GLOBALS['db']->quote($start_date).' AND '.$GLOBALS['db']->quote($end_date);
-		$rows = $GLOBALS['db']->queryAll($sql, null, null, TRUE);
+		$rows = $GLOBALS['db']->queryAll($sql, null, null, true);
+
 		return $rows;
 	}
 
-	public function printCSV($start_date=NULL, $end_date=NULL, $return=FALSE)
+	public function printCSV($start_date = null, $end_date = null, $return = false)
 	{
 		$GLOBALS['system']->includeDBClass('service');
 		$dummy_service = new Service();
 
-		if (empty($start_date)) $start_date = date('Y-m-d');
-		$service_params = Array('congregationid' => $this->getCongregations(), '>date' => date('Y-m-d', strtotime($start_date.' -1 day')));
-		if (!empty($end_date)) $service_params['<date'] = date('Y-m-d', strtotime($end_date.' +1 day'));
+		if (empty($start_date)) {
+			$start_date = date('Y-m-d');
+		}
+		$service_params = ['congregationid' => $this->getCongregations(), '>date' => date('Y-m-d', strtotime($start_date.' -1 day'))];
+		if (!empty($end_date)) {
+			$service_params['<date'] = date('Y-m-d', strtotime($end_date.' +1 day'));
+		}
 		$services = $GLOBALS['system']->getDBObjectData('service', $service_params, 'AND', 'date');
 
-		$to_print = Array();
+		$to_print = [];
 		foreach ($services as $id => $service_details) {
 			$to_print[$service_details['date']]['service'][$service_details['congregationid']] = $service_details;
 			$to_print[$service_details['date']]['service'][$service_details['congregationid']]['id'] = $id;
-			$to_print[$service_details['date']]['assignments'] = Array();
+			$to_print[$service_details['date']]['assignments'] = [];
 		}
 		foreach ($this->getAssignments($start_date, $end_date) as $date => $date_assignments) {
 			$to_print[$date]['assignments'] = $date_assignments;
 		}
 		ksort($to_print);
-		$role_objects = Array();
+		$role_objects = [];
 
-		$csvData = Array();
+		$csvData = [];
 
 		// Headers
-		$row = Array('');
+		$row = [''];
 		$lastCong = '';
 		foreach ($this->_members as $id => $details) {
 			if ($details['congregation_name'] != $lastCong) {
@@ -447,7 +476,7 @@ class roster_view extends db_object
 		}
 		$csvData[] = $row;
 
-		$row = Array('Date');
+		$row = ['Date'];
 		$dummy_service = new Service();
 		foreach ($this->_members as $id => $details) {
 			if ($details['role_id']) {
@@ -459,16 +488,18 @@ class roster_view extends db_object
 		$csvData[] = $row;
 
 		foreach ($to_print as $date => $ddetail) {
-			$row = Array(format_date($date));
+			$row = [format_date($date)];
 			foreach ($this->_members as $id => $mdetail) {
-				if (empty($mdetail)) continue;
+				if (empty($mdetail)) {
+					continue;
+				}
 
 				if (!empty($mdetail['role_id'])) {
-					$names = Array();
-					foreach (array_get($ddetail['assignments'], $mdetail['role_id'], Array()) as $rank => $vs) {
+					$names = [];
+					foreach (array_get($ddetail['assignments'], $mdetail['role_id'], []) as $rank => $vs) {
 						$names[] = $vs['name'];
 					}
-					$row[] = implode("\n", $names);;
+					$row[] = implode("\n", $names);
 				} else {
 					if (!empty($ddetail['service'][$mdetail['congregationid']])) {
 						$dummy_service->populate($ddetail['service'][$mdetail['congregationid']]['id'], $ddetail['service'][$mdetail['congregationid']]);
@@ -480,26 +511,32 @@ class roster_view extends db_object
 			}
 			$csvData[] = $row;
 		}
-		if ($return) return $csvData;
+		if ($return) {
+			return $csvData;
+		}
 		print_csv($csvData);
 	}
 
-	function printSingleViewFlexi($service, $includeServiceFields=FALSE)
+	function printSingleViewFlexi($service, $includeServiceFields = false)
 	{
 		$showBlanks = ($this->getValue('show_on_run_sheet') == 1);
 		$asns = $this->getAssignments($service->getValue('date'), $service->getValue('date'));
-		$asns = empty($asns) ? Array() : reset($asns);
-		$ourMembers = Array();
+		$asns = empty($asns) ? [] : reset($asns);
+		$ourMembers = [];
 		foreach ($this->_members as $member) {
-			if (empty($member['role_id']) && !$includeServiceFields) continue;
-			if (!$showBlanks && !empty($member['role_id']) && empty($asns[$member['role_id']])) continue;
+			if (empty($member['role_id']) && !$includeServiceFields) {
+				continue;
+			}
+			if (!$showBlanks && !empty($member['role_id']) && empty($asns[$member['role_id']])) {
+				continue;
+			}
 			$ourMembers[] = $member;
 		}
 		?>
 		<div class="column">
 		<?php
 		$numCols = 3;
-		$totalRows = ceil(count($ourMembers)/$numCols);
+		$totalRows = ceil(count($ourMembers) / $numCols);
 		$i = 0;
 		foreach ($ourMembers as $member) {
 			?>
@@ -508,11 +545,11 @@ class roster_view extends db_object
 					<?php $this->_printOutputLabel($member, $service); ?>
 				</label>
 				<div>
-					<?php $this->_printOutputValue($member, $service, array_get($asns, $member['role_id'], Array())); ?>
+					<?php $this->_printOutputValue($member, $service, array_get($asns, $member['role_id'], [])); ?>
 				</div>
 			</div>
 			<?php
-			$i++;
+			++$i;
 			if (($i % $totalRows == 0) && ($i < count($ourMembers))) {
 				?>
 		</div>
@@ -527,24 +564,28 @@ class roster_view extends db_object
 		return $asns;
 	}
 
-	function printSingleViewTable($service, $columns=2, $includeServiceFields=FALSE)
+	function printSingleViewTable($service, $columns = 2, $includeServiceFields = false)
 	{
 		$showBlanks = ($this->getValue('show_on_run_sheet') == 1);
 		$asns = $this->getAssignments($service->getValue('date'), $service->getValue('date'));
-		$asns = empty($asns) ? Array() : reset($asns);
+		$asns = empty($asns) ? [] : reset($asns);
 
-		$ourMembers = Array();
+		$ourMembers = [];
 		foreach ($this->_members as $member) {
-			if (empty($member['role_id']) && !$includeServiceFields) continue;
-			if (!$showBlanks && !empty($member['role_id']) && empty($asns[$member['role_id']])) continue;
+			if (empty($member['role_id']) && !$includeServiceFields) {
+				continue;
+			}
+			if (!$showBlanks && !empty($member['role_id']) && empty($asns[$member['role_id']])) {
+				continue;
+			}
 			$ourMembers[] = $member;
 		}
 
-		$totalRows = ceil(count($ourMembers)/$columns);
+		$totalRows = ceil(count($ourMembers) / $columns);
 		?>
 		<table cellpadding="5">
 			<?php
-			for ($rowNum = 0; $rowNum < $totalRows; $rowNum++) {
+			for ($rowNum = 0; $rowNum < $totalRows; ++$rowNum) {
 				?>
 				<tr>
 				<?php
@@ -554,17 +595,17 @@ class roster_view extends db_object
 						?>
 						<th><?php $this->_printOutputLabel($member, $service); ?></th>
 						<td>
-							<?php $this->_printOutputValue($member, $service, array_get($asns, $member['role_id'], Array()), 0); ?>
+							<?php $this->_printOutputValue($member, $service, array_get($asns, $member['role_id'], []), 0); ?>
 						</td>
 						<?php
 					}
-					$i++;
+					++$i;
 				}
 				?>
 				</tr>
 				<?php
 			}
-			?>
+		?>
 		</table>
 		<?php
 	}
@@ -573,37 +614,41 @@ class roster_view extends db_object
 	{
 		if ($member['role_id']) {
 			if (ifdef('PUBLIC_AREA_ENABLED', 1)) {
-				echo '<a class="med-popup" href="'.BASE_PATH.'/public/?view=display_role_description&role='.(int)$member['role_id'].'">';
+				echo '<a class="med-popup" href="'.BASE_PATH.'/public/?view=display_role_description&role='.(int) $member['role_id'].'">';
 			} else {
-				echo '<a class="med-popup" href="'.BASE_PATH.'?view=rosters__define_roster_roles&roster_roleid='.(int)$member['role_id'].'">';
+				echo '<a class="med-popup" href="'.BASE_PATH.'?view=rosters__define_roster_roles&roster_roleid='.(int) $member['role_id'].'">';
 			}
 			echo ents($member['role_title']);
 			echo '</a>';
-		} else if ($member['service_field']) {
-			echo ents($service->getFieldLabel($member['service_field'], TRUE));
+		} elseif ($member['service_field']) {
+			echo ents($service->getFieldLabel($member['service_field'], true));
 		}
 	}
 
-	private function _printOutputValue($member, $service, $asn, $withLinks=TRUE)
+	private function _printOutputValue($member, $service, $asn, $withLinks = true)
 	{
 		// This is only used in run sheets
 		if ($member['role_id']) {
-			if (empty($asn)) echo '--';
+			if (empty($asn)) {
+				echo '--';
+			}
 			foreach ($asn as $rank => $asn) {
-				if ($withLinks) echo '<span class="nowrap"><a href="?view=persons&personid='.$asn['personid'].'" class="med-popup">';
+				if ($withLinks) {
+					echo '<span class="nowrap"><a href="?view=persons&personid='.$asn['personid'].'" class="med-popup">';
+				}
 				echo ents($asn['name']);
 				if ($withLinks) {
 					echo '</a>';
 					if ($asn['absenceid']) {
 						echo ' <span class="label label-important" title="Planned absence: '.ents($asn['absence_comment']).'">!</i></span>';
 					}
-					if (('' === $asn['email'])) echo ' <img class="visible-desktop" src="'.BASE_URL.'resources/img/no_email.png" title="No Email Address" />';
+					if ('' === $asn['email']) {
+						echo ' <img class="visible-desktop" src="'.BASE_URL.'resources/img/no_email.png" title="No Email Address" />';
+					}
 					if (('' === $asn['mobile']) && SMS_Sender::canSend()) {
 						echo ' <img class="visible-desktop" src="'.BASE_URL.'resources/img/no_phone.png" title="No Mobile" />';
 					}
 					echo '</span>';
-
-
 				} else {
 					echo '&nbsp;';
 				}
@@ -614,57 +659,66 @@ class roster_view extends db_object
 		}
 	}
 
-
 	/**
-	 *
 	 * @param string $start_date
 	 * @param string $end_date
-	 * @param boolean $editing Whether to show the editable version
-	 * @param boolean $public Whether we are showing on the public site
-	 * @param boolean $printable Whether to show the printable version
-	 * @return int	Count of the number of rows(dates) displayed.
+	 * @param bool   $editing    Whether to show the editable version
+	 * @param bool   $public     Whether we are showing on the public site
+	 * @param bool   $printable  Whether to show the printable version
+	 *
+	 * @return int count of the number of rows(dates) displayed
 	 */
-	function printView($start_date=NULL, $end_date=NULL, $editing=FALSE, $public=FALSE, $printable=FALSE)
+	function printView($start_date = null, $end_date = null, $editing = false, $public = false, $printable = false)
 	{
-		if (empty($this->_members)) return;
+		if (empty($this->_members)) {
+			return;
+		}
 		$GLOBALS['system']->includeDBClass('service');
 		$dummy_service = new Service();
 
-		if (is_null($start_date)) $start_date = date('Y-m-d');
-		$service_params = Array('congregationid' => $this->getCongregations(), '>date' => date('Y-m-d', strtotime($start_date.' -1 day')));
-		if (!is_null($end_date)) $service_params['<date'] = date('Y-m-d', strtotime($end_date.' +1 day'));
+		if (null === $start_date) {
+			$start_date = date('Y-m-d');
+		}
+		$service_params = ['congregationid' => $this->getCongregations(), '>date' => date('Y-m-d', strtotime($start_date.' -1 day'))];
+		if (null !== $end_date) {
+			$service_params['<date'] = date('Y-m-d', strtotime($end_date.' +1 day'));
+		}
 		$services = $GLOBALS['system']->getDBObjectData('service', $service_params, 'AND', 'date');
 
 		if (!$editing && !$public) {
 			$my_email = $GLOBALS['user_system']->getCurrentUser('email');
 		}
 		if ($editing) {
-			$absences = $GLOBALS['system']->getDBObjectData('planned_absence',
-																Array(
-																	'>=end_date' => $start_date,
-																	'<=start_date' => $end_date,
-																),
-																'AND');
+			$absences = $GLOBALS['system']->getDBObjectData(
+				'planned_absence',
+				[
+					'>=end_date' => $start_date,
+					'<=start_date' => $end_date,
+				],
+				'AND',
+			);
 		}
 
-		$to_print = Array();
+		$to_print = [];
 		foreach ($services as $id => $service_details) {
 			$service_details['id'] = $id;
 			$to_print[$service_details['date']]['service'][$service_details['congregationid']] = $service_details;
-			$to_print[$service_details['date']]['assignments'] = Array();
+			$to_print[$service_details['date']]['assignments'] = [];
 		}
-		$haveHidden = FALSE;
+		$haveHidden = false;
 		foreach ($this->getAssignments($start_date, $end_date) as $date => $date_assignments) {
 			$to_print[$date]['assignments'] = $date_assignments;
 			foreach ($date_assignments as $rid => $asns) {
 				foreach ($asns as $rank => $dets) {
-					if ($dets['assigneehidden']) $haveHidden = TRUE;
-					break(2);
+					if ($dets['assigneehidden']) {
+						$haveHidden = true;
+					}
+					break 2;
 				}
 			}
 		}
 		ksort($to_print);
-		$role_objects = Array();
+		$role_objects = [];
 		$this_sunday = date('Y-m-d', strtotime('Sunday'));
 		if (empty($to_print)) {
 			if ($public) {
@@ -676,20 +730,21 @@ class roster_view extends db_object
 				<div class="alert alert-error">There are no services during the date range specified.  Please try a different date range, or create some services using the 'Edit service program' page.</div>
 				<?php
 			}
+
 			return;
 		}
 		if (!$public && $haveHidden) {
 			if ($editing) {
 				print_message("Some allocations can't be edited because they involve persons you do not have permission to view", 'warning');
 			} else {
-				print_message("This roster includes some persons that you do not have permission to view", 'warning');
+				print_message('This roster includes some persons that you do not have permission to view', 'warning');
 			}
 		}
 
 		if ($editing) {
 			$show_lock_fail_msg = false;
 			$show_group_denied_msg = false;
-			$lockholders = Array(); // Array mapping personid of lock holders to info about them and their lock, for later display. Typically there will be N identical locks for N roles edited. We only store the first, assuming it is representative.
+			$lockholders = []; // Array mapping personid of lock holders to info about them and their lock, for later display. Typically there will be N identical locks for N roles edited. We only store the first, assuming it is representative.
 			foreach ($this->_members as $id => &$details) {
 				if (!empty($details['role_id'])) {
 					$role = $GLOBALS['system']->getDBObject('roster_role', $details['role_id']);
@@ -712,10 +767,10 @@ class roster_view extends db_object
 				$this->printLockHoldMessage($lockholders);
 			}
 			if ($show_group_denied_msg) {
-				print_message("There are some roles in this roster which you are not able to edit because they refer to a volunteer group you do not have access to.");
+				print_message('There are some roles in this roster which you are not able to edit because they refer to a volunteer group you do not have access to.');
 			}
 			?>
-			<form id="roster" method="post" class="warn-unsaved bubble-option-props" data-lock-length="<?php echo db_object::getLockLength() ?>">
+			<form id="roster" method="post" class="warn-unsaved bubble-option-props" data-lock-length="<?php echo db_object::getLockLength(); ?>">
 			<?php
 		}
 		if (!$public) {
@@ -727,7 +782,7 @@ class roster_view extends db_object
 					<h4>Choose assignee</h4>
 				</div>
 				<div class="modal-body">
-					<?php Person::printSingleFinder('personid', NULL); ?>
+					<?php Person::printSingleFinder('personid', null); ?>
 					<label class="checkbox">
 						<input type="checkbox" name="add-to-group" value="1" />
 						Add this person to the volunteer group for this role
@@ -752,7 +807,7 @@ class roster_view extends db_object
 
 			foreach ($to_print as $date => $ddetail) {
 				if ($editing) {
-					$date_absences = Array();
+					$date_absences = [];
 					foreach ($absences as $ab) {
 						if (($ab['start_date'] <= $date) && ($ab['end_date'] >= $date)) {
 							$date_absences[] = $ab['personid'];
@@ -766,43 +821,43 @@ class roster_view extends db_object
 					<th class="roster-date nowrap">
 						<?php
 						echo '<strong>'.str_replace(' ', '&nbsp;', date('j M y', strtotime($date))).'</strong>';
-						if (!$editing && !$public) {
-							$emails = Array();
-							$mobiles = Array();
-							$personids = Array();
-							foreach ($ddetail['assignments'] as $roleid => $assignees) {
-								foreach ($assignees as $rank => $pdetails) {
-									$personids[] = $pdetails['personid'];
-									if (!empty($pdetails['email']) && $pdetails['email'] != $my_email) {
-										$emails[] = $pdetails['email'];
-									}
-									if (!empty($pdetails['mobile'])) {
-										$mobiles[] = $pdetails['mobile'];
-									}
-								}
+				if (!$editing && !$public) {
+					$emails = [];
+					$mobiles = [];
+					$personids = [];
+					foreach ($ddetail['assignments'] as $roleid => $assignees) {
+						foreach ($assignees as $rank => $pdetails) {
+							$personids[] = $pdetails['personid'];
+							if (!empty($pdetails['email']) && $pdetails['email'] != $my_email) {
+								$emails[] = $pdetails['email'];
 							}
-							if (!empty($emails) || (!empty($mobiles) && SMS_Sender::canSend())) {
-								echo '<br />';
-							}
-							if (!empty($emails)) {
-								?>
-								<div class="smallprint no-print soft">
-									<a class="soft" href="<?php echo get_email_href($my_email, NULL, $emails, date('jS F', strtotime($date))); ?>" <?php echo email_link_extras(); ?>>Email&nbsp;All</a>
-				                </div>
-								<?php
-							}
-							if (!empty($mobiles) && SMS_Sender::canSend()) {
-								?>
-								<div class="smallprint no-print">
-								  <a class="soft" href="#send-sms-modal" data-personid="<?php echo implode(',', array_unique($personids)); ?>" data-toggle="sms-modal" data-name="People Rostered on <?php echo format_date($date);?>" onclick="$(this).parents('tr:first').addClass('tblib-hover')">SMS&nbsp;All</a>
-								</div>
-								<?php
+							if (!empty($pdetails['mobile'])) {
+								$mobiles[] = $pdetails['mobile'];
 							}
 						}
+					}
+					if (!empty($emails) || (!empty($mobiles) && SMS_Sender::canSend())) {
+						echo '<br />';
+					}
+					if (!empty($emails)) {
 						?>
+								<div class="smallprint no-print soft">
+									<a class="soft" href="<?php echo get_email_href($my_email, null, $emails, date('jS F', strtotime($date))); ?>" <?php echo email_link_extras(); ?>>Email&nbsp;All</a>
+				                </div>
+								<?php
+					}
+					if (!empty($mobiles) && SMS_Sender::canSend()) {
+						?>
+								<div class="smallprint no-print">
+								  <a class="soft" href="#send-sms-modal" data-personid="<?php echo implode(',', array_unique($personids)); ?>" data-toggle="sms-modal" data-name="People Rostered on <?php echo format_date($date); ?>" onclick="$(this).parents('tr:first').addClass('tblib-hover')">SMS&nbsp;All</a>
+								</div>
+								<?php
+					}
+				}
+				?>
 					</th>
 				<?php
-				$last_congid = NULL;
+				$last_congid = null;
 				foreach ($this->_members as $id => $mdetail) {
 					$td_class = '';
 					if ($mdetail['congregationid'] != $last_congid) {
@@ -813,13 +868,15 @@ class roster_view extends db_object
 					<td class="<?php echo $td_class; ?>">
 					<?php
 					if ($mdetail['role_id']) {
-						$haveHidden = FALSE;
-						foreach (array_get($ddetail['assignments'], $mdetail['role_id'], Array()) as $pdetails) {
-							if ($pdetails['assigneehidden']) $haveHidden = TRUE;
+						$haveHidden = false;
+						foreach (array_get($ddetail['assignments'], $mdetail['role_id'], []) as $pdetails) {
+							if ($pdetails['assigneehidden']) {
+								$haveHidden = true;
+							}
 						}
 						if ($editing && empty($mdetail['readonly']) && !$haveHidden) {
-							$currentval = Array();
-							foreach (array_get($ddetail['assignments'], $mdetail['role_id'], Array()) as $rank => $pdetails) {
+							$currentval = [];
+							foreach (array_get($ddetail['assignments'], $mdetail['role_id'], []) as $rank => $pdetails) {
 								$currentval[] = $pdetails['personid'];
 							}
 							if (empty($role_objects[$mdetail['role_id']])) {
@@ -831,27 +888,29 @@ class roster_view extends db_object
 							}
 							$role_objects[$mdetail['role_id']]->printChooser($date, $currentval, $date_absences);
 						} else {
-							$names = Array();
-							foreach (array_get($ddetail['assignments'], $mdetail['role_id'], Array()) as $rank => $vs) {
+							$names = [];
+							foreach (array_get($ddetail['assignments'], $mdetail['role_id'], []) as $rank => $vs) {
 								$personid = $vs['personid'];
 								if (!$public && !$vs['assigneehidden']) {
 									$href = '?view=persons&personid='.$personid;
 									$n = '<span class="nowrap">';
-									$n .= '<a data-personid="'.$personid . '" href="'.$href.'" title="Assigned by '.ents($vs['assigner']).' on '.format_datetime($vs['assignedon']).'">'.ents($vs['name']).'</a>';
-									if (strlen(strval($vs['absenceid']))) {
+									$n .= '<a data-personid="'.$personid.'" href="'.$href.'" title="Assigned by '.ents($vs['assigner']).' on '.format_datetime($vs['assignedon']).'">'.ents($vs['name']).'</a>';
+									if (strlen((string) $vs['absenceid'])) {
 										$n .= ' <a href="'.$href.'#rosters" class="label label-important" title="Planned absence: '.ents($vs['absence_comment']).'">!</i></a>';
 									}
-									if (('' === $vs['email'])) $n .= ' <img class="visible-desktop" src="'.BASE_URL.'resources/img/no_email.png" title="No Email Address" />';
+									if ('' === $vs['email']) {
+										$n .= ' <img class="visible-desktop" src="'.BASE_URL.'resources/img/no_email.png" title="No Email Address" />';
+									}
 									if (('' === $vs['mobile']) && SMS_Sender::canSend()) {
 										$n .= ' <img class="visible-desktop" src="'.BASE_URL.'resources/img/no_phone.png" title="No Mobile" />';
-					                }
+									}
 									$n .= '</span>';
 									$names[] = $n;
 								} else {
-									$names[] = '<span data-personid="'.$personid.'">'.nbsp(ents($vs['name'])).'</span>';;
+									$names[] = '<span data-personid="'.$personid.'">'.nbsp(ents($vs['name'])).'</span>';
 								}
 							}
-							echo implode("<br />", $names);
+							echo implode('<br />', $names);
 						}
 					} else {
 						echo '<div class="service-field-'.$mdetail['service_field'].'">';
@@ -861,7 +920,7 @@ class roster_view extends db_object
 								unset($ddetail['service'][$mdetail['congregationid']]['notes']);
 							}
 							$dummy_service->populate($ddetail['service'][$mdetail['congregationid']]['id'], $ddetail['service'][$mdetail['congregationid']]);
-							$dummy_service->printFieldvalue($mdetail['service_field'], NULL, $printable);
+							$dummy_service->printFieldvalue($mdetail['service_field'], null, $printable);
 						}
 						echo '</div>';
 					}
@@ -897,7 +956,7 @@ class roster_view extends db_object
 				<th rowspan="2" class="roster-date">Date</th>
 				<?php
 				$this->_printCongHeaders();
-				?>
+		?>
 			</tr>
 			<tr>
 				<?php $this->_printRoleHeaders($editing, $public); ?>
@@ -909,18 +968,18 @@ class roster_view extends db_object
 	function _printCongHeaders()
 	{
 		// print congregation headings
-		$current_cong_name = FALSE;
+		$current_cong_name = false;
 		$colspan = 1;
 		foreach ($this->_members as $id => $details) {
 			if ($details['congregation_name'] !== $current_cong_name) {
-				if ($current_cong_name !== FALSE) {
-					echo $colspan.'">'.($current_cong_name ? $current_cong_name : '&nbsp;').'</th>';
+				if ($current_cong_name !== false) {
+					echo $colspan.'">'.($current_cong_name ?: '&nbsp;').'</th>';
 				}
 				$colspan = 1;
 				echo '<th class="thick-left-border" colspan="';
 				$current_cong_name = $details['congregation_name'];
 			} else {
-				$colspan++;
+				++$colspan;
 			}
 		}
 		echo $colspan.'">'.$current_cong_name.'</th>';
@@ -930,7 +989,7 @@ class roster_view extends db_object
 	{
 		// print role/field headings
 		$dummy_service = new Service();
-		$last_congid = NULL;
+		$last_congid = null;
 		foreach ($this->_members as $id => $details) {
 			$th_class = '';
 			if ($details['congregationid'] != $last_congid) {
@@ -942,18 +1001,22 @@ class roster_view extends db_object
 				<?php
 				if ($details['role_id']) {
 					if ($public) {
-						echo '<a class="med-popup" href="'.BASE_PATH.'/public/?view=display_role_description&role='.(int)$details['role_id'].'">';
+						echo '<a class="med-popup" href="'.BASE_PATH.'/public/?view=display_role_description&role='.(int) $details['role_id'].'">';
 					} else {
-						echo '<a class="med-popup" href="'.BASE_PATH.'?view=rosters__define_roster_roles&roster_roleid='.(int)$details['role_id'].'">';
+						echo '<a class="med-popup" href="'.BASE_PATH.'?view=rosters__define_roster_roles&roster_roleid='.(int) $details['role_id'].'">';
 					}
 					echo ents($details['role_title']);
 					echo '</a>';
 				} else {
-					if (!$public) echo '<a href="?view=services__list_all">';
+					if (!$public) {
+						echo '<a href="?view=services__list_all">';
+					}
 					echo ents($dummy_service->getFieldLabel($details['service_field'], true));
-					if (!$public) echo '</a>';
+					if (!$public) {
+						echo '</a>';
+					}
 				}
-				?>
+			?>
 			</th>
 			<?php
 		}
@@ -961,15 +1024,17 @@ class roster_view extends db_object
 
 	function populate($id, $values)
 	{
-		$this->_members = Array();
-		$this->_members_to_set = Array();
+		$this->_members = [];
+		$this->_members_to_set = [];
+
 		return parent::populate($id, $values);
 	}
 
-
 	function processAllocations($start_date, $end_date)
 	{
-		if (!isset($_POST['assignees'])) return FALSE;
+		if (!isset($_POST['assignees'])) {
+			return false;
+		}
 
 		// Exclude roles that we couldn't get the lock for
 		$roles = $this->getRoleIds();
@@ -985,40 +1050,46 @@ class roster_view extends db_object
 
 		if (empty($roles)) {
 			trigger_error('Couldn\'t process allocations - do not have the lock on any role');
-			return FALSE;
+
+			return false;
 		}
 
-		$to_add = Array();
+		$to_add = [];
 		$to_delete = $this->getAssignments($start_date, $end_date);
 		foreach ($roles as $roleid) {
 			if (!empty($_POST['assignees'][$roleid])) {
 				foreach ($_POST['assignees'][$roleid] as $date => $assignee) {
-					if (!is_array($assignee)) $assignee = Array($assignee);
+					if (!is_array($assignee)) {
+						$assignee = [$assignee];
+					}
 					foreach ($assignee as $rank => $new_personid) {
-						$new_personid = (int)$new_personid;
-						if (empty($new_personid)) continue;
+						$new_personid = (int) $new_personid;
+						if (empty($new_personid)) {
+							continue;
+						}
 						if (isset($to_delete[$date][$roleid][$rank]) && $to_delete[$date][$roleid][$rank]['personid'] == $new_personid) {
 							// unchanged allocation - leave it as is
 							unset($to_delete[$date][$roleid][$rank]);
 						} else {
 							// new allocation
-							$to_add[] = '('.(int)$roleid.', '.$GLOBALS['db']->quote($date).', '.(int)$new_personid.', '.(int)$rank.', '.(int)$GLOBALS['user_system']->getCurrentUser('id').')';
+							$to_add[] = '('.(int) $roleid.', '.$GLOBALS['db']->quote($date).', '.(int) $new_personid.', '.(int) $rank.', '.(int) $GLOBALS['user_system']->getCurrentUser('id').')';
 						}
 					}
 				}
 			}
 		}
-		$del_clauses = Array();
+		$del_clauses = [];
 		foreach ($to_delete as $date => $date_allocs) {
 			foreach ($date_allocs as $roleid => $role_allocs) {
-				if (in_array($roleid, $roles)) { // don't delete any allocations for read-only roles!!
+				if (in_array($roleid, $roles, true)) { // don't delete any allocations for read-only roles!!
 					foreach ($role_allocs as $rank => $person_details) {
-						if ($person_details['assigneehidden']) continue;
-						$del_clauses[] = '(roster_role_id = '.(int)$roleid.' AND assignment_date = '.$GLOBALS['db']->quote($date).' AND `rank` = '.(int)$rank.')';
+						if ($person_details['assigneehidden']) {
+							continue;
+						}
+						$del_clauses[] = '(roster_role_id = '.(int) $roleid.' AND assignment_date = '.$GLOBALS['db']->quote($date).' AND `rank` = '.(int) $rank.')';
 					}
 				}
 			}
-
 		}
 		$GLOBALS['system']->doTransaction('BEGIN');
 		if (!empty($del_clauses)) {
@@ -1035,8 +1106,10 @@ class roster_view extends db_object
 		// Tidy up ranks - for example if somebody already had rank 4 but they're
 		// now the only assignee, update their rank to 0.
 		// Just to be safe, we'll just do this for the roles in this roster view.
-		$clean_role_ids = Array();
-		foreach ($roles as $roleid) $clean_role_ids[] = (int)$roleid; // paranoia pays.
+		$clean_role_ids = [];
+		foreach ($roles as $roleid) {
+			$clean_role_ids[] = (int) $roleid;
+		} // paranoia pays.
 		$SQL = 'UPDATE roster_role_assignment rra
 				INNER JOIN ( SELECT *,
 								(row_number() OVER (PARTITION BY assignment_date, roster_role_id
@@ -1067,23 +1140,28 @@ class roster_view extends db_object
 					continue;
 				}
 				foreach ($personIDs as $personID) {
-					if ($personID) $group->addMember($personID);
+					if ($personID) {
+						$group->addMember($personID);
+					}
 				}
 			}
 		}
 
 		$GLOBALS['system']->doTransaction('COMMIT');
-		return TRUE;
+
+		return true;
 	}
 
 	/**
-	 * Get all the roster views that should be shown on the run sheet for the specified congregation
+	 * Get all the roster views that should be shown on the run sheet for the specified congregation.
+	 *
 	 * @param int $congregationid
+	 *
 	 * @return array
 	 */
 	static function getForRunSheet($congregationid)
 	{
-		$res = Array();
+		$res = [];
 		$SQL = '
 		SELECT id
 		FROM roster_view
@@ -1091,23 +1169,26 @@ class roster_view extends db_object
 		AND id IN (
 			SELECT DISTINCT roster_view_id
 			FROM roster_view_service_field sf
-			WHERE sf.congregationid = '.(int)$congregationid.'
+			WHERE sf.congregationid = '.(int) $congregationid.'
 			UNION
 			SELECT DISTINCT roster_view_id
 			FROM roster_view_role_membership rm
 			JOIN roster_role rr ON rr.id = rm.roster_role_id
-			WHERE rr.congregationid = '.(int)$congregationid.'
+			WHERE rr.congregationid = '.(int) $congregationid.'
 		)';
 		$ids = $GLOBALS['db']->queryCol($SQL);
 		foreach ($ids as $id) {
 			$res[$id] = $GLOBALS['system']->getDBObject('roster_view', $id);
 		}
+
 		return $res;
 	}
 
 	public function printAnalysis($start, $end)
 	{
-		if (!$this->getRoleIDs()) return;
+		if (!$this->getRoleIDs()) {
+			return;
+		}
 		$db = JethroDB::get();
 		$SQL = '
 				SELECT personid, first_name, last_name,
@@ -1127,6 +1208,7 @@ class roster_view extends db_object
 		$res = $db->queryAll($SQL);
 		if (empty($res)) {
 			echo '<i>('._('None').')</i>';
+
 			return;
 		}
 
@@ -1146,13 +1228,13 @@ class roster_view extends db_object
 				$dt = $row['date_count'] > 1 ? 'dates' : 'date';
 				?>
 				<tr>
-					<td><a title="Click to highlight assignments" data-personid="<?php echo (int)$row['personid']; ?>" href="#"><?php echo ents($row['first_name'].' '.$row['last_name']); ?></a></td>
+					<td><a title="Click to highlight assignments" data-personid="<?php echo (int) $row['personid']; ?>" href="#"><?php echo ents($row['first_name'].' '.$row['last_name']); ?></a></td>
 					<td><?php echo $row['assignment_count'].' '.$asn.' on '.$row['date_count'].' '.$dt; ?></td>
 					<td><?php echo ents($row['role_titles']); ?></td>
 				</tr>
 				<?php
 			}
-			?>
+		?>
 			</tbody>
 		</table>
 		<?php
@@ -1170,26 +1252,26 @@ class roster_view extends db_object
 
 	/**
 	 * Print an error explaining which other user has the roster edit lock, and for how long.
-	 * @param array{userid: int, array{userid: int, expires: string, first_name: ?string, last_name: ?string}} $lockholders Array mapping lock holder userids to info about them and their lock.
 	 *
-	 * @return void
+	 * @param array{userid: int, array{userid: int, expires: string, first_name: ?string, last_name: ?string}} $lockholders array mapping lock holder userids to info about them and their lock
+	 *
 	 * @throws DateMalformedStringException
 	 */
 	public function printLockHoldMessage(array $lockholders): void
 	{
 		$lockHoldersStr = implode(' and ', array_map(
-			function($lockowner, $userid) {
+			function ($lockowner, $userid) {
 				return $lockowner['first_name'] !== null
 					? "{$lockowner['first_name']} {$lockowner['last_name']} ({$userid})"
 					: "user $userid";
 			},
 			$lockholders,
-			array_keys($lockholders)
+			array_keys($lockholders),
 		));
 		// If more than one person holds locks of differing expiries, the longest expiry is most relevant.
 		$maxLockExpiry = array_reduce($lockholders, function ($carry, $lockholder) {
 			return $lockholder['expires'] > $carry ? $lockholder['expires'] : $carry;
-		}, PHP_INT_MIN);
+		}, \PHP_INT_MIN);
 		$lockExpiresStr = (new DateTime($maxLockExpiry))->format('H:i');
 		print_message("Some of the roles in this roster are currently being edited by $lockHoldersStr.  To edit assignments for these roles, wait until the other user finishes or their lock expires (at $lockExpiresStr), then try again.", 'failure');
 	}

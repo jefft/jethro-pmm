@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<?php include dirname(dirname(dirname(__FILE__))).'/templates/head.template.php' ?>
+	<?php include dirname(__DIR__, 2).'/templates/head.template.php'; ?>
 </head>
 <body id="login">
 	<form method="post" id="login-box" class="well">
@@ -21,7 +21,7 @@
 				Please contact <a href="mailto:<?php echo ents(MEMBER_REGO_HELP_EMAIL); ?>"><?php echo ents(MEMBER_REGO_HELP_EMAIL); ?></a> for help.</p>
 				<?php
 			}
-			?>
+	?>
 			</p>
 			
 			<a class="btn btn-lnk" href="/members">&laquo; Back to login form</a>

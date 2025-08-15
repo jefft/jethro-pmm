@@ -4,19 +4,18 @@ class Family_Note extends Abstract_Note
 {
 	protected static function _getFields()
 	{
-		return Array(
-				'familyid'	=> Array(
-								'type'			=> 'int',
-								'references'	=> 'family',
-								'editable'		=> false,
-								'allow_empty'	=> false,
-								'label'			=> 'Family',
-							   ),
-			   );
-
+		return [
+			'familyid' => [
+				'type' => 'int',
+				'references' => 'family',
+				'editable' => false,
+				'allow_empty' => false,
+				'label' => 'Family',
+			],
+		];
 	}
 
-	function getInitSQL($table_name=NULL)
+	function getInitSQL($table_name = null)
 	{
 		return "
 			CREATE TABLE `family_note` (
@@ -27,31 +26,33 @@ class Family_Note extends Abstract_Note
 		";
 	}
 
-	function getForeignKeys() {
-		return Array(
+	function getForeignKeys()
+	{
+		return [
 			'familyid' => 'family(id) ON DELETE CASCADE',
 			'id' => '_abstract_note(id) ON DELETE CASCADE',
-		);
+		];
 	}
 
 	function readyToCreate()
 	{
 		$res = parent::readyToCreate();
 		if ($this->values['familyid']) {
-			$members = $GLOBALS['system']->getDBObjectData('person', Array('familyid' => $this->values['familyid']));
+			$members = $GLOBALS['system']->getDBObjectData('person', ['familyid' => $this->values['familyid']]);
 			if (count($members) == 1) {
 				trigger_error('Family notes can only be added to families with at least two members.  Add a person note instead.');
-				$res = FALSE;
+				$res = false;
 			}
 		}
-		return $res;
 
+		return $res;
 	}
 
-
-	function printFieldValue($name, $value=NULL)
+	function printFieldValue($name, $value = null)
 	{
-		if (is_null($value)) $value = $this->values[$name];
+		if (null === $value) {
+			$value = $this->values[$name];
+		}
 		if ($name == 'familyid') {
 			if (!empty($value)) {
 				$family = $GLOBALS['system']->getDBObject('family', $value);
@@ -61,6 +62,7 @@ class Family_Note extends Abstract_Note
 				return;
 			}
 		}
+
 		return parent::printFieldValue($name, $value);
 	}
 
@@ -72,9 +74,9 @@ class Family_Note extends Abstract_Note
 		if ($GLOBALS['user_system']->getCurrentRestrictions()) {
 			// eliminate any notes linked to families with no visible members
 			$res['from'] .= ' JOIN person fmember ON fmember.familyid = subject.id ';
-		}	
+		}
 		$res['select'][] = 'subject.family_name as family_name';
+
 		return $res;
 	}
-
 }

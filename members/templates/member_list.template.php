@@ -12,25 +12,25 @@ foreach ($persons as $personid => $person) {
 			<img src="?call=photo&personid=<?php echo $personid; ?>" />
 			<?php
 		}
-		?>
+	?>
 		<div>
 			<strong><?php echo ents($dummy->toString()); ?></strong>
 			<br />
 			<?php
-			if (ifdef('MEMBERS_SEE_AGE_BRACKET', TRUE)) {
-				echo ents($dummy->getFormattedValue('age_bracketid'));
-				echo ' &bull; ';
-			}
-			echo ents($dummy->getFormattedValue('gender'));
-			if ($dummy->getValue('mobile_tel')) {
-				echo ' &bull; ';	
-				$dummy->printFieldValue('mobile_tel');
-			}
-			if ($dummy->getValue('email')) {
-				echo '<br />';
-				$dummy->printFieldValue('email');
-			}
-			?>
+		if (ifdef('MEMBERS_SEE_AGE_BRACKET', true)) {
+			echo ents($dummy->getFormattedValue('age_bracketid'));
+			echo ' &bull; ';
+		}
+	echo ents($dummy->getFormattedValue('gender'));
+	if ($dummy->getValue('mobile_tel')) {
+		echo ' &bull; ';
+		$dummy->printFieldValue('mobile_tel');
+	}
+	if ($dummy->getValue('email')) {
+		echo '<br />';
+		$dummy->printFieldValue('email');
+	}
+	?>
 		</div>
 
 	</div>

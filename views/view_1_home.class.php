@@ -3,7 +3,7 @@ class View_Home extends View
 {
 	function getTitle()
 	{
-		return NULL;
+		return null;
 	}
 
 	function processView()
@@ -14,7 +14,7 @@ class View_Home extends View
 	{
 		if (ifdef('NEEDS_1086_CHECK')) {
 			if ($GLOBALS['user_system']->havePerm(PERM_SYSADMIN)) {
-				if (PHP_VERSION_ID >= 70400) {
+				if (\PHP_VERSION_ID >= 70400) {
 					// This code requires php 7.4+ but isn't particularly essential, so let's not break on 7.2. Issue #1245
 					require_once 'views/view_0_fix_age_brackets.class.php';
 				}
@@ -38,29 +38,29 @@ class View_Home extends View
 				>
 					<small class="hidden-phone"><i class="icon-bookmark"></i>Bookmark</small>
 				</a>
-				<?php echo _('System-Wide Search');?>
+				<?php echo _('System-Wide Search'); ?>
 			</h3>
 			<?php
 			require_once 'views/view_0_mixed_search.class.php';
-			View__mixed_search::printSearchForm();
-			?>
+		View__mixed_search::printSearchForm();
+		?>
 		</div>
 
 		<?php
-		if ( $GLOBALS['user_system']->havePerm(PERM_VIEWMYNOTES)) {
+		if ($GLOBALS['user_system']->havePerm(PERM_VIEWMYNOTES)) {
 			$user = $GLOBALS['system']->getDBObject('staff_member', $GLOBALS['user_system']->getCurrentUser('id'));
 			$tasks = $user->getTasks('now');
 			?>
 			<div class="homepage-box my-notes">
-				<h3><?php echo _('Notes '); ?><span><?php echo _('for immediate action');?></span></h3>
+				<h3><?php echo _('Notes '); ?><span><?php echo _('for immediate action'); ?></span></h3>
 				<?php
 				if ($tasks) {
 					?>
 					<table class="table table-condensed table-striped table-hover clickable-rows">
 						<thead>
 							<tr>
-								<th><?php echo _('For');?></th>
-								<th><?php echo _('Subject');?></th>
+								<th><?php echo _('For'); ?></th>
+								<th><?php echo _('Subject'); ?></th>
 							</tr>
 						</thead>
 						<tbody>
@@ -69,7 +69,7 @@ class View_Home extends View
 								$icon = ($task['type'] == 'person') ? 'user' : 'home';
 								$view = ($task['type'] == 'person') ? 'persons' : 'families';
 								$url = ifdef('NOTES_LINK_TO_EDIT')
-										? '?view=_edit_note&note_type='.ents($task['type']).'&noteid='.(int)$id.'&back_to=home'
+										? '?view=_edit_note&note_type='.ents($task['type']).'&noteid='.(int) $id.'&back_to=home'
 										: '?view='.$view.'&'.$task['type'].'id='.$task[$task['type'].'id'].'&note_back_to=home#note_'.$id;
 								$nameurl = '?view='.$view.'&'.$task['type'].'id='.$task[$task['type'].'id'];
 								?>
@@ -79,7 +79,7 @@ class View_Home extends View
 								</tr>
 								<?php
 							}
-							?>
+					?>
 						</tbody>
 					</table>
 					<?php
@@ -88,14 +88,14 @@ class View_Home extends View
 					<p><i>None</i></p>
 					<?php
 				}
-				$later = $user->getTasks('later');
-				$count = count($later);
-				if ($count) {
-					?>
-					<p class="align-right"><?php echo _('You have ');?><a href="<?php echo build_url(Array('view' => 'notes__for_future_action', 'assignee' => $user->id)); ?>"><?php echo count($later); ?> note<?php echo ($count > 1) ? 's' : ''; ?> <?php echo _('for future action');?></a></p>
-					<?php
-				}
+			$later = $user->getTasks('later');
+			$count = count($later);
+			if ($count) {
 				?>
+					<p class="align-right"><?php echo _('You have '); ?><a href="<?php echo build_url(['view' => 'notes__for_future_action', 'assignee' => $user->id]); ?>"><?php echo count($later); ?> note<?php echo ($count > 1) ? 's' : ''; ?> <?php echo _('for future action'); ?></a></p>
+					<?php
+			}
+			?>
 			</div>
 			<?php
 		}
@@ -110,42 +110,42 @@ class View_Home extends View
 					<a href="?view=_manage_ical" class="pull-right"><small><i class="icon-rss"></i><span class="hidden-phone">Subscribe</span></small></a>
 					<?php
 				}
-				?>
+			?>
 					Upcoming roster
 				</h3>
 				<?php
-				$GLOBALS['system']->includeDBClass('roster_role_assignment');
-				$rallocs = Roster_Role_Assignment::getUpcomingAssignments($GLOBALS['user_system']->getCurrentUser('id'));
-				if ($rallocs) {
-					foreach ($rallocs as $date => $allocs) {
-						 ?>
+			$GLOBALS['system']->includeDBClass('roster_role_assignment');
+			$rallocs = Roster_Role_Assignment::getUpcomingAssignments($GLOBALS['user_system']->getCurrentUser('id'));
+			if ($rallocs) {
+				foreach ($rallocs as $date => $allocs) {
+					?>
 						 <h5><?php echo date('j M', strtotime($date)); ?></h5>
 						 <?php
-						 foreach ($allocs as $alloc) {
-							  echo $alloc['cong'].' '.$alloc['title'].'<br />';
-						 }
+					foreach ($allocs as $alloc) {
+						echo $alloc['cong'].' '.$alloc['title'].'<br />';
 					}
-					?>
-					<div class="pull-right"><a href="./?view=persons&personid=<?php echo $GLOBALS['user_system']->getCurrentUser('id'); ?>#rosters">See all</a></div>
-					<?php
-				} else {
-					?>
-					<p><i>None</i></p>
-					<?php
 				}
 				?>
+					<div class="pull-right"><a href="./?view=persons&personid=<?php echo $GLOBALS['user_system']->getCurrentUser('id'); ?>#rosters">See all</a></div>
+					<?php
+			} else {
+				?>
+					<p><i>None</i></p>
+					<?php
+			}
+			?>
 			 </div>
 			<?php
 		}
 		?>
 		</div>
 		<?php
-		$reportVals = Array('all');
+		$reportVals = ['all'];
 		if ($GLOBALS['user_system']->havePerm(PERM_RUNREPORT)) {
 			$reportVals[] = 'auth';
 		}
-		$owners = Array(NULL, $GLOBALS['user_system']->getCurrentUser('id'));
-		$frontpagereports = $GLOBALS['system']->getDBObjectData('person_query', Array('show_on_homepage' => $reportVals, 'owner' => $owners), 'AND', 'name');
+		$owners = [null, $GLOBALS['user_system']->getCurrentUser('id')];
+		$frontpagereports = $GLOBALS['system']->getDBObjectData('person_query', ['show_on_homepage' => $reportVals, 'owner' => $owners], 'AND', 'name');
 		foreach ($frontpagereports as $reportid => $reportparams) {
 			$report = $GLOBALS['system']->getDBObject('person_query', $reportid);
 			?>
@@ -154,6 +154,6 @@ class View_Home extends View
 				<?php $report->printResults(); ?>
 			</div>
 			<?php
-		 }
+		}
 	}
 }

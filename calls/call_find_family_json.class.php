@@ -1,19 +1,20 @@
 <?php
+
 class Call_Find_Family_JSON extends Call
 {
 	function run()
 	{
-		$results = Array();
+		$results = [];
 		if (!empty($_REQUEST['search'])) {
 			$name = $_REQUEST['search'];
-			$results = $GLOBALS['system']->getDBObjectData('family', Array('family_name' => '%'.$_REQUEST['search'].'%'));
-			header ("Expires: Mon, 26 Jul 1997 05:00:00 GMT"); // Date in the past
-			header ("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT"); // always modified
-			header ("Cache-Control: no-cache, must-revalidate"); // HTTP/1.1
-			header ("Pragma: no-cache"); // HTTP/1.0
-			//header ("Content-Type: application/json");
-			echo "{\"results\": [";
-			$arr = array();
+			$results = $GLOBALS['system']->getDBObjectData('family', ['family_name' => '%'.$_REQUEST['search'].'%']);
+			header('Expires: Mon, 26 Jul 1997 05:00:00 GMT'); // Date in the past
+			header('Last-Modified: '.gmdate('D, d M Y H:i:s').' GMT'); // always modified
+			header('Cache-Control: no-cache, must-revalidate'); // HTTP/1.1
+			header('Pragma: no-cache'); // HTTP/1.0
+			// header ("Content-Type: application/json");
+			echo '{"results": [';
+			$arr = [];
 			$GLOBALS['system']->includeDBClass('family');
 			foreach ($results as $i => $details) {
 				$arr[] = '
@@ -24,8 +25,8 @@ class Call_Find_Family_JSON extends Call
 					}
 				';
 			}
-			echo implode(", ", $arr);
-			echo "]}";
+			echo implode(', ', $arr);
+			echo ']}';
 		}
 	}
 }

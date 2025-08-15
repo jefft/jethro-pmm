@@ -1,6 +1,7 @@
 <?php
+
 /**
- * JETHRO PMM
+ * JETHRO PMM.
  *
  * This file is part of Jethro PMM - https://github.com/tbar0970/jethro-pmm
  *
@@ -20,26 +21,25 @@
  * index.php - first stop for every request
  *
  * @author Tom Barrett <tom@tombarrett.id.au>
+ *
  * @version $Id: index.php,v 1.17 2013/09/25 12:23:22 tbar0970 Exp $
- * @package jethro-pmm
  */
-
-define('JETHRO_ROOT', dirname(__FILE__));
+define('JETHRO_ROOT', __DIR__);
 define('TEMPLATE_DIR', JETHRO_ROOT.'/templates/');
 
 // Load configuration
-$conf=JETHRO_ROOT.'/conf.php';
+$conf = JETHRO_ROOT.'/conf.php';
 if (!file_exists($conf)) {
 	$errmsg = "Jethro configuration file not found.  You need to copy $conf.sample to $conf and edit it before Jethro can run";
 	echo $errmsg;
-	throw new \RuntimeException($errmsg);
-	exit();
+	throw new RuntimeException($errmsg);
+	exit;
 }
 if (!is_readable($conf)) {
-	$errmsg = "$conf not readable by user ".$_SERVER["USER"].".";
+	$errmsg = "$conf not readable by user ".$_SERVER['USER'].'.';
 	echo $errmsg;
-	throw new \RuntimeException($errmsg);
-	exit();
+	throw new RuntimeException($errmsg);
+	exit;
 }
 require_once $conf;
 
@@ -51,7 +51,7 @@ require_once JETHRO_ROOT.'/include/user_system.class.php';
 require_once JETHRO_ROOT.'/include/system_controller.class.php';
 $GLOBALS['user_system'] = new User_System();
 
-if ($GLOBALS['user_system']->getCurrentUser() == NULL) {
+if ($GLOBALS['user_system']->getCurrentUser() == null) {
 	// Nobody is logged in, so show login screen or installer
 	if (!$GLOBALS['db']->hasTables()) {
 		require_once JETHRO_ROOT.'/include/installer.class.php';

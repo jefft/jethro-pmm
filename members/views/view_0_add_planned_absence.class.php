@@ -13,6 +13,7 @@ class View__Add_Planned_Absence extends View
 	private function _getUsersFamilyMembers()
 	{
 		$person = new Person($GLOBALS['user_system']->getCurrentPerson('id'));
+
 		return $person->getFamily()->getMemberData();
 	}
 
@@ -23,7 +24,7 @@ class View__Add_Planned_Absence extends View
 
 		if (array_get($_REQUEST, 'new_'.$this->_create_type.'_submitted')) {
 			if (array_diff($_REQUEST['personid'], array_keys($this->_getUsersFamilyMembers()))) {
-				throw new \RuntimeException('Attempt to add absence for a person outside the users family');
+				throw new RuntimeException('Attempt to add absence for a person outside the users family');
 				exit;
 			}
 
@@ -34,24 +35,23 @@ class View__Add_Planned_Absence extends View
 				$x->setValue('personid', $personid);
 				if ($x->hasRosterAssignments()) {
 					$p = new Person($personid);
-					add_message("Absence could not be saved because ".$p->toString().' is already assigned to roster roles during the absent period. Arrange a swap or subsitutute, then try again', 'failure');
+					add_message('Absence could not be saved because '.$p->toString().' is already assigned to roster roles during the absent period. Arrange a swap or subsitutute, then try again', 'failure');
 					$GLOBALS['system']->doTransaction('ROLLBACK');
+
 					return;
 				}
 				if (!$x->create()) {
-					add_message("Error saving planned absences", 'failure');
+					add_message('Error saving planned absences', 'failure');
 					$GLOBALS['system']->doTransaction('ROLLBACK');
+
 					return;
 				}
 			}
 			$GLOBALS['system']->doTransaction('COMMIT');
-			add_message("Planned absence saved", 'success');
+			add_message('Planned absence saved', 'success');
 			redirect('rosters');
-
 		}
 	}
-
-	
 
 	function printView()
 	{
@@ -60,8 +60,8 @@ class View__Add_Planned_Absence extends View
 			<input type="hidden" name="new_<?php echo $this->_create_type; ?>_submitted" value="1" />
 			<?php
 			$members = $this->_getUsersFamilyMembers();
-			if (count($members) > 1) {
-				?>
+		if (count($members) > 1) {
+			?>
 				<div class="form-horizontal">
 					<div class="control-group">
 						<label class="control-label">
@@ -69,38 +69,35 @@ class View__Add_Planned_Absence extends View
 						</label>
 						<div class="controls">
 							<?php
-							foreach ($members as $id => $detail) {
-								?>
+						foreach ($members as $id => $detail) {
+							?>
 								<label class="checkbox">
 									<input type="checkbox" name="personid[]" value="<?php echo $id; ?>" checked="checked" />
 									<?php echo ents($detail['first_name'].' '.$detail['last_name']); ?>
 								</label>
 								<?php
-							}
-							?>
+						}
+			?>
 						</div>
 					</div>
 				</div>
 				<?php
-			} else {
-				print_hidden_field('personid[]', key($members));
-			}
-			
-			$this->_new_object->printForm();
-			?>
+		} else {
+			print_hidden_field('personid[]', key($members));
+		}
+
+		$this->_new_object->printForm();
+		?>
 			<div class="form-horizontal"><div class="controls">
 				<button type="submit" class="btn"><?php echo _($this->_submit_label); ?></button>
-				<button type="button" class="btn back"><?php echo _('Cancel');?></button>
+				<button type="button" class="btn back"><?php echo _('Cancel'); ?></button>
 			</div></div>
 		</form>
 		<?php
 	}
 
-
-	
 	function getTitle()
 	{
 		return 'Add Planned Absence';
 	}
-
 }

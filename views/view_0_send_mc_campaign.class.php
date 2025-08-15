@@ -1,13 +1,14 @@
 <?php
-use \DrewM\MailChimp\MailChimp;
+use DrewM\MailChimp\MailChimp;
+
 require_once 'vendor/autoload.php';
 
 class View__Send_MC_Campaign extends View
 {
-	private $_report = NULL;
+	private $_report;
 	private $_from_name = '';
 	private $_from_address = '';
-	private $_mc = NULL;
+	private $_mc;
 	private $_sent_campaign_id = '';
 
 	static function getMenuPermissionLevel()
@@ -17,13 +18,13 @@ class View__Send_MC_Campaign extends View
 
 	function processView()
 	{
-		$this->_report = new Person_Query((int)$_REQUEST['reportid']);
+		$this->_report = new Person_Query((int) $_REQUEST['reportid']);
 		if (empty($this->_report)) {
-			trigger_error("Report not found");
+			trigger_error('Report not found');
 			exit;
 		}
 		if (!strlen(ifdef('MAILCHIMP_API_KEY'))) {
-			trigger_error("Mailchimp API key needs to be set up in system config first");
+			trigger_error('Mailchimp API key needs to be set up in system config first');
 			exit;
 		}
 		$this->_mc = new MailChimp(MAILCHIMP_API_KEY);
@@ -35,35 +36,39 @@ class View__Send_MC_Campaign extends View
 		if (!empty($_POST['subject']) && !empty($_POST['message'])) {
 			$html = $_POST['message'];
 
-			$attachment_error = FALSE;
-			$attachments = Array();
+			$attachment_error = false;
+			$attachments = [];
 			if (!empty($_FILES['attachment'])) {
 				foreach ($_FILES['attachment']['name'] as $i => $name) {
-					if (!strlen($name)) continue;
-					if ($_FILES['attachment']['size'][$i] == 0) {
-						add_message("Attachment ".ents($name)." was empty. Campaign not sent.", 'error');
-						$attachment_error = TRUE;
+					if (!strlen($name)) {
 						continue;
 					}
-					if ($_FILES['attachment']['size'][$i] > 1024*1024*5) {
-						add_message("Attachment ".ents($name)." was too large (max 5MB).  Campaign not sent.", 'error');
-						$attachment_error = TRUE;
+					if ($_FILES['attachment']['size'][$i] == 0) {
+						add_message('Attachment '.ents($name).' was empty. Campaign not sent.', 'error');
+						$attachment_error = true;
+						continue;
+					}
+					if ($_FILES['attachment']['size'][$i] > 1024 * 1024 * 5) {
+						add_message('Attachment '.ents($name).' was too large (max 5MB).  Campaign not sent.', 'error');
+						$attachment_error = true;
 						continue;
 					}
 					if ($_FILES['attachment']['error'][$i]) {
-						add_message("Error (code ".$_FILES['attachment']['error'].") attaching ".ents($name).". Campaign not sent.", 'error');
-						$attachment_error = TRUE;
+						add_message('Error (code '.$_FILES['attachment']['error'].') attaching '.ents($name).'. Campaign not sent.', 'error');
+						$attachment_error = true;
 						continue;
 					}
 					$attachments[$name] = $_FILES['attachment']['tmp_name'][$i];
 				}
 			}
-			if ($attachment_error) return; // Do not send.
+			if ($attachment_error) {
+				return;
+			} // Do not send.
 
 			$zip = new ZipArchive();
 			$zip_name = str_replace('.tmp', '', tempnam(sys_get_temp_dir(), 'mailchimp_content-zip'));
 			if (!$zip->open($zip_name, ZipArchive::CREATE)) {
-				throw new \RuntimeException("Could not create zip archive to submit to mailchimp");
+				throw new RuntimeException('Could not create zip archive to submit to mailchimp');
 				exit;
 			}
 			foreach ($attachments as $name => $tmpname) {
@@ -75,40 +80,41 @@ class View__Send_MC_Campaign extends View
 			$zip->close();
 
 			// Let's send us a campaign!
-			$postData = Array(
+			$postData = [
 				'type' => 'regular',
-				'recipients' => Array('list_id' => $this->_report->getValue('mailchimp_list_id')),
-				'settings' => Array(
+				'recipients' => ['list_id' => $this->_report->getValue('mailchimp_list_id')],
+				'settings' => [
 					'subject_line' => $_POST['subject'],
 					'title' => $_POST['subject'],
 					'from_name' => $this->_from_name,
 					'reply_to' => $this->_from_address,
-	 				/*'template_id' => (int)$_POST['templateid'],*/
-				),
-			);
+					/* 'template_id' => (int)$_POST['templateid'], */
+				],
+			];
 			$postRes = $this->_mc->post('/campaigns', $postData);
 			if (!$this->_mc->success()) {
-				trigger_error("Mailchimp error: ".$this->_mc->getLastError());
+				trigger_error('Mailchimp error: '.$this->_mc->getLastError());
+
 				return;
 			}
 			$campaignID = $postRes['id'];
 			if (empty($campaignID)) {
-				trigger_error("Failed to create campaign");
+				trigger_error('Failed to create campaign');
 				exit;
 			}
-			$putContent = Array(
-				/*'html' => $html,*/
-				/*'template' => Array('id' => (int)$_POST['templateid']),*/
-				'archive' => Array(
+			$putContent = [
+				/* 'html' => $html, */
+				/* 'template' => Array('id' => (int)$_POST['templateid']), */
+				'archive' => [
 					'archive_content' => base64_encode(file_get_contents($zip_name)),
-					'archive_type' => 'zip'
-				)
-			);
+					'archive_type' => 'zip',
+				],
+			];
 
 			$timeout = 30; // sometimes takes a while to handle the ZIP
 			$putRes = $this->_mc->put('/campaigns/'.$campaignID.'/content', $putContent, $timeout);
 			if (!$this->_mc->success()) {
-				trigger_error("Mailchimp error: ".$this->_mc->getLastError());
+				trigger_error('Mailchimp error: '.$this->_mc->getLastError());
 			}
 
 			$checklistRes = $this->_mc->GET('/campaigns/'.$campaignID.'/send-checklist');
@@ -121,7 +127,7 @@ class View__Send_MC_Campaign extends View
 			} else {
 				$sendRes = $this->_mc->POST('/campaigns/'.$campaignID.'/actions/send');
 				if (!$this->_mc->success()) {
-					trigger_error("Mailchimp error: ".$this->_mc->getLastError());
+					trigger_error('Mailchimp error: '.$this->_mc->getLastError());
 				} else {
 					$this->_sent_campaign_id = $campaignID;
 				}
@@ -131,7 +137,6 @@ class View__Send_MC_Campaign extends View
 				unlink($tmpname);
 			}
 			unlink($zip_name);
-
 		}
 	}
 
@@ -144,16 +149,18 @@ class View__Send_MC_Campaign extends View
 	{
 		if (!$GLOBALS['user_system']->havePerm(PERM_SENDSMS)) {
 			print_message("Sorry, you don't have permission to send MailChimp campaigns. Please ask your system administrator for help.", 'error');
+
 			return;
 		}
 		if (!empty($this->_sent_campaign_id)) {
 			$URL = 'https://us1.admin.mailchimp.com/reports/summary?id='.$this->_sent_campaign_id;
-			print_message('Your MailChimp campaign has been sent.  <a target="_mailchimp" href="'.$URL.'">Track in Mailchimp</a>.', 'success', TRUE);
+			print_message('Your MailChimp campaign has been sent.  <a target="_mailchimp" href="'.$URL.'">Track in Mailchimp</a>.', 'success', true);
+
 			return;
 		}
-		$templates = $this->_mc->get('/templates', Array('count' => 100));
-		$defaultTemplateID = NULL;
-		$templateOptions = Array('' => '(None)');
+		$templates = $this->_mc->get('/templates', ['count' => 100]);
+		$defaultTemplateID = null;
+		$templateOptions = ['' => '(None)'];
 		foreach ($templates['templates'] as $t) {
 			$templateOptions[$t['id']] = $t['name'];
 		}
@@ -164,8 +171,8 @@ class View__Send_MC_Campaign extends View
 				<div class="controls">
 					<?php
 					echo ents($this->_from_name);
-					echo ents(' <'.$this->_from_address.'>');
-					?>
+		echo ents(' <'.$this->_from_address.'>');
+		?>
 				</div>
 			</div>
 			<div class="control-group">
@@ -189,18 +196,18 @@ class View__Send_MC_Campaign extends View
 			<div class="control-group">
 				<label class="control-label">Template</label>
 				<div class="controls">
-					<?php print_widget('templateid', Array('type' => 'select', 'options' => $templateOptions), ''); ?>
+		<?php print_widget('templateid', Array('type' => 'select', 'options' => $templateOptions), ''); ?>
 				</div>
 			</div>
 			 */
-			?>
+		?>
 			<div class="control-group">
 				<label class="control-label">Message</label>
 				<div class="controls">
-					<?php 
-					$content = $this->_sent_campaign_id ? '' : array_get($_REQUEST, 'message', '');
-					print_widget('message', Array('type' => 'html'), $content);
-					?>
+					<?php
+				$content = $this->_sent_campaign_id ? '' : array_get($_REQUEST, 'message', '');
+		print_widget('message', ['type' => 'html'], $content);
+		?>
 				</div>
 			</div>
 			<div class="control-group">
@@ -227,5 +234,4 @@ class View__Send_MC_Campaign extends View
 		<?php
 
 	}
-
 }

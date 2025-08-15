@@ -14,20 +14,22 @@ class View__Manage_Service_Component_Tags extends View
 	function processView()
 	{
 		if (!empty($_POST['tagname'])) {
-			$to_add = $to_delete = $to_update = Array();
+			$to_add = $to_delete = $to_update = [];
 			foreach ($_POST['tagname'] as $id => $name) {
 				if ($id == '_new_') {
 					foreach ($name as $n) {
-						if ($n) $to_add[] = $n;
+						if ($n) {
+							$to_add[] = $n;
+						}
 					}
-				} else if ($name) {
+				} elseif ($name) {
 					$to_update[$id] = $name;
 				}
 			}
 			foreach ($to_update as $id => $name) {
 				$SQL = 'UPDATE service_component_tag
 						SET tag = '.$GLOBALS['db']->quote($name).'
-						WHERE id = '.(int)$id;
+						WHERE id = '.(int) $id;
 				$res = $GLOBALS['db']->query($SQL);
 			}
 			if ($to_update) {
@@ -41,7 +43,7 @@ class View__Manage_Service_Component_Tags extends View
 						VALUES ('.$GLOBALS['db']->quote($name).')';
 				$res = $GLOBALS['db']->query($SQL);
 			}
-			add_message("Tags updated");
+			add_message('Tags updated');
 		}
 	}
 
@@ -53,7 +55,7 @@ class View__Manage_Service_Component_Tags extends View
 			<p><i>No tags have been set up in the system yet.</i></p>
 			<?php
 		}
-		$tags += Array('' => Array('tag' => ''));
+		$tags += ['' => ['tag' => '']];
 		?>
 		<form method="post">
 		<table class="expandable valign-middle">
@@ -62,8 +64,8 @@ class View__Manage_Service_Component_Tags extends View
 			<tbody>
 			<?php
 			$i = 0;
-			foreach ($tags as $id => $tagdata) {
-				?>
+		foreach ($tags as $id => $tagdata) {
+			?>
 				<tr>
 					<td><?php echo $id; ?></td>
 					<td>
@@ -74,9 +76,9 @@ class View__Manage_Service_Component_Tags extends View
 					</td>
 				</tr>
 				<?php
-				$i++;
-			}
-			?>
+			++$i;
+		}
+		?>
 			</tbody>
 		</table>
 		<input type="submit" class="btn" value="Save" />

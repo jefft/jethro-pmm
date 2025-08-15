@@ -14,7 +14,7 @@ class View_People extends View
 	function processView()
 	{
 	}
-	
+
 	function printView()
 	{
 		$GLOBALS['system']->includeDBClass('member');
@@ -27,7 +27,7 @@ class View_People extends View
 				<input name="search" type="text" placeholder="Enter name to search" value="<?php echo ents(array_get($_REQUEST, 'search')); ?>"))">
 				<br class="visible-phone" />
 				<?php
-				print_widget('congregationid', Array('type' => 'select', 'options' => Array('' => 'Any congregation') + Member::getCongregations()), array_get($_REQUEST, 'congregationid')); ?>
+				print_widget('congregationid', ['type' => 'select', 'options' => ['' => 'Any congregation'] + Member::getCongregations()], array_get($_REQUEST, 'congregationid')); ?>
 				<button data-action="search" class="btn" type="submit">Filter</button>
 				<a class="btn" href="?view=<?php echo ents($_REQUEST['view']); ?>">Clear</a>
 			</div>
@@ -35,9 +35,9 @@ class View_People extends View
 
 		<?php
 		$list = Member::getList(array_get($_REQUEST, 'search'), array_get($_REQUEST, 'congregationid'));
-		$lastFamilyID = NULL;
+		$lastFamilyID = null;
 		$dummy = new Member();
-		$persons = Array();
+		$persons = [];
 		foreach ($list as $id => $member) {
 			if ($member['familyid'] != $lastFamilyID) {
 				if (!empty($persons)) {
@@ -46,7 +46,7 @@ class View_People extends View
 					echo '</div>';
 					echo '</div>'; // member-family-contents
 				}
-				$persons = Array();
+				$persons = [];
 
 				$dummy->populate($id, $member);
 				$showAddress = defined('MEMBERS_SHARE_ADDRESS')
@@ -71,10 +71,10 @@ class View_People extends View
 								echo ents($member['address_suburb'].' '.$member['address_state'].' '.$member['address_postcode']);
 								echo '<br />';
 							}
-							if (!empty($member['home_tel'])) {
-								$dummy->printFieldValue('home_tel');
-							}
-							?>
+					if (!empty($member['home_tel'])) {
+						$dummy->printFieldValue('home_tel');
+					}
+					?>
 					</div>
 					<?php
 				}
@@ -86,7 +86,5 @@ class View_People extends View
 		include 'templates/member_list.template.php';
 		echo '</div>';
 		echo '</div>';
-
 	}
-
 }

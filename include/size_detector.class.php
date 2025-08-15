@@ -1,6 +1,8 @@
 <?php
-class SizeDetector {
-	static function printFormFields() {
+class SizeDetector
+{
+	static function printFormFields()
+	{
 		?>
 		<input type="hidden" id="size-detector-width" name="_sizeDetector[width]" value="" />
 		<input type="hidden" id="size-detector-height" name="_sizeDetector[height]" value="" />
@@ -16,49 +18,60 @@ class SizeDetector {
 		});
 		</script>
 		<?php
-		if (!empty($_REQUEST['showsize'])) bam($_SERVER['HTTP_USER_AGENT']);
+		if (!empty($_REQUEST['showsize'])) {
+			bam($_SERVER['HTTP_USER_AGENT']);
+		}
 	}
 
-	static function processRequest() {
+	static function processRequest()
+	{
 		if (isset($_REQUEST['_sizeDetector'])) {
 			$_SESSION['_sizeDetector'] = $_REQUEST['_sizeDetector'];
 		}
 	}
-	
-	static function getHeight() {
+
+	static function getHeight()
+	{
 		if (isset($_SESSION['_sizeDetector']) && isset($_SESSION['_sizeDetector']['height'])) {
 			return $_SESSION['_sizeDetector']['height'];
 		} else {
-			return NULL;
+			return null;
 		}
 	}
 
-	static function getWidth() {
+	static function getWidth()
+	{
 		if (isset($_SESSION['_sizeDetector']) && isset($_SESSION['_sizeDetector']['width'])) {
 			return $_SESSION['_sizeDetector']['width'];
 		} else {
-			return NULL;
+			return null;
 		}
 	}
 
-	static function isWide()  {
+	static function isWide()
+	{
 		if ($w = self::getWidth()) {
 			return $w > 1024;
 		} else {
-			return NULL;
+			return null;
 		}
 	}
 
-	static function isMedium() {
-		if (!self::getWidth()) return NULL;
+	static function isMedium()
+	{
+		if (!self::getWidth()) {
+			return null;
+		}
+
 		return !self::isWide() && !self::isNarrow();
 	}
 
-	static function isNarrow() {
+	static function isNarrow()
+	{
 		if ($w = self::getWidth()) {
 			return $w < 640;
 		} else {
-			return NULL;
+			return null;
 		}
 	}
 }

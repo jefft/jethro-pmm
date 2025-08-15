@@ -1,10 +1,11 @@
 <?php
+
 include_once 'include/db_object.class.php';
 class roster_role_assignment extends db_object
 {
 	// NB This class only exists for the following SQL
 	// It has no ID
-	function getInitSql($table_name = NULL)
+	function getInitSql($table_name = null)
 	{
 		return 'create table roster_role_assignment (
 					assignment_date	date not null,
@@ -26,12 +27,13 @@ class roster_role_assignment extends db_object
 				FROM roster_role_assignment rra
 					JOIN roster_role rr ON rr.id = rra.roster_role_id
 				WHERE assignment_date = '.$GLOBALS['db']->quote($date).'
-					AND ((rr.congregationid = '.(int)$congid.') OR (rr.congregationid IS NULL))
+					AND ((rr.congregationid = '.(int) $congid.') OR (rr.congregationid IS NULL))
 				GROUP BY personid';
-		return $GLOBALS['db']->queryAll($SQL, NULL, NULL, TRUE);
+
+		return $GLOBALS['db']->queryAll($SQL, null, null, true);
 	}
 
-	static function getUpcomingAssignments($personid, $timeframe='4 weeks')
+	static function getUpcomingAssignments($personid, $timeframe = '4 weeks')
 	{
 		$end_date = date('Y-m-d', strtotime('+'.$timeframe));
 		$sql = 'SELECT rra.assignment_date, COALESCE(c.name, "") as cong, rr.title, rr.id, c.meeting_time, rra.assignedon
@@ -49,15 +51,15 @@ class roster_role_assignment extends db_object
 
 		$sql .= '
 			ORDER BY rra.assignment_date ASC, c.meeting_time';
-		$res = $GLOBALS['db']->queryAll($sql, NULL, NULL, true, false, true);
+		$res = $GLOBALS['db']->queryAll($sql, null, null, true, false, true);
+
 		return $res;
 	}
 
 	static function hasAssignments($personid)
 	{
 		$SQL = 'SELECT count(*) FROM roster_role_assignment
-				WHERE personid = '.(int)$personid;
+				WHERE personid = '.(int) $personid;
 		$res = $GLOBALS['db']->queryOne($SQL);
 	}
-
 }

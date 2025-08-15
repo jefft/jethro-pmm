@@ -3,8 +3,6 @@
 /**
  * @var $id
  * $var $entry
- * @var $show_form
- * @var $show_edit_link
  */
 $dummy->reset();
 $dummy->populate($id, $entry);
@@ -32,32 +30,32 @@ include_once 'urllinker.php';
 		<h4><a href="<?php echo $view_url; ?>"><?php echo ents($notee); ?></a></h4>
 		<?php
 	}
-	if (!empty($show_form) && $dummy->canEditOriginal()) {
-		?>
-		<a class="pull-right" href="<?php echo build_url(Array('edit_original' => 1)); ?>"><i class="icon-wrench"></i><?php echo _('Edit original note')?></a>
-		<?php
-	}
+if (!empty($show_form) && $dummy->canEditOriginal()) {
 	?>
+		<a class="pull-right" href="<?php echo build_url(['edit_original' => 1]); ?>"><i class="icon-wrench"></i><?php echo _('Edit original note'); ?></a>
+		<?php
+}
+?>
 	<i class="icon-<?php echo $type == 'family' ? 'home' : 'user'; ?>"></i>
 	<blockquote>
 		<p class="subject"><?php echo ents($entry['subject']); ?></p>
 	<?php
-	if (strlen($entry['details'])) {
-		?>
+if (strlen($entry['details'])) {
+	?>
 		<p class="content"><?php echo linkUrlsInTrustedHtml(nl2br(ents($entry['details']))); ?></p>
 		<?php
-	}
-	?>
+}
+?>
 		<small class="author">
 			<?php echo $entry['creator_fn'].' '.$entry['creator_ln'].' <span class="visible-desktop">(#'.$entry['creator'].')</span>,'; ?>
 			<?php echo format_datetime($entry['created']); ?>
 			<?php
-			if ($entry['editor']) {
-				$editor = $GLOBALS['system']->getDBObject('person', $entry['editor']);
-				$name = $editor ? $editor->toString() : '(restricted user)';
-				echo '. '._('Edited by').' '.ents($name)." <span class=\"visible-desktop\">(#{$entry['editor']})</span>, ".format_datetime($entry['edited']);
-			}
-			?>
+		if ($entry['editor']) {
+			$editor = $GLOBALS['system']->getDBObject('person', $entry['editor']);
+			$name = $editor ? $editor->toString() : '(restricted user)';
+			echo '. '._('Edited by').' '.ents($name)." <span class=\"visible-desktop\">(#{$entry['editor']})</span>, ".format_datetime($entry['edited']);
+		}
+?>
 		</small>
 	</blockquote>
 	<?php
@@ -81,44 +79,44 @@ include_once 'urllinker.php';
 		<?php
 	}
 
-
-	if (!empty($show_form)) {
-		?>
+if (!empty($show_form)) {
+	?>
 		<h4 class="note-update">Add Update:</h4>
 			<?php $dummy->printUpdateForm(); ?>
 		<?php
-	} else {
-		?>
+} else {
+	?>
 		<div class="status">
 			<?php
-			$back_to = array_get($_REQUEST, 'note_back_to', '');
-			if ($back_to) $back_to = '&back_to='.ents($back_to);
-			if (!empty($show_edit_link) && $dummy->canEdit()) {
-				?>
-				<a class="pull-right link-collapse" href="?view=_edit_note&note_type=<?php echo $type; ?>&noteid=<?php echo $id.$back_to ?>"><i class="icon-wrench"></i><?php echo _('Update note')?></a>
+		$back_to = array_get($_REQUEST, 'note_back_to', '');
+	if ($back_to) {
+		$back_to = '&back_to='.ents($back_to);
+	}
+	if (!empty($show_edit_link) && $dummy->canEdit()) {
+		?>
+				<a class="pull-right link-collapse" href="?view=_edit_note&note_type=<?php echo $type; ?>&noteid=<?php echo $id.$back_to; ?>"><i class="icon-wrench"></i><?php echo _('Update note'); ?></a>
 				<?php
-			}
-			$statusClasses = Array(
-								'no_action'	=> 'default',
-								'pending'	=> 'important',
-								'failed'	=> 'inverse',
-								'complete'	=> 'success',
-							);
-			?>
+	}
+	$statusClasses = [
+		'no_action' => 'default',
+		'pending' => 'important',
+		'failed' => 'inverse',
+		'complete' => 'success',
+	];
+	?>
 			<span class="label label-<?php echo $statusClasses[$dummy->getValue('status')]; ?>">
 			<?php $dummy->printStatusSummary(); ?>
 			</span>
 			<?php
-			if ($entry['status'] == 'pending') {
-				$str = 'Assigned to %s';
-				echo ' <span>'.sprintf(nbsp(_($str)), $entry['assignee_fn'].'&nbsp;'.$entry['assignee_ln'].' <span class="visible-desktop">(#'.$entry['assignee'].')</span></span>');
+	if ($entry['status'] == 'pending') {
+		$str = 'Assigned to %s';
+		echo ' <span>'.sprintf(nbsp(_($str)), $entry['assignee_fn'].'&nbsp;'.$entry['assignee_ln'].' <span class="visible-desktop">(#'.$entry['assignee'].')</span></span>');
+	}
 
-			}
-
-			?>
+	?>
 		</div>
 		<?php
-	}
-	?>
+}
+?>
 
 </div>

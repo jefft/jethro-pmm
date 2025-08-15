@@ -1,43 +1,46 @@
 <?php
-require_once dirname(__FILE__).'/view.class.php';
+require_once __DIR__.'/view.class.php';
 class System_Controller
 {
-	private $_view = NULL;
+	private $_view;
 	private $_friendly_errors = false;
 	private $_base_dir = '';
-	private $_object_cache = Array();
+	private $_object_cache = [];
 	private $_transaction_depth = 0;
 
-	static private $instance = NULL;
+	static private $instance = null;
 
 	/**
 	 * Get the instance of the System Controller.
 	 *
 	 * Singleton pattern.
 	 *
-	 * @param type $base_dir The base directory.
-	 * @return \System_Controller
+	 * @param type $base_dir the base directory
+	 *
+	 * @return System_Controller
 	 */
-	public static function get($base_dir=NULL)
+	public static function get($base_dir = null)
 	{
 		static $instance = null;
 
-		if ($instance == NULL) {
-			$instance = new System_Controller($base_dir);
+		if ($instance == null) {
+			$instance = new self($base_dir);
 		}
 
 		return $instance;
 	}
 
-	private function __construct($base_dir=NULL)
+	private function __construct($base_dir = null)
 	{
-		if (is_null($base_dir)) $base_dir = dirname(dirname(__FILE__));
+		if (null === $base_dir) {
+			$base_dir = dirname(__DIR__);
+		}
 		$this->_base_dir = $base_dir;
-		$path_sep = defined('PATH_SEPARATOR') ? PATH_SEPARATOR : ((FALSE === strpos($_ENV['OS'], 'Win')) ? ';' : ':');
+		$path_sep = defined('PATH_SEPARATOR') ? \PATH_SEPARATOR : ((!str_contains($_ENV['OS'], 'Win')) ? ';' : ':');
 		ini_set('include_path', ini_get('include_path').$path_sep.$this->_base_dir);
 
 		if (!isset($_SESSION['views'][$base_dir]) || isset($_REQUEST['regen'])) {
-			$_SESSION['views'][$base_dir] = Array();
+			$_SESSION['views'][$base_dir] = [];
 			$raw_filenames = glob($this->_base_dir.'/views/*.class.php');
 			natsort($raw_filenames);
 			foreach ($raw_filenames as $filename) {
@@ -45,23 +48,27 @@ class System_Controller
 				$classname = null;
 				if (preg_match('/^view_([0-9.]*)_(.*)__([0-9]*)_(.*)\.class\.php/', $filename, $matches)) {
 					$classname = 'View_'.$matches[2].'__'.$matches[4];
-				} else if (preg_match('/^view_([0-9]*)_(.*)\.class\.php/', $filename, $matches)) {
-					if ($matches[1] == 0) $matches[2] = '_'.$matches[2];
+				} elseif (preg_match('/^view_([0-9]*)_(.*)\.class\.php/', $filename, $matches)) {
+					if ($matches[1] == 0) {
+						$matches[2] = '_'.$matches[2];
+					}
 					$classname = 'View_'.$matches[2];
 				}
 				if ($classname) {
-					include_once($this->_base_dir.'/views/'.$filename);
-					$showView = TRUE;
-					if ($view_perm = call_user_func(Array($classname, 'getMenuPermissionLevel'))) {
+					include_once $this->_base_dir.'/views/'.$filename;
+					$showView = true;
+					if ($view_perm = call_user_func([$classname, 'getMenuPermissionLevel'])) {
 						$showView = !empty($GLOBALS['user_system']) && $GLOBALS['user_system']->havePerm($view_perm);
-					} else if ($view_feature = call_user_func(Array($classname, 'getMenuRequiredFeature'))) {
+					} elseif ($view_feature = call_user_func([$classname, 'getMenuRequiredFeature'])) {
 						$showView = $this->featureEnabled($view_feature);
 					}
 					if ($showView) {
 						if (preg_match('/^view_([0-9.]*)_(.*)__([0-9]*)_(.*)\.class\.php/', $filename, $matches)) {
 							$_SESSION['views'][$base_dir][$matches[2]]['children'][$matches[4]]['filename'] = $filename;
-						} else if (preg_match('/^view_([0-9.]*)_(.*)\.class\.php/', $filename, $matches)) {
-							if ($matches[1] == 0) $matches[2] = '_'.$matches[2];
+						} elseif (preg_match('/^view_([0-9.]*)_(.*)\.class\.php/', $filename, $matches)) {
+							if ($matches[1] == 0) {
+								$matches[2] = '_'.$matches[2];
+							}
 							$_SESSION['views'][$base_dir][$matches[2]]['filename'] = $filename;
 						}
 					}
@@ -72,30 +79,29 @@ class System_Controller
 
 	public function initErrorHandler()
 	{
-		set_error_handler(Array($this, '_handleError'));
-		set_exception_handler(Array($this, '_handleException'));
+		set_error_handler([$this, '_handleError']);
+		set_exception_handler([$this, '_handleException']);
 	}
 
 	public function run()
 	{
-
 		$this->setGlobalHeaders();
 		if (!empty($_REQUEST['call'])) {
 			$this->initErrorHandler();
 			$call_name = str_replace('/', '', $_REQUEST['call']);
 			// Try both the Jethro and system_root calls folders
-			$filename = ''; //dirname(dirname(__FILE__)).'/calls/call_'.$call_name.'.class.php';
+			$filename = ''; // dirname(dirname(__FILE__)).'/calls/call_'.$call_name.'.class.php';
 			if (!file_exists($filename)) {
 				$filename = $this->_base_dir.'/calls/call_'.$call_name.'.class.php';
 			}
 			if (file_exists($filename)) {
-				include_once dirname(__FILE__).'/call.class.php';
+				include_once __DIR__.'/call.class.php';
 				include_once $filename;
 				$classname = 'Call_'.$call_name;
-				$call_obj = new $classname;
+				$call_obj = new $classname();
 				$call_obj->run();
 			} else {
-				trigger_error('Unknown call '.ents($_REQUEST['call']), E_USER_WARNING);
+				trigger_error('Unknown call '.ents($_REQUEST['call']), \E_USER_WARNING);
 			}
 		} else {
 			$this->initErrorHandler();
@@ -107,7 +113,7 @@ class System_Controller
 					$view_filename = $_SESSION['views'][$this->_base_dir][$bits[0]]['children'][$bits[1]]['filename'];
 					$view_classname = 'View_'.$bits[0].'__'.$bits[1];
 				}
-			} else if (isset($_SESSION['views'][$this->_base_dir][$bits[0]])
+			} elseif (isset($_SESSION['views'][$this->_base_dir][$bits[0]])
 				&& isset($_SESSION['views'][$this->_base_dir][$bits[0]]['filename'])) {
 				// NB if they have permission to a sub-view (eg services > view) but not to the top level
 				// view (eg services) then the view will be in the array but without a filename
@@ -115,11 +121,11 @@ class System_Controller
 				$view_classname = 'View_'.$bits[0];
 			}
 
-			if (!is_null($view_filename)) {
+			if (null !== $view_filename) {
 				require_once $this->_base_dir.'/views/'.$view_filename;
-				$view_perm = call_user_func(Array($view_classname, 'getMenuPermissionLevel'));
+				$view_perm = call_user_func([$view_classname, 'getMenuPermissionLevel']);
 				if (!empty($view_perm) && !$GLOBALS['user_system']->havePerm($view_perm)) {
-					throw new \RuntimeException("You don't have permission to access this view"); // exits
+					throw new RuntimeException("You don't have permission to access this view"); // exits
 				}
 				$this->_view = new $view_classname();
 				$this->_view->processView();
@@ -131,7 +137,7 @@ class System_Controller
 
 	public function getTitle()
 	{
-		if (is_null($this->_view)) {
+		if (null === $this->_view) {
 			return '';
 		} else {
 			return $this->_view->getTitle();
@@ -140,23 +146,33 @@ class System_Controller
 
 	public function getPageHeading()
 	{
-		if ($this->_view) return $this->_view->getPageHeading();
+		if ($this->_view) {
+			return $this->_view->getPageHeading();
+		}
 	}
 
 	public function shouldShowNavigation()
 	{
-		if ($this->_view) return $this->_view->shouldShowNavigation();
+		if ($this->_view) {
+			return $this->_view->shouldShowNavigation();
+		}
 	}
 
 	public function printNavigation()
 	{
-		if ($this->_view && !$this->_view->shouldShowNavigation()) return;
+		if ($this->_view && !$this->_view->shouldShowNavigation()) {
+			return;
+		}
 
 		$current_view = array_get($_REQUEST, 'view', 'home');
 		foreach ($_SESSION['views'][$this->_base_dir] as $name => $data) {
-			if ($name[0] == '_') continue;
+			if ($name[0] == '_') {
+				continue;
+			}
 			$class = '';
-			if (($current_view == $name) || (strpos($current_view, $name.'__') === 0)) $class = 'active';
+			if (($current_view == $name) || str_starts_with($current_view, $name.'__')) {
+				$class = 'active';
+			}
 			if (empty($data['children'])) {
 				// deliberately - only leaf nodes can be navigated to directly
 				?>
@@ -174,17 +190,16 @@ class System_Controller
 								$class = ($current_view == $name.'__'.$subname) ? 'active' : '';
 								?><li class="<?php echo $class; ?>"><a href="?view=<?php echo $name.'__'.$subname; ?>"><?php echo gettext(ucwords(str_replace('_', ' ', $subname))); ?></a></li><?php
 							}
-							?></ul>
+				?></ul>
 				</li>
 				<?php
 			}
 		}
 	}
 
-
 	public function printBody()
 	{
-		if (is_null($this->_view)) {
+		if (null === $this->_view) {
 			echo 'Error: Undefined view';
 		} else {
 			$this->_view->printView();
@@ -194,7 +209,7 @@ class System_Controller
 	public function includeDBClass($classname)
 	{
 		$classname = strtolower($classname);
-		require_once dirname(__FILE__).'/db_object.class.php';
+		require_once __DIR__.'/db_object.class.php';
 		require_once 'db_objects/'.$classname.'.class.php';
 	}
 
@@ -203,20 +218,24 @@ class System_Controller
 		if (!isset($this->_object_cache[$classname]) || !isset($this->_object_cache[$classname][$id])) {
 			$this->includeDBClass($classname);
 			$this->_object_cache[$classname][$id] = new $classname($id);
-			if (!$this->_object_cache[$classname][$id]->id) $this->_object_cache[$classname][$id] = null;
+			if (!$this->_object_cache[$classname][$id]->id) {
+				$this->_object_cache[$classname][$id] = null;
+			}
 		}
+
 		return $this->_object_cache[$classname][$id];
 	}
 
-	public function getDBObjectData($classname, $params=Array(), $logic='OR', $order='', $refreshCache=FALSE)
+	public function getDBObjectData($classname, $params = [], $logic = 'OR', $order = '', $refreshCache = false)
 	{
-		static $cache = Array();
+		static $cache = [];
 		$cacheKey = "$classname-$logic-$order-".serialize($params);
 		if ($refreshCache || !isset($cache[$cacheKey])) {
 			$this->includeDBClass($classname);
 			$sample = new $classname();
 			$cache[$cacheKey] = $sample->getInstancesData($params, $logic, $order);
 		}
+
 		return $cache[$cacheKey];
 	}
 
@@ -225,11 +244,15 @@ class System_Controller
 		switch (strtoupper($operation)) {
 			case 'BEGIN':
 				$this->_transaction_depth++;
-				if ($this->_transaction_depth == 1) $GLOBALS['db']->beginTransaction();
+				if ($this->_transaction_depth == 1) {
+					$GLOBALS['db']->beginTransaction();
+				}
 				break;
 			case 'COMMIT':
 				$this->_transaction_depth--;
-				if ($this->_transaction_depth == 0) $GLOBALS['db']->commit();
+				if ($this->_transaction_depth == 0) {
+					$GLOBALS['db']->commit();
+				}
 				break;
 			case 'ROLLBACK':
 				// Rollback always rolls back everything
@@ -245,45 +268,54 @@ class System_Controller
 
 	public function _handleError($errno, $errstr, $errfile, $errline)
 	{
-		if (error_reporting() == 0) return; // the "@" shutup-operator was used
-		$PHP_8_SUPPRESSED = E_ERROR | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR | E_RECOVERABLE_ERROR | E_PARSE;
-		if (error_reporting() == $PHP_8_SUPPRESSED) return; // the "@" shutup-operator was used
+		if (error_reporting() == 0) {
+			return;
+		} // the "@" shutup-operator was used
+		$PHP_8_SUPPRESSED = \E_ERROR | \E_CORE_ERROR | \E_COMPILE_ERROR | \E_USER_ERROR | \E_RECOVERABLE_ERROR | \E_PARSE;
+		if (error_reporting() == $PHP_8_SUPPRESSED) {
+			return;
+		} // the "@" shutup-operator was used
 		$send_email = true;
-		$showTechDetails = ifdef('SHOW_ERROR_DETAILS', (JETHRO_VERSION == 'DEV'));	
+		$showTechDetails = ifdef('SHOW_ERROR_DETAILS', JETHRO_VERSION == 'DEV');
 		$exit = false;
 		switch ($errno) {
-			case E_ERROR:
-			case E_USER_ERROR:
-				if (FALSE !== strpos($errstr, 'variables should be assigned by reference')) return;
+			case \E_ERROR:
+			case \E_USER_ERROR:
+				if (str_contains($errstr, 'variables should be assigned by reference')) {
+					return;
+				}
 				$bg = 'error';
 				$title = 'SYSTEM ERROR (ERROR)';
 				$exit = true;
 				break;
-			case E_WARNING:
-			case E_USER_WARNING:
+			case \E_WARNING:
+			case \E_USER_WARNING:
 				$bg = 'warning';
 				$title = 'SYSTEM ERROR (WARNING)';
 				break;
-			case E_NOTICE:
-				$bg = $showTechDetails ? 'info' : NULL; // on prod, send emails but show nothing in browser
+			case \E_NOTICE:
+				$bg = $showTechDetails ? 'info' : null; // on prod, send emails but show nothing in browser
 				$title = 'SYSTEM ERROR (NOTICE)';
 				break;
-			case E_USER_NOTICE:
+			case \E_USER_NOTICE:
 				$send_email = false; // never send emails for E_USER_NOTICE
 				if ($this->_friendly_errors || (!headers_sent() && !$showTechDetails)) {
 					add_message('Error: '.$errstr, 'failure');
+
 					return;
-				} else if (!$showTechDetails) {
+				} elseif (!$showTechDetails) {
 					// if headers are sent, print it now - we don't want it on the next page load
 					print_message('Error: '.$errstr, 'failure');
+
 					return;
 				}
 				$bg = 'warning';
 				$title = 'NOTICE';
 				break;
-			case E_DEPRECATED:
+			case \E_DEPRECATED:
 				// Log deprecations, but don't print anything to the browser. #1250
 				error_log("$errstr - Line $errline of $errfile");
+
 				return;
 			default:
 				$bg = 'info';
@@ -295,8 +327,9 @@ class System_Controller
 		array_shift($bt); // remove reference to this handleError function
 
 		$this->_reportError($title, $bg, $errstr, $errfile, $errline, $bt, $send_email);
-		if ($exit) exit();
-
+		if ($exit) {
+			exit;
+		}
 	}
 
 	private function _reportError($title, $bg, $errstr, $errfile, $errline, $bt, $send_email)
@@ -304,16 +337,20 @@ class System_Controller
 		foreach ($bt as &$b) {
 			if (!empty($b['args'])) {
 				foreach ($b['args'] as &$v) {
-					if (!is_scalar($v)) $v = '[Object/Array]';
+					if (!is_scalar($v)) {
+						$v = '[Object/Array]';
+					}
 				}
 			}
 			unset($b['object']);
 		}
 
-		$showTechDetails = ifdef('SHOW_ERROR_DETAILS', (JETHRO_VERSION == 'DEV'));
+		$showTechDetails = ifdef('SHOW_ERROR_DETAILS', JETHRO_VERSION == 'DEV');
 		if ($bg) {
 			?>
-			<div class="alert<?php if(isset($bg)){ echo" alert-".$bg;} ?>">
+			<div class="alert<?php if (isset($bg)) {
+				echo ' alert-'.$bg;
+			} ?>">
 			<?php
 			if ($showTechDetails || !$send_email) {
 				?>
@@ -340,24 +377,26 @@ class System_Controller
 		if ($send_email && defined('ERRORS_EMAIL_ADDRESS') && constant('ERRORS_EMAIL_ADDRESS')) {
 			$content = "$errstr \nLine $errline of $errfile\n\n";
 			if (!empty($GLOBALS['user_system'])) {
-				$content .= "USER:       ".$GLOBALS['user_system']->getCurrentPerson('id')." ".$GLOBALS['user_system']->getCurrentUser('user')."\n";
+				$content .= 'USER:       '.$GLOBALS['user_system']->getCurrentPerson('id').' '.$GLOBALS['user_system']->getCurrentUser('user')."\n";
 			}
 			$content .= 'REFERER:    '.array_get($_SERVER, 'HTTP_REFERER', '')."\n";
 			$content .= 'USER_AGENT: '.array_get($_SERVER, 'HTTP_USER_AGENT', '')."\n\n";
 			$safe_request = $_REQUEST;
 			unset($safe_request['password']);
-			$content .= "REQUEST: \n".print_r($safe_request,1)."\n\n";
+			$content .= "REQUEST: \n".print_r($safe_request, 1)."\n\n";
 			$content .= "BACKTRACE:\n";
 			$content .= print_r($bt, 1);
 			@mail(constant('ERRORS_EMAIL_ADDRESS'), 'Jethro Error from '.base_url(), $content);
 		}
-		if ($send_email) error_log("$errstr - Line $errline of $errfile");
+		if ($send_email) {
+			error_log("$errstr - Line $errline of $errfile");
+		}
 	}
 
 	public function _handleException($exception)
 	{
-		$this->_reportError('Fatal Error (Exception)', 'error', $exception->getMessage(), $exception->getFile(), $exception->getLine(), $exception->getTrace(), TRUE);
-		exit();
+		$this->_reportError('Fatal Error (Exception)', 'error', $exception->getMessage(), $exception->getFile(), $exception->getLine(), $exception->getTrace(), true);
+		exit;
 	}
 
 	public function runHooks($hook_name, $params)
@@ -365,24 +404,31 @@ class System_Controller
 		require_once 'include/hook.class.php';
 		$dir = @opendir(JETHRO_ROOT.'/hooks/'.$hook_name);
 		while ($dir && ($hook_file = readdir($dir))) {
-			if (is_dir(JETHRO_ROOT.'/hooks/'.$hook_file)) continue;
-			if ($hook_file[0] == '.') continue;
-			if (0 === strpos($hook_file, 'sample.')) continue;
+			if (is_dir(JETHRO_ROOT.'/hooks/'.$hook_file)) {
+				continue;
+			}
+			if ($hook_file[0] == '.') {
+				continue;
+			}
+			if (str_starts_with($hook_file, 'sample.')) {
+				continue;
+			}
 			require_once 'hooks/'.$hook_name.'/'.$hook_file;
 			$class_name = str_replace('.class.php', '', $hook_file);
-			call_user_func(Array($class_name, 'run'), $params);
+			call_user_func([$class_name, 'run'], $params);
 		}
 	}
 
 	public function featureEnabled($feature)
 	{
 		$enabled_features = explode(',', strtoupper(ifdef('ENABLED_FEATURES', '')));
-		return in_array(strtoupper($feature), $enabled_features);
+
+		return in_array(strtoupper($feature), $enabled_features, true);
 	}
 
-    public function setGlobalHeaders()
+	public function setGlobalHeaders()
 	{
-        	if (session_id()) {
+		if (session_id()) {
 			// log just a subset for security
 			header('X-Jethro-Session: '.substr(session_id(), 0, 5));
 		}

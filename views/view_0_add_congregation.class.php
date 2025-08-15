@@ -24,12 +24,11 @@ class View__Add_Congregation extends View
 			}
 		}
 	}
-	
+
 	function getTitle()
 	{
 		return 'Add Congregation';
 	}
-
 
 	function printView()
 	{
@@ -39,7 +38,7 @@ class View__Add_Congregation extends View
 			<h3>Congregation Details</h3>
 			<?php
 			$this->_congregation->printForm();
-			?>
+		?>
 			<div class="controls">
 				<input type="submit" class="btn" value="Create Congregation" />
 				<input type="button" class="btn back" value="Cancel" />

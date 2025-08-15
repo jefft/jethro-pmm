@@ -1,4 +1,5 @@
 <?php
+
 class View_Persons extends View
 {
 	// for viewing one persons
@@ -8,13 +9,12 @@ class View_Persons extends View
 	function processView()
 	{
 		if (!empty($_REQUEST['personid'])) {
-			$this->_person = $GLOBALS['system']->getDBObject('person', (int)$_REQUEST['personid']);
+			$this->_person = $GLOBALS['system']->getDBObject('person', (int) $_REQUEST['personid']);
 			if ($this->_person) {
 				$this->_family = $GLOBALS['system']->getDBObject('family', $this->_person->getValue('familyid'));
 			}
 		}
 	}
-
 
 	function getTitle()
 	{
@@ -25,13 +25,12 @@ class View_Persons extends View
 		}
 	}
 
-
 	function printView()
 	{
 		if ($this->_person) {
-			$person =& $this->_person;
-			$family =& $this->_family;
-			include dirname(dirname(__FILE__)).'/templates/view_person.template.php';
+			$person = &$this->_person;
+			$family = &$this->_family;
+			include dirname(__DIR__).'/templates/view_person.template.php';
 		}
 	}
 }

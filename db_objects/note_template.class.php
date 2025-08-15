@@ -4,66 +4,72 @@ class Note_Template extends db_object
 {
 	public $_save_permission_level = PERM_SYSADMIN;
 
-	private $_fields = Array();
-	private $_fields_to_delete = Array();
+	private $_fields = [];
+	private $_fields_to_delete = [];
 
-	private $_field_values = Array();
+	private $_field_values = [];
 
 	protected static function _getFields()
 	{
-		return Array(
-			'name'	=> Array(
-							'type'		=> 'text',
-							'width'		=> 30,
-							'maxlength'	=> 128,
-							'allow_empty'	=> FALSE,
-							'initial_cap'	=> TRUE,
-							'label' => 'Template name',
-						),
-			'subject' => Array(
-							'type'		=> 'text',
-							'width'		=> 30,
-							'maxlength'	=> 128,
-							'allow_empty'	=> FALSE,
-							'initial_cap'	=> TRUE,
-							'label' => 'Note Subject',
-							'divider_before' => true,
-						),
-		);
+		return [
+			'name' => [
+				'type' => 'text',
+				'width' => 30,
+				'maxlength' => 128,
+				'allow_empty' => false,
+				'initial_cap' => true,
+				'label' => 'Template name',
+			],
+			'subject' => [
+				'type' => 'text',
+				'width' => 30,
+				'maxlength' => 128,
+				'allow_empty' => false,
+				'initial_cap' => true,
+				'label' => 'Note Subject',
+				'divider_before' => true,
+			],
+		];
 	}
 
 	/**
 	 * Print the form for CONFIGURING this note template.
+	 *
 	 * @see DB_Object::printForm()
+	 *
 	 * @param string $prefix
 	 */
-	function printForm($prefix='', $fields=NULL)
+	function printForm($prefix = '', $fields = null)
 	{
-		$this->fields['fields'] = Array();
+		$this->fields['fields'] = [];
 		parent::printForm();
 		unset($this->fields['fields']);
 	}
 
 	/**
 	 * Process the form for CONFIGURING this note template.
+	 *
 	 * @see DB_Object::processForm()
-	 * @param string $prefix
-	 * @param array|NULL $fields
+	 *
+	 * @param string     $prefix
+	 * @param array|null $fields
 	 */
-	function processForm($prefix='', $fields=NULL) {
-		$this->fields['fields'] = Array();
+	function processForm($prefix = '', $fields = null)
+	{
+		$this->fields['fields'] = [];
 		$res = parent::processForm($prefix, $fields);
 		unset($this->fields['fields']);
+
 		return $res;
 	}
 
 	/**
-	 * Print an interface for CONFIGURING this note template
+	 * Print an interface for CONFIGURING this note template.
 	 *
 	 * @param string $fieldname
 	 * @param string $prefix
 	 */
-	function printFieldInterface($fieldname, $prefix='')
+	function printFieldInterface($fieldname, $prefix = '')
 	{
 		switch ($fieldname) {
 			case 'fields':
@@ -75,24 +81,24 @@ class Note_Template extends db_object
 	}
 
 	/**
-	 * Print the interface for configuring the fields WITHIN this note template
+	 * Print the interface for configuring the fields WITHIN this note template.
 	 */
 	private function _printFieldsConfiguration()
 	{
-		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', Array('templateid' => $this->id), 'OR', 'rank');
+		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', ['templateid' => $this->id], 'OR', 'rank');
 
-		$fieldTypeParams = Array(
+		$fieldTypeParams = [
 			'type' => 'select',
-			'options' => Array(
-							'custom' => 'Person Field',
-							'independent' => 'Independent Field',
-						),
-			'attrs' => Array(
+			'options' => [
+				'custom' => 'Person Field',
+				'independent' => 'Independent Field',
+			],
+			'attrs' => [
 				'data-toggle' => 'visible',
 				'data-target' => 'row td.template-field-props>*',
 				'data-match-attr' => 'data-fieldtype',
-			)
-		);
+			],
+		];
 		?>
 		<table class="table expandable reorderable">
 			<thead>
@@ -108,31 +114,35 @@ class Note_Template extends db_object
 
 			<?php
 			$i = 0;
-			$dummyField = new Note_Template_Field();
+		$dummyField = new Note_Template_Field();
 
-			// Hack this field because we don't want 'empty' in the dropdown.
-			$dummyField->fields['customfieldid']['allow_empty'] = FALSE;
+		// Hack this field because we don't want 'empty' in the dropdown.
+		$dummyField->fields['customfieldid']['allow_empty'] = false;
 
-			$fields += Array(0 => Array());
-			foreach ($fields as $id => $field) {
-				$prefix = 'fields_'.$i.'_';
-				$dummyField->populate($id, $field);
-				$dummyField->acquireLock();
-				if (!$id) $fieldTypeParams['options'] = Array('' => '--Choose new field type--') + $fieldTypeParams['options'];
-				?>
+		$fields += [0 => []];
+		foreach ($fields as $id => $field) {
+			$prefix = 'fields_'.$i.'_';
+			$dummyField->populate($id, $field);
+			$dummyField->acquireLock();
+			if (!$id) {
+				$fieldTypeParams['options'] = ['' => '--Choose new field type--'] + $fieldTypeParams['options'];
+			}
+			?>
 				<tr>
 					<td class="narrow cursor-move">
 						<?php
-						print_hidden_field('index[]', $i);
-						print_hidden_field($prefix.'id', $id);
-						if ($id) echo $id;
-						?>
+					print_hidden_field('index[]', $i);
+			print_hidden_field($prefix.'id', $id);
+			if ($id) {
+				echo $id;
+			}
+			?>
 					</td>
 					<td class="narrow">
 						<?php
-						$fieldType = $id ? (array_get($field, 'customfieldid') ? 'custom' : 'independent') : '';
-						print_widget($prefix.'fieldtype', $fieldTypeParams, $fieldType);
-						?>
+			$fieldType = $id ? (array_get($field, 'customfieldid') ? 'custom' : 'independent') : '';
+			print_widget($prefix.'fieldtype', $fieldTypeParams, $fieldType);
+			?>
 					</td>
 					<td class="template-field-props">
 						<div data-fieldtype="custom">
@@ -141,8 +151,8 @@ class Note_Template extends db_object
 
 						<div data-fieldtype="independent">
 							<?php
-							$dummyField->printFieldInterface('label', $prefix);
-							?>
+				$dummyField->printFieldInterface('label', $prefix);
+			?>
 						</div>
 					</td>
 					<td class="template-field-props">
@@ -161,38 +171,40 @@ class Note_Template extends db_object
 							<input type="checkbox" name="<?php echo $prefix; ?>delete" data-toggle="strikethrough" data-target="row" value="<?php echo $id; ?>" />
 							<?php
 						}
-						?>
+			?>
 					</td>
 				</tr>
 				<?php
-				$i++;
-			}
-			?>
+				++$i;
+		}
+		?>
 			</tbody>
 		</table>
 		<small>When someone uses this template to add a note to a person, they will be prompted to enter values for these fields.<br />
 			Values for "independent" fields are saved only within the note itself. <br />
 			Values for "person" fields are saved within the note and will also update the corresponding
-			<a href="<?php build_url(Array('view' => 'admin__custom_fields')); ?>">custom field</a>
+			<a href="<?php build_url(['view' => 'admin__custom_fields']); ?>">custom field</a>
 			in the person record.</small>
 		<?php
 	}
 
 	/**
-	 * Process an interface for CONFIGURING this note template
+	 * Process an interface for CONFIGURING this note template.
+	 *
 	 * @param string $fieldname
 	 * @param string $prefix
 	 */
-	public function processFieldInterface($fieldname, $prefix='') {
+	public function processFieldInterface($fieldname, $prefix = '')
+	{
 		switch ($fieldname) {
 			case 'fields':
-				$ranks = array_flip(array_get($_REQUEST, 'index', Array()));
+				$ranks = array_flip(array_get($_REQUEST, 'index', []));
 				$i = 0;
 				while (isset($_REQUEST['fields_'.$i.'_fieldtype'])) {
 					$prefix = 'fields_'.$i.'_';
 					if (!empty($_REQUEST[$prefix.'delete'])) {
 						$this->_fields_to_delete[] = $_REQUEST[$prefix.'delete'];
-					} else if (!empty($_REQUEST['fields_'.$i.'_fieldtype'])) {
+					} elseif (!empty($_REQUEST['fields_'.$i.'_fieldtype'])) {
 						$fieldObj = new Note_Template_Field($_REQUEST[$prefix.'id']);
 						$fieldObj->setValue('rank', $ranks[$i]);
 						if ($_REQUEST[$prefix.'fieldtype'] == 'custom') {
@@ -201,13 +213,13 @@ class Note_Template extends db_object
 						} else {
 							// Set everything except the customfieldid
 							$fieldObj->processForm($prefix);
-							$fieldObj->setValue('customfieldid', NULL);
+							$fieldObj->setValue('customfieldid', null);
 						}
 						if ($fieldObj->getValue('customfieldid') || $fieldObj->getValue('label')) {
 							$this->_fields[] = $fieldObj;
 						}
 					}
-					$i++;
+					++$i;
 				}
 				break;
 			default:
@@ -216,10 +228,10 @@ class Note_Template extends db_object
 		}
 	}
 
-
 	/**
-	 * Save a brand new note template to the DB
-	 * @return boolean
+	 * Save a brand new note template to the DB.
+	 *
+	 * @return bool
 	 */
 	public function create()
 	{
@@ -227,14 +239,17 @@ class Note_Template extends db_object
 		if (parent::create()) {
 			$this->_saveFields();
 			$GLOBALS['system']->doTransaction('COMMIT');
-			return TRUE;
+
+			return true;
 		}
-		return FALSE;
+
+		return false;
 	}
 
 	/**
-	 * Save changes to an existing note template to the DB
-	 * @return boolean
+	 * Save changes to an existing note template to the DB.
+	 *
+	 * @return bool
 	 */
 	public function save()
 	{
@@ -242,19 +257,21 @@ class Note_Template extends db_object
 		if (parent::save()) {
 			$this->_saveFields();
 			$GLOBALS['system']->doTransaction('COMMIT');
-			return TRUE;
+
+			return true;
 		}
-		return FALSE;
+
+		return false;
 	}
 
 	/**
-	 * Save the configuration of the note fields within this template
+	 * Save the configuration of the note fields within this template.
 	 */
 	private function _saveFields()
 	{
 		$dummy = new Note_Template_Field();
 		foreach ($this->_fields_to_delete as $fieldid) {
-			$dummy->populate($fieldid, Array());
+			$dummy->populate($fieldid, []);
 			$dummy->delete();
 		}
 		foreach ($this->_fields as $field) {
@@ -269,11 +286,11 @@ class Note_Template extends db_object
 
 	/**
 	 * Print interface for POPULATING the fields within this note template
-	 * (used when adding a note to a person)
+	 * (used when adding a note to a person).
 	 */
 	public function printNoteFieldWidgets()
 	{
-		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', Array('templateid' => $this->id), 'OR', 'rank');
+		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', ['templateid' => $this->id], 'OR', 'rank');
 		?>
 		<div class="note-template-fields">
 			<?php
@@ -287,31 +304,31 @@ class Note_Template extends db_object
 						<?php
 						if ($details['customfieldid']) {
 							$f = $GLOBALS['system']->getDBObject('custom_field', $details['customfieldid']);
-							$f->printWidget(NULL, Array('allow_empty' => FALSE, 'default_empty' => TRUE));
+							$f->printWidget(null, ['allow_empty' => false, 'default_empty' => true]);
 						} else {
 							$params = unserialize($details['params']);
 							$params['type'] = $details['type'];
-							$params['allow_empty'] = FALSE;
-							$params['default_empty'] = TRUE;
-							print_widget('template_field_'.$id, $params, NULL);
+							$params['allow_empty'] = false;
+							$params['default_empty'] = true;
+							print_widget('template_field_'.$id, $params, null);
 						}
-						?>
+				?>
 					</div>
 				</div>
 				<?php
 			}
-			?>
+		?>
 		</div>
 		<?php
 	}
 
 	/**
 	 * Process the interface for POPULATING fields within this note template
-	 * (used when adding a note to a person)
+	 * (used when adding a note to a person).
 	 */
 	public function processNoteFieldWidgets()
 	{
-		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', Array('templateid' => $this->id), 'OR', 'rank');
+		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', ['templateid' => $this->id], 'OR', 'rank');
 		foreach ($fields as $id => $details) {
 			if ($details['customfieldid']) {
 				$cf = $GLOBALS['system']->getDBObject('custom_field', $details['customfieldid']);
@@ -319,36 +336,41 @@ class Note_Template extends db_object
 			} else {
 				$params = unserialize($details['params']);
 				$params['type'] = $details['type'];
-				$this->_field_values[$id] = process_widget('template_field_'.$id, $params);;
+				$this->_field_values[$id] = process_widget('template_field_'.$id, $params);
 			}
 		}
 	}
 
 	/**
 	 * Returns whether or not this note template refers to and sets custom person fields
-	 * (rather than just standalone fields within the note)
-	 * @return boolean
+	 * (rather than just standalone fields within the note).
+	 *
+	 * @return bool
 	 */
 	public function usesCustomFields()
 	{
-		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', Array('templateid' => $this->id), 'OR', 'rank');
+		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', ['templateid' => $this->id], 'OR', 'rank');
 		foreach ($fields as $id => $details) {
-			if ($details['customfieldid']) return TRUE;
+			if ($details['customfieldid']) {
+				return true;
+			}
 		}
-		return FALSE;
+
+		return false;
 	}
 
 	/**
 	 * Apply the values of this template's fields to a person record's custom fields (where applicable).
 	 * Used when saving a note.
-	 * @param Person $person  The person record to set custom values on.
+	 *
+	 * @param Person $person the person record to set custom values on
 	 */
 	public function applyFieldValues($person)
 	{
-		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', Array('templateid' => $this->id), 'OR', 'rank');
+		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', ['templateid' => $this->id], 'OR', 'rank');
 		foreach ($fields as $id => $details) {
 			if ($details['customfieldid']) {
-				$person->setCustomValue($details['customfieldid'], $this->_field_values[$id], FALSE);
+				$person->setCustomValue($details['customfieldid'], $this->_field_values[$id], false);
 			}
 		}
 	}
@@ -356,12 +378,13 @@ class Note_Template extends db_object
 	/**
 	 * Add a block of text to the top of the specified note showing the values supplied for this template's fields
 	 * Used when saving a note.
-	 * @param Person_Note $note	The note object to append text to.
+	 *
+	 * @param Person_Note $note the note object to append text to
 	 */
 	public function applyDataBlock($note)
 	{
 		$res = '';
-		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', Array('templateid' => $this->id), 'OR', 'rank');
+		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', ['templateid' => $this->id], 'OR', 'rank');
 		$maxLength = 0;
 		foreach ($fields as $id => $details) {
 			$params = unserialize($details['params']);
@@ -376,28 +399,30 @@ class Note_Template extends db_object
 			$maxLength = max($maxLength, strlen($line));
 			$res .= $line."\n";
 		}
-		$divider = str_repeat('-', (int)($maxLength*1.6));
+		$divider = str_repeat('-', (int) ($maxLength * 1.6));
 		$res = $res.$divider."\n";
 		$note->setValue('details', $res.$note->getValue('details'));
 	}
 
 	public static function printTemplateChooserRow($selectedID)
 	{
-		$templates = $GLOBALS['system']->getDBObjectData('note_template', Array(), 'OR', 'name');
+		$templates = $GLOBALS['system']->getDBObjectData('note_template', [], 'OR', 'name');
 		if ($templates) {
-			$templateParams = Array(
-								'type' => 'select',
-								'options' => Array(NULL => '(No template)'),
-								'attrs' => Array('id' => 'note_template_chooser')
-							 );
-			foreach ($templates as $id => $tpl)  $templateParams['options'][$id] = $tpl['name'];
+			$templateParams = [
+				'type' => 'select',
+				'options' => [null => '(No template)'],
+				'attrs' => ['id' => 'note_template_chooser'],
+			];
+			foreach ($templates as $id => $tpl) {
+				$templateParams['options'][$id] = $tpl['name'];
+			}
 			?>
 			<div class="control-group">
 				<label class="control-label">Note Template</label>
 				<div class="controls">
 					<?php
 					print_widget('note_template_id', $templateParams, $selectedID);
-					?>
+			?>
 				</div>
 			</div>
 			<hr />

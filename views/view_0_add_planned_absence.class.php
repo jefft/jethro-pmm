@@ -1,4 +1,5 @@
 <?php
+
 require_once 'abstract_view_add_object.class.php';
 class View__Add_Planned_Absence extends Abstract_View_Add_Object
 {
@@ -13,30 +14,30 @@ class View__Add_Planned_Absence extends Abstract_View_Add_Object
 	{
 		return PERM_EDITROSTER;
 	}
-	
+
 	function getTitle()
 	{
-		$person = new Person((int)$_REQUEST['personid']);
+		$person = new Person((int) $_REQUEST['personid']);
+
 		return 'Add Planned Absence for '.$person->toString();
 	}
 
-	function processView() 
+	function processView()
 	{
 		parent::processView();
 	}
-	
+
 	function _beforeCreate()
 	{
-		$this->_new_object->setValue('personid', (int)$_REQUEST['personid']);
+		$this->_new_object->setValue('personid', (int) $_REQUEST['personid']);
 	}
 
 	protected function _doSuccessRedirect()
 	{
 		if ($this->_new_object->hasRosterAssignments()) {
-			$person = new Person((int)$_REQUEST['personid']);
+			$person = new Person((int) $_REQUEST['personid']);
 			add_message($person->toString().' is already assigned to roster roles during the absent period. You should edit the roster to address this.', 'warning');
 		}
-		redirect($this->_on_success_view, Array('personid' => $_REQUEST['personid']), 'rosters');
+		redirect($this->_on_success_view, ['personid' => $_REQUEST['personid']], 'rosters');
 	}
-	
 }

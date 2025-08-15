@@ -15,24 +15,28 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-class JethroDB extends PDO
+class jethrodb extends PDO
 {
 	/**
 	 * Create a JethroDB object from the details in conf.php and make it a global variable.
+	 *
 	 * @param type $mode
 	 */
 	public static function init($mode = '')
 	{
 		$mode = strtoupper($mode);
-		if ($oldDsn = ifdef($mode . '_DSN')) {
+		if ($oldDsn = ifdef($mode.'_DSN')) {
 			// legacy config
 			preg_match('|([a-z]+)://([^:]*)(:(.*))?@([A-Za-z0-9\.-]*)(/([0-9a-zA-Z_/\.]*))|', $oldDsn, $matches);
-			if (!defined('DB_TYPE'))
+			if (!defined('DB_TYPE')) {
 				define('DB_TYPE', $matches[1]);
-			if (!defined('DB_HOST'))
+			}
+			if (!defined('DB_HOST')) {
 				define('DB_HOST', $matches[5]);
-			if (!defined('DB_DATABASE'))
+			}
+			if (!defined('DB_DATABASE')) {
 				define('DB_DATABASE', $matches[7]);
+			}
 			$username = ifdef('DB_USERNAME', $matches[2]);
 			$password = ifdef('DB_PASSWORD', $matches[4]);
 		} else {
@@ -50,53 +54,58 @@ class JethroDB extends PDO
 		$port = ifdef('DB_PORT', '');
 		$type = ifdef('DB_TYPE', 'mysql');
 		$host = ifdef('DB_HOST', 'localhost');
-		$dsn = $type . ':host=' . $host . (strlen($port) ? (';port=' . $port) : '') . ';dbname=' . DB_DATABASE . ';charset=utf8';
-		$GLOBALS['db'] = new JethroDB($dsn, $username, $password);
+		$dsn = $type.':host='.$host.(strlen($port) ? (';port='.$port) : '').';dbname='.DB_DATABASE.';charset=utf8';
+		$GLOBALS['db'] = new self($dsn, $username, $password);
 	}
 
 	public static function get()
 	{
-		if (empty($GLOBALS['db'])) self::init();
+		if (empty($GLOBALS['db'])) {
+			self::init();
+		}
+
 		return $GLOBALS['db'];
 	}
 
-
 	/**
-	 * Construct a JethroDB object
-	 * @param string $dsn		PDO dsn
-	 * @param string $username	Username
-	 * @param string $password	Password
-	 * @param array $options	PDO options
+	 * Construct a JethroDB object.
+	 *
+	 * @param string $dsn      PDO dsn
+	 * @param string $username Username
+	 * @param string $password Password
+	 * @param array  $options  PDO options
 	 */
-	public function __construct($dsn, $username, $password, $options = array())
+	public function __construct($dsn, $username, $password, $options = [])
 	{
-		if ($options === NULL) {
-			$options = array();
+		if ($options === null) {
+			$options = [];
 		}
 		$options[PDO::ATTR_DEFAULT_FETCH_MODE] = PDO::FETCH_ASSOC;
 		$options[PDO::ATTR_ERRMODE] = PDO::ERRMODE_EXCEPTION;
 		try {
 			$result = parent::__construct($dsn, $username, $password, $options);
 		} catch (PDOException $e) {
-			error_log((string)$e);
-			throw new \RuntimeException('Could not connect to database - please check for mistakes in your Database configuration in conf.php, and check in MySQL that the database exists and the specified user has been granted access.');
-			exit();
+			error_log((string) $e);
+			throw new RuntimeException('Could not connect to database - please check for mistakes in your Database configuration in conf.php, and check in MySQL that the database exists and the specified user has been granted access.');
+			exit;
 		}
+
 		return $result;
 	}
 
 	/**
-	 * Quote and escape a value ready for use in SQL
-	 * @param string$string
-	 * @param mixed $paramtype
+	 * Quote and escape a value ready for use in SQL.
+	 *
+	 * @param string $string
+	 *
 	 * @return string|false
 	 */
-	public function quote($string, $paramtype = NULL)
+	public function quote($string, $paramtype = null)
 	{
-		if ($string === NULL) {
+		if ($string === null) {
 			return 'NULL';
 		} else {
-			if ($paramtype === NULL) {
+			if ($paramtype === null) {
 				return parent::quote($string);
 			} else {
 				return parent::quote($string, $paramtype);
@@ -105,24 +114,28 @@ class JethroDB extends PDO
 	}
 
 	/**
-	 * Quote an identifier (eg table or column name) ready for use in SQL
+	 * Quote an identifier (eg table or column name) ready for use in SQL.
+	 *
 	 * @param string $field
+	 *
 	 * @return string
 	 */
 	public function quoteIdentifier($field)
 	{
 		$parts = explode('.', $field);
 		foreach (array_keys($parts) as $k) {
-			$parts[$k] = "`" . str_replace("`", "``", $parts[$k]) . "`";
+			$parts[$k] = '`'.str_replace('`', '``', $parts[$k]).'`';
 		}
+
 		return implode('.', $parts);
 	}
 
 	/**
 	 * Execute the specified query and fetch the values from the first row
-	 * of the result set into an array
+	 * of the result set into an array.
 	 *
-	 * @param string $sql	Query to execute
+	 * @param string $sql Query to execute
+	 *
 	 * @return array
 	 */
 	public function queryRow($sql)
@@ -131,15 +144,17 @@ class JethroDB extends PDO
 		$stmnt->execute();
 		$result = $stmnt->fetch();
 		$stmnt->closeCursor();
+
 		return $result;
 	}
 
 	/**
 	 * Execute the specified query and fetch the value from a single column of
-	 * each row of the result set into an array
+	 * each row of the result set into an array.
 	 *
-	 * @param $sql	Query to execute
-	 * @param $colnum	Column index OR column name to include in the result array
+	 * @param $sql    Query to execute
+	 * @param $colnum Column index OR column name to include in the result array
+	 *
 	 * @return array
 	 */
 	public function queryCol($sql, $colnum = 0)
@@ -147,26 +162,28 @@ class JethroDB extends PDO
 		$stmnt = self::prepare($sql);
 		$stmnt->execute();
 		$result = $stmnt->fetchAll(PDO::FETCH_COLUMN, $colnum);
+
 		return $result;
 	}
 
 	/**
 	 * Execute the specified query and
-	 * fetch all the rows of the result set into a two dimensional array
+	 * fetch all the rows of the result set into a two dimensional array.
 	 *
-	 * @param string $sql		Query to execute
-	 * @param array $types		Legacy parameter, not used.
-	 * @param int $fetchmode	Legacy parameter, not used.
-	 * @param boolean $rekey	Whether to use the first col of the query result as the keys of the result array
-	 * @param boolean $force_array	 	Used only when the query returns exactly two columns.
-	 *									If true, the values of the returned array will be one-element arrays instead of scalars.
-	 * @param boolean $group			If true, the values of the returned array is wrapped in another array.
-	 *									If the same key value (in the first column) repeats itself, the values will be appended to this array instead of overwriting the existing values.
+	 * @param string $sql         Query to execute
+	 * @param array  $types       legacy parameter, not used
+	 * @param int    $fetchmode   legacy parameter, not used
+	 * @param bool   $rekey       Whether to use the first col of the query result as the keys of the result array
+	 * @param bool   $force_array Used only when the query returns exactly two columns.
+	 *                            If true, the values of the returned array will be one-element arrays instead of scalars.
+	 * @param bool   $group       If true, the values of the returned array is wrapped in another array.
+	 *                            If the same key value (in the first column) repeats itself, the values will be appended to this array instead of overwriting the existing values.
+	 *
 	 * @return array
 	 */
 	public function queryAll($sql, $types = null, $fetchmode = null, $rekey = false, $force_array = false, $group = false)
 	{
-		$all = array();
+		$all = [];
 		$stmnt = self::prepare($sql);
 		$stmnt->execute();
 
@@ -196,8 +213,9 @@ class JethroDB extends PDO
 				} else {
 					$all[$key] = $row;
 				}
-			} while (($row = $stmnt->fetch()));
+			} while ($row = $stmnt->fetch());
 		}
+
 		return $all;
 	}
 
@@ -206,9 +224,9 @@ class JethroDB extends PDO
 	 * fetch the value from the first column of the first row of the result set
 	 * and then frees the result set.
 	 *
-	 * @param string $query	SQL query to run
-	 * @param string  $type
-	 * @param mixed $colnum
+	 * @param string $query SQL query to run
+	 * @param string $type
+	 *
 	 * @return mixed field value
 	 */
 	public function queryOne($query, $type = null, $colnum = 0)
@@ -221,24 +239,28 @@ class JethroDB extends PDO
 			$result = $row[$colnum];
 		}
 		$stmnt->closeCursor();
+
 		return $result;
 	}
 
 	/**
-	 * Return true if the database has any tables in it
-	 * @return boolean
+	 * Return true if the database has any tables in it.
+	 *
+	 * @return bool
 	 */
 	public function hasTables()
 	{
 		$stmnt = self::prepare('SHOW TABLES');
 		$stmnt->execute();
 		$result = $stmnt->fetchAll(PDO::FETCH_COLUMN, 0);
+
 		return !empty($result);
 	}
 
 	/**
-	 * Return true if the database has the getCurrentUserID function in it
-	 * @return boolean
+	 * Return true if the database has the getCurrentUserID function in it.
+	 *
+	 * @return bool
 	 */
 	public function hasFunctions()
 	{
@@ -251,21 +273,22 @@ class JethroDB extends PDO
 		} catch (PDOException $e) {
 			$result = false;
 		}
+
 		return $result;
 	}
 
 	/**
-	 * Set the current User ID variable in the DB
-	 * @param int	$userid
+	 * Set the current User ID variable in the DB.
+	 *
+	 * @param int $userid
 	 */
 	public function setCurrentUserID($userid)
 	{
 		try {
-			$sql = 'SET @current_user_id = ' . $userid;
+			$sql = 'SET @current_user_id = '.$userid;
 			$result = parent::query($sql);
 		} catch (PDOException $e) {
-			throw new \RuntimeException('Failed to set user id in database');
+			throw new RuntimeException('Failed to set user id in database');
 		}
 	}
-
 }

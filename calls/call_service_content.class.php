@@ -2,14 +2,13 @@
 class Call_Service_Content extends Call
 {
 	/**
-	 * Execute this call
+	 * Execute this call.
 	 *
 	 * @return void
-	 * @access public
 	 */
 	function run()
 	{
-		$service = $GLOBALS['system']->getDBObject('service', (int)$_REQUEST['serviceid']);
+		$service = $GLOBALS['system']->getDBObject('service', (int) $_REQUEST['serviceid']);
 
 		?>
 		<html>
@@ -55,7 +54,7 @@ class Call_Service_Content extends Call
 				</style>
 			</head>
 			<body>
-				<h1><?php echo ents($service->toString(TRUE)); ?></h1>
+				<h1><?php echo ents($service->toString(true)); ?></h1>
 				<?php $service->printServiceContent(); ?>
 			</body>
 		</html>

@@ -7,41 +7,43 @@ class View__Edit_Ical extends View
 	{
 		return 'Manage Roster iCal Feed';
 	}
-	
+
 	function _loadPerson()
 	{
 		$this->person = $GLOBALS['system']->getDBObject('person', $GLOBALS['user_system']->getCurrentMember('id'));
 	}
-	
+
 	function processView()
 	{
-            $this->_loadPerson();
-			if (array_get($_POST, 'action')) {
-				if (!$this->person->acquireLock()) {
-					add_message("Could not adjust iCal feed at this time; please try again later", 'error');
-					return;
-				}
-				if ($_POST['action'] == 'enable') {
-					$this->person->setFeedUUID();
-					$message = 'iCal feed enabled';
-				} else if ($_POST['action'] == 'change') {
-					$this->person->setFeedUUID();
-					$message = 'iCal URL changed';
-				} else if ($_POST['action'] == 'disable') {
-					$this->person->setValue('feed_uuid', NULL);
-					$message = 'iCal feed disabled';
-				} else {
-					$message = 'Invalid action';
-				}
-				if (!$this->person->save(FALSE)) {
-					add_message("Could not adjust iCal feed at this time; please try again later", 'error');
-					return;
-				}
-				$this->person->releaseLock();
-				add_message($message);
+		$this->_loadPerson();
+		if (array_get($_POST, 'action')) {
+			if (!$this->person->acquireLock()) {
+				add_message('Could not adjust iCal feed at this time; please try again later', 'error');
+
+				return;
 			}
+			if ($_POST['action'] == 'enable') {
+				$this->person->setFeedUUID();
+				$message = 'iCal feed enabled';
+			} elseif ($_POST['action'] == 'change') {
+				$this->person->setFeedUUID();
+				$message = 'iCal URL changed';
+			} elseif ($_POST['action'] == 'disable') {
+				$this->person->setValue('feed_uuid', null);
+				$message = 'iCal feed disabled';
+			} else {
+				$message = 'Invalid action';
+			}
+			if (!$this->person->save(false)) {
+				add_message('Could not adjust iCal feed at this time; please try again later', 'error');
+
+				return;
+			}
+			$this->person->releaseLock();
+			add_message($message);
+		}
 	}
-	
+
 	function printView()
 	{
 		$uuid = $this->person->getValue('feed_uuid');
@@ -78,5 +80,4 @@ class View__Edit_Ical extends View
 			<?php
 		}
 	}
-
 }

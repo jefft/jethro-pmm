@@ -9,7 +9,8 @@ class View_Groups__Add extends Abstract_View_Add_Object
 	var $_submit_label = 'Create Group';
 	var $_title = 'Add Person Group';
 
-	function processView() {
+	function processView()
+	{
 		if (!empty($_REQUEST['create_another'])) {
 			$this->_on_success_view = $_REQUEST['view'];
 		}
@@ -28,12 +29,12 @@ class View_Groups__Add extends Abstract_View_Add_Object
 			<input type="hidden" name="new_<?php echo $this->_create_type; ?>_submitted" value="1" />
 			<?php
 			$this->_new_object->printForm();
-			?>
+		?>
 			<hr />
 			<div class="controls">
-				<input class="btn" type="submit" value="<?php echo _('Save and view group');?>" />
-				<input class="btn" name="create_another" type="submit" value="<?php echo _('Save group and create another');?>" />
-				<a href="<?php echo build_url(Array('view' => 'groups__list_all')); ?>" class="btn">Cancel</a>
+				<input class="btn" type="submit" value="<?php echo _('Save and view group'); ?>" />
+				<input class="btn" name="create_another" type="submit" value="<?php echo _('Save group and create another'); ?>" />
+				<a href="<?php echo build_url(['view' => 'groups__list_all']); ?>" class="btn">Cancel</a>
 			</div>
 		</form>
 		<?php
@@ -42,13 +43,12 @@ class View_Groups__Add extends Abstract_View_Add_Object
 	function _afterCreate()
 	{
 		if (!empty($_POST['personid']) && is_array($_POST['personid'])) {
-
 			// When moving from an old group to this one, the magic membership status _PRESERVE_
 			// means we should look up their status in the old group and use that status in the new group.
 
-			$mstatus = array_get($_POST, 'membership_status', NULL);
+			$mstatus = array_get($_POST, 'membership_status', null);
 			if (!empty($_POST['remove_from_groupid'])) {
-				$old_group = $GLOBALS['system']->getDBObject('person_group', (int)$_POST['remove_from_groupid']);
+				$old_group = $GLOBALS['system']->getDBObject('person_group', (int) $_POST['remove_from_groupid']);
 				if ($mstatus == '_PRESERVE_') {
 					$old_memberships = $old_group->getMembers();
 				}
@@ -56,7 +56,7 @@ class View_Groups__Add extends Abstract_View_Add_Object
 
 			foreach ($_POST['personid'] as $personid) {
 				$newstatus = ($mstatus == '_PRESERVE_') ? $old_memberships[$personid]['membership_status_id'] : $mstatus;
-				$this->_new_object->addMember((int)$personid, $newstatus);
+				$this->_new_object->addMember((int) $personid, $newstatus);
 			}
 
 			if (!empty($_POST['remove_from_groupid'])) {

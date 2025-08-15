@@ -1,13 +1,14 @@
 <?php
+
 include_once 'include/db_object.class.php';
 class Attendance_Record extends db_object
 {
 	// NB This class only exists for the following SQL
 	// See Attendance_Record_Set for CRUD functionality of this table
 
-	function getInitSQL($table_name=NULL)
+	function getInitSQL($table_name = null)
 	{
-		return "
+		return '
 			CREATE TABLE `attendance_record` (
 			  `date` date NOT NULL,
 			  `personid` int(11) NOT NULL,
@@ -16,14 +17,14 @@ class Attendance_Record extends db_object
 			  `checkinid` int(11) default null,
 			  PRIMARY KEY  (`date`,`personid`,`groupid`)
 			) ENGINE=InnoDB ;
-		";
+		';
 	}
 
 	public function getForeignKeys()
 	{
-		return Array(
+		return [
 			'personid' => '`_person` (`id`) ON DELETE CASCADE',
-			'checkinid'  => '`checkin` (`id`) ON DELETE SET NULL',
-		);
+			'checkinid' => '`checkin` (`id`) ON DELETE SET NULL',
+		];
 	}
 }

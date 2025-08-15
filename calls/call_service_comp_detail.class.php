@@ -4,7 +4,7 @@ class Call_Service_Comp_Detail extends Call
 	function run()
 	{
 		$GLOBALS['system']->initErrorHandler();
-		$comp = $GLOBALS['system']->getDBObject('service_component', (int)$_REQUEST['id']);
+		$comp = $GLOBALS['system']->getDBObject('service_component', (int) $_REQUEST['id']);
 		if ($comp) {
 			if (!empty($_REQUEST['head'])) {
 				?>

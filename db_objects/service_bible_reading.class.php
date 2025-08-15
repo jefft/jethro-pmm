@@ -1,10 +1,11 @@
 <?php
+
 include_once 'include/db_object.class.php';
 class service_bible_reading extends db_object
 {
 	// NB This class only exists for the following SQL
 	// It has no ID
-	function getInitSql($tablename=NULL)
+	function getInitSql($tablename = null)
 	{
 		return 'create table service_bible_reading (
 					service_id int(5) not null,

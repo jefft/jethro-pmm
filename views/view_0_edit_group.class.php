@@ -1,4 +1,5 @@
 <?php
+
 require_once 'abstract_view_edit_object.class.php';
 class View__Edit_Group extends Abstract_View_Edit_Object
 {
@@ -21,18 +22,18 @@ class View__Edit_Group extends Abstract_View_Edit_Object
 	function _processObjectEditing()
 	{
 		$mod_count = 0;
-		$processed = FALSE;
+		$processed = false;
 		switch (array_get($_REQUEST, 'action')) {
 			case 'add_member':
 			case 'add_members':
-				$personids = array_get($_POST, 'personid', Array());
-				list($status_options, $default_status) = Person_Group::getMembershipStatusOptionsAndDefault();
+				$personids = array_get($_POST, 'personid', []);
+				[$status_options, $default_status] = Person_Group::getMembershipStatusOptionsAndDefault();
 				$mstatus = array_get($_POST, 'membership_status', $default_status);
 
 				// When moving from an old group to this one, the magic membership status _PRESERVE_
 				// means we should look up their status in the old group and use that status in the new group.
 				if (!empty($_POST['remove_from_groupid'])) {
-					$old_group = $GLOBALS['system']->getDBObject('person_group', (int)$_POST['remove_from_groupid']);
+					$old_group = $GLOBALS['system']->getDBObject('person_group', (int) $_POST['remove_from_groupid']);
 					if ($mstatus == '_PRESERVE_') {
 						$old_memberships = $old_group->getMembers();
 					}
@@ -43,14 +44,14 @@ class View__Edit_Group extends Abstract_View_Edit_Object
 				$overwrite = array_get($_POST, 'overwrite_membership');
 				if (!empty($personids)) {
 					if (!is_array($personids)) {
-						$personids = Array($personids);
+						$personids = [$personids];
 					}
 					foreach ($personids as $personid) {
-						$new_member = $GLOBALS['system']->getDBObject('person', (int)$personid);
+						$new_member = $GLOBALS['system']->getDBObject('person', (int) $personid);
 						$newstatus = ($mstatus == '_PRESERVE_') ? $old_memberships[$personid]['membership_status_id'] : $mstatus;
 						if ($new_member->id) {
-							if ($this->_edited_object->addMember((int)$personid, $newstatus, $overwrite)) {
-								$mod_count++;
+							if ($this->_edited_object->addMember((int) $personid, $newstatus, $overwrite)) {
+								++$mod_count;
 							}
 						}
 					}
@@ -66,7 +67,7 @@ class View__Edit_Group extends Abstract_View_Edit_Object
 					$old_group->removeMembers($_POST['personid']);
 				}
 
-				$processed = TRUE;
+				$processed = true;
 				break;
 
 			case 'remove_member':
@@ -74,11 +75,11 @@ class View__Edit_Group extends Abstract_View_Edit_Object
 				$personids = array_get($_POST, 'personid');
 				if (!empty($personids)) {
 					if (!is_array($personids)) {
-						$personids = Array($personids);
+						$personids = [$personids];
 					}
 					foreach ($personids as $personid) {
-						if ($this->_edited_object->removeMember((int)$personid)) {
-							$mod_count++;
+						if ($this->_edited_object->removeMember((int) $personid)) {
+							++$mod_count;
 						}
 					}
 					if (count($personids) > 1) {
@@ -86,7 +87,7 @@ class View__Edit_Group extends Abstract_View_Edit_Object
 					} else {
 						add_message('Person removed from group');
 					}
-					$processed = TRUE;
+					$processed = true;
 				}
 				break;
 
@@ -96,9 +97,9 @@ class View__Edit_Group extends Abstract_View_Edit_Object
 					$name = $this->_edited_object->toString();
 					if ($this->_edited_object->delete()) {
 						add_message('Group "'.$name.'" deleted');
-						redirect('groups__list_all', Array('groupid' => NULL, 'action' => NULL)); // exits
+						redirect('groups__list_all', ['groupid' => null, 'action' => null]); // exits
 					} else {
-						redirect('groups', Array('groupid' => $this->_edited_object->id));
+						redirect('groups', ['groupid' => $this->_edited_object->id]);
 					}
 				} else {
 					add_message('Groups can only be deleted in the same browser window. Please try again');
@@ -106,27 +107,24 @@ class View__Edit_Group extends Abstract_View_Edit_Object
 				break;
 		}
 
-
 		if (!$processed) {
 			// normal group edit
 			$GLOBALS['user_system']->checkPerm(PERM_EDITGROUP);
 			$processed = parent::_processObjectEditing();
 		}
-		
+
 		if ($processed) {
-		
 			switch (array_get($_REQUEST, 'back_to')) {
 				case 'persons':
-					redirect('persons', Array('personid' => (int)reset($personids)), 'groups');
+					redirect('persons', ['personid' => (int) reset($personids)], 'groups');
+					// no break
 				case 'groups__list_all':
-					redirect('groups__list_all', Array('groupid' => NULL, 'action' => NULL)); // exits
+					redirect('groups__list_all', ['groupid' => null, 'action' => null]); // exits
+					// no break
 				case 'groups':
 				default:
-					redirect('groups', Array('groupid' => $this->_edited_object->id)); // exits
+					redirect('groups', ['groupid' => $this->_edited_object->id]); // exits
 			}
 		}
-
-
 	}
-	
 }

@@ -9,14 +9,13 @@ class View_Rosters__Define_Roster_Views extends View
 	function processView()
 	{
 		if (!empty($_REQUEST['delete_viewid'])) {
-			$view = $GLOBALS['system']->getDBOBject('roster_view', (int)$_REQUEST['delete_viewid']);
+			$view = $GLOBALS['system']->getDBOBject('roster_view', (int) $_REQUEST['delete_viewid']);
 			if ($view) {
 				$view->delete();
 				add_message('View Deleted');
-				redirect('rosters__define_roster_views', Array());
+				redirect('rosters__define_roster_views', []);
 			}
 		}
-
 	}
 
 	function getTitle()
@@ -24,7 +23,6 @@ class View_Rosters__Define_Roster_Views extends View
 		return 'Define Roster Views';
 	}
 
-	
 	function printView()
 	{
 		?>
@@ -47,7 +45,7 @@ class View_Rosters__Define_Roster_Views extends View
 				</tr>
 			</thead>
 		<?php
-		$views = $GLOBALS['system']->getDBObjectData('roster_view', Array(), 'OR', 'name');
+		$views = $GLOBALS['system']->getDBObjectData('roster_view', [], 'OR', 'name');
 		foreach ($views as $id => $details) {
 			?>
 			<tr>
@@ -55,7 +53,7 @@ class View_Rosters__Define_Roster_Views extends View
 				<td><?php echo ents($details['members']); ?></td>
 				<td class="nowrap">
 					<a href="?view=_edit_roster_view&roster_viewid=<?php echo $id; ?>"><i class="icon-wrench"></i>Edit</a> &nbsp;
-					<a href="<?php echo build_url(Array('delete_viewid'=>$id)); ?>" class="confirm-title" title="Delete this roster view altogether"><i class="icon-trash"></i>Delete</a>
+					<a href="<?php echo build_url(['delete_viewid' => $id]); ?>" class="confirm-title" title="Delete this roster view altogether"><i class="icon-trash"></i>Delete</a>
 				</td>
 			</tr>
 			<?php

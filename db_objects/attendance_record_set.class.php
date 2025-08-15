@@ -3,20 +3,19 @@
 // This is not a standard DB object but performs similarly
 class Attendance_Record_Set
 {
-
-	public $date = NULL;
-	public $congregationid = NULL;
+	public $date;
+	public $congregationid;
 	public $groupid = 0;
-	public $age_brackets = NULL;
-	public $statuses = NULL;
-	public $show_photos = FALSE;
-	private $_persons = NULL;
-	private $_attendance_records = Array();
-	private $_cohort_object = NULL;
+	public $age_brackets;
+	public $statuses;
+	public $show_photos = false;
+	private $_persons;
+	private $_attendance_records = [];
+	private $_cohort_object;
 
-//--        CREATING, LOADING AND SAVING        --//
+	// --        CREATING, LOADING AND SAVING        --//
 
-	function __construct($date=NULL, $cohort=NULL, $age_brackets=NULL, $statuses=NULL, $order=NULL)
+	function __construct($date = null, $cohort = null, $age_brackets = null, $statuses = null, $order = null)
 	{
 		if ($date && $cohort) {
 			$this->load($date, $cohort, $age_brackets, $statuses, $order);
@@ -28,10 +27,11 @@ class Attendance_Record_Set
 		if (!$this->_cohort_object) {
 			if ($this->groupid) {
 				$this->_cohort_object = $GLOBALS['system']->getDBObject('person_group', $this->groupid);
-			} else if ($this->congregationid) {
+			} elseif ($this->congregationid) {
 				$this->_cohort_object = $GLOBALS['system']->getDBObject('congregation', $this->congregationid);
 			}
 		}
+
 		return $this->_cohort_object;
 	}
 
@@ -39,9 +39,11 @@ class Attendance_Record_Set
 	{
 		$obj = $this->_getCohortObject();
 		if (!$obj) {
-			trigger_error("Could not get cohort object for lock");
-			return FALSE;
+			trigger_error('Could not get cohort object for lock');
+
+			return false;
 		}
+
 		return $obj->acquireLock('att-'.$this->date);
 	}
 
@@ -49,9 +51,11 @@ class Attendance_Record_Set
 	{
 		$obj = $this->_getCohortObject();
 		if (!$obj) {
-			trigger_error("Could not get cohort object for lock");
-			return FALSE;
+			trigger_error('Could not get cohort object for lock');
+
+			return false;
 		}
+
 		return $obj->haveLock('att-'.$this->date);
 	}
 
@@ -59,9 +63,11 @@ class Attendance_Record_Set
 	{
 		$obj = $this->_getCohortObject();
 		if (!$obj) {
-			trigger_error("Could not get cohort object for lock");
-			return FALSE;
+			trigger_error('Could not get cohort object for lock');
+
+			return false;
 		}
+
 		return $obj->releaseLock('att-'.$this->date);
 	}
 
@@ -69,66 +75,76 @@ class Attendance_Record_Set
 	{
 		$obj = $this->_getCohortObject();
 		if (!$obj) {
-			trigger_error("Could not get cohort object for lock");
-			return FALSE;
-		}
-		return $obj->getLockHolder('att-'.$this->date);
+			trigger_error('Could not get cohort object for lock');
 
+			return false;
+		}
+
+		return $obj->getLockHolder('att-'.$this->date);
 	}
 
 	function create()
 	{
 	}
 
-	function load($date, $cohort, $age_brackets, $statuses, $order=NULL)
+	function load($date, $cohort, $age_brackets, $statuses, $order = null)
 	{
-		if (empty($order)) $order = self::getOrderDefault();
+		if (empty($order)) {
+			$order = self::getOrderDefault();
+		}
 		$this->date = $date;
-		list($cohortType, $cohortID) = explode('-', $cohort);
+		[$cohortType, $cohortID] = explode('-', $cohort);
 		switch ($cohortType) {
-			case 'c': $this->congregationid = $cohortID; break;
-			case 'g': $this->groupid = $cohortID; break;
-			default: trigger_error("Invalid cohort $cohort"); return;
+			case 'c': $this->congregationid = $cohortID;
+				break;
+			case 'g': $this->groupid = $cohortID;
+				break;
+			default: trigger_error("Invalid cohort $cohort");
+
+				return;
 		}
 		$this->age_brackets = $age_brackets;
 		$this->statuses = $statuses;
 		if ($this->statuses) {
 			foreach ($this->statuses as $status) {
-				list($statusType, $statusID) = explode('-', $status);
+				[$statusType, $statusID] = explode('-', $status);
 				if (($statusType == 'g') && ($cohortType != 'g')) {
-					trigger_error("Cannot restrict congregational attendance by a group membership status");
+					trigger_error('Cannot restrict congregational attendance by a group membership status');
+
 					return;
 				}
 			}
 		}
 
 		// FETCH ANY EXISTING ATTENDANCE RECORDS
-		$db =& $GLOBALS['db'];
+		$db = &$GLOBALS['db'];
 		$sql = 'SELECT ar.personid, ar.present
 					FROM attendance_record ar
 					JOIN person p ON ar.personid = p.id
 					LEFT JOIN person_group_membership pgm
 						ON pgm.groupid = ar.groupid AND pgm.personid = p.id
 				WHERE ar.date = '.$db->quote($date).'
-					AND ar.groupid = '.(int)$this->groupid;
+					AND ar.groupid = '.(int) $this->groupid;
 		if ($this->congregationid) {
 			$sql .= '
 				AND p.congregationid = '.$db->quote($this->congregationid);
 		}
-		$statusType = $statusID = NULL;
+		$statusType = $statusID = null;
 		if ($this->statuses) {
-			$statusClauses = Array();
+			$statusClauses = [];
 			foreach ($this->statuses as $status) {
-				list($statusType, $statusID) = explode('-', $status);
+				[$statusType, $statusID] = explode('-', $status);
 				switch ($statusType) {
 					case 'p':
-						$statusClauses[] = 'p.status = '.(int)$statusID;
+						$statusClauses[] = 'p.status = '.(int) $statusID;
 						break;
 					case 'g':
-						$statusClauses[] ='pgm.membership_status = '.(int)$statusID;
+						$statusClauses[] = 'pgm.membership_status = '.(int) $statusID;
 						break;
 					default:
-						trigger_error("invalid status filter $status"); return;
+						trigger_error("invalid status filter $status");
+
+						return;
 				}
 			}
 			$sql .= '
@@ -136,25 +152,26 @@ class Attendance_Record_Set
 		}
 		if ($this->age_brackets) {
 			$sql .= '
-				AND p.age_bracketid IN ('.implode(',', array_map(Array($db, 'quote'), $this->age_brackets)).')';
+				AND p.age_bracketid IN ('.implode(',', array_map([$db, 'quote'], $this->age_brackets)).')';
 		}
 		$this->_attendance_records = $db->queryAll($sql, null, null, true);
 
 		// NOW FETCH THE APPLICABLE PERSON RECORDS
-		
 
-		$conds = Array();
+		$conds = [];
 		if ($this->age_brackets) {
 			$conds['(age_bracketid'] = $this->age_brackets;
 		}
 		if ($this->statuses) {
 			foreach ($this->statuses as $status) {
-				list($statusType, $statusID) = explode('-', $status);
+				[$statusType, $statusID] = explode('-', $status);
 				$field = $statusType == 'g' ? '(membership_status' : '(status';
 				$conds[$field][] = $statusID;
 			}
 		}
-		if (!isset($conds['(status'])) $conds['!(status'] = Person_Status::getArchivedIDs();
+		if (!isset($conds['(status'])) {
+			$conds['!(status'] = Person_Status::getArchivedIDs();
+		}
 		if ($this->congregationid) {
 			$conds['congregationid'] = $this->congregationid;
 			$orderSQL = self::getOrderSQL($order, 'ps');
@@ -181,78 +198,76 @@ class Attendance_Record_Set
 		}
 	}
 
-
 	function save()
 	{
 		if (empty($this->date)) {
-			trigger_error('Cannot save attendance record set with no date', E_USER_WARNING);
+			trigger_error('Cannot save attendance record set with no date', \E_USER_WARNING);
+
 			return;
 		}
 		if (!$this->haveLock()) {
-			trigger_error("Cannot save attendance record set - we do not have the lock");
+			trigger_error('Cannot save attendance record set - we do not have the lock');
+
 			return;
 		}
-		$db =& $GLOBALS['db'];
+		$db = &$GLOBALS['db'];
 		$GLOBALS['system']->doTransaction('begin');
-			$this->delete();
-			$stmt = $db->prepare('REPLACE INTO attendance_record (date, groupid, personid, present) VALUES ('.$db->quote($this->date).', '.(int)$this->groupid.', ?, ?)', Array('integer', 'integer', 'integer'));
-			foreach ($this->_attendance_records as $personid => $present) {
-                $res = $stmt->execute(Array($personid, $present));
-			}
+		$this->delete();
+		$stmt = $db->prepare('REPLACE INTO attendance_record (date, groupid, personid, present) VALUES ('.$db->quote($this->date).', '.(int) $this->groupid.', ?, ?)', ['integer', 'integer', 'integer']);
+		foreach ($this->_attendance_records as $personid => $present) {
+			$res = $stmt->execute([$personid, $present]);
+		}
 		$GLOBALS['system']->doTransaction('commit');
 	}
-
 
 	function delete()
 	{
 		// If group/congregation filters caused no persons to have attendance marked for this congregation, do nothing. #1241
 		if ($this->_persons) {
-			$db =& $GLOBALS['db'];
+			$db = &$GLOBALS['db'];
 			$sql = 'DELETE ar
 				FROM attendance_record ar
 				JOIN person p ON ar.personid = p.id
-				WHERE date = ' . $db->quote($this->date) . '
-					AND (ar.groupid = ' . $db->quote((int)$this->groupid) . ')';
+				WHERE date = '.$db->quote($this->date).'
+					AND (ar.groupid = '.$db->quote((int) $this->groupid).')';
 			if ($this->congregationid) {
 				$sql .= '
-					AND (congregationid = ' . $db->quote($this->congregationid) . ')
+					AND (congregationid = '.$db->quote($this->congregationid).')
 					';
 			}
-			$sql .= '  AND personid IN (' . implode(',', array_map(array($db, 'quote'), array_keys($this->_persons))) . ')';
+			$sql .= '  AND personid IN ('.implode(',', array_map([$db, 'quote'], array_keys($this->_persons))).')';
 			$res = $db->query($sql);
 		}
 	}
 
-
-
-//--        INTERFACE PAINTING AND PROCESSING        --//
-
+	// --        INTERFACE PAINTING AND PROCESSING        --//
 
 	function printSummary()
 	{
 	}
 
-
 	public function printWidget($prefix, $personid)
 	{
-		static $is_first = TRUE;
+		static $is_first = true;
 		if (isset($this->_persons[$personid])) {
 			$v = isset($this->_attendance_records[$personid])
 					? ($this->_attendance_records[$personid] ? 'present' : 'absent')
 					: (empty($this->_attendance_records) ? '' : 'unknown');
 			print_widget(
 				'attendances['.$prefix.']['.$personid.']',
-				Array(
-					'options' => Array('unknown' => '?', 'present' => 'Present', 'absent' => 'Absent'),
+				[
+					'options' => ['unknown' => '?', 'present' => 'Present', 'absent' => 'Absent'],
 					'type' => 'select',
 					'style' => 'colour-buttons',
 					'class' => $is_first ? 'autofocus' : '',
-				),
-				$v
+				],
+				$v,
 			);
-			$is_first = FALSE;
+			$is_first = false;
+
 			return 1;
 		}
+
 		return 0;
 	}
 
@@ -264,26 +279,33 @@ class Attendance_Record_Set
 	public function getCohortName()
 	{
 		$obj = $this->_getCohortObject();
-		if ($obj) return $obj->getValue('name');
+		if ($obj) {
+			return $obj->getValue('name');
+		}
 	}
 
 	public function checkAllowedDate()
 	{
 		$obj = $this->_getCohortObject();
-		if (!$obj) return FALSE;
+		if (!$obj) {
+			return false;
+		}
+
 		return $obj->canRecordAttendanceOn($this->date);
 	}
 
-	public function printForm($prefix=0)
+	public function printForm($prefix = 0)
 	{
-		if (empty($this->_persons)) return 0;
+		if (empty($this->_persons)) {
+			return 0;
+		}
 
 		$GLOBALS['system']->includeDBClass('person');
 		$dummy = new Person();
 		?>
 		<table class="table table-condensed table-auto-width valign-middle attendance-record">
 		<?php
-		$is_first = TRUE;
+		$is_first = true;
 		foreach ($this->_persons as $personid => $details) {
 			$dummy->populate($personid, $details);
 			?>
@@ -298,7 +320,7 @@ class Attendance_Record_Set
 				?>
 				<td>
 					<a class="med-popup" tabindex="-1" href="?view=persons&personid=<?php echo $personid; ?>">
-						<img style="width: 50px; max-width: 50px" src="?call=photo&personid=<?php echo (int)$personid; ?>" />
+						<img style="width: 50px; max-width: 50px" src="?call=photo&personid=<?php echo (int) $personid; ?>" />
 					</a>
 				</td>
 				<?php
@@ -310,7 +332,7 @@ class Attendance_Record_Set
 					if (!empty($details['assignments'])) {
 						echo '<br /><small><i>'.ents($details['assignments']).'</i></small>';
 					}
-					?>
+			?>
 				</td>
 			<?php
 			if (!SizeDetector::isNarrow()) {
@@ -322,7 +344,7 @@ class Attendance_Record_Set
 					} else {
 						$dummy->printFieldValue('status');
 					}
-					?>
+				?>
 				</td>
 				<?php
 			}
@@ -349,7 +371,7 @@ class Attendance_Record_Set
 			?>
 			</tr>
 			<?php
-			$is_first = FALSE;
+			$is_first = false;
 		}
 		?>
 		</table>
@@ -359,7 +381,7 @@ class Attendance_Record_Set
 
 	function printHeadcountField()
 	{
-		if ((int)$this->congregationid) {
+		if ((int) $this->congregationid) {
 			$headcountFieldName = 'headcount[congregation]['.$this->congregationid.']';
 			$headcountValue = Headcount::fetch('congregation', $this->date, $this->congregationid);
 		} else {
@@ -374,21 +396,22 @@ class Attendance_Record_Set
 
 	function processForm($prefix)
 	{
-		$this->_attendance_records = Array();
+		$this->_attendance_records = [];
 		if (isset($_POST['attendances']) && isset($_POST['attendances'][$prefix])) {
 			foreach ($_POST['attendances'][$prefix] as $personid => $present) {
 				if (!empty($present) && ($present != 'unknown')) {
-					$this->_attendance_records[$personid] = (int)($present == 'present');
+					$this->_attendance_records[$personid] = (int) ($present == 'present');
 				}
 			}
 		}
+
 		return count($this->_attendance_records);
 	}
 
 	public function getStats()
 	{
 		$db = $GLOBALS['db'];
-		$groupingField = ((int)$this->congregationid) ? 'p.status' : 'pgms.label';
+		$groupingField = ((int) $this->congregationid) ? 'p.status' : 'pgms.label';
 		$SQL = 'SELECT present, '.$groupingField.' AS status, count(p.id) AS total
 				FROM attendance_record ar
 				JOIN person p ON ar.personid = p.id
@@ -396,7 +419,7 @@ class Attendance_Record_Set
 				LEFT JOIN person_group_membership pgm ON pgm.personid = p.id AND pgm.groupid = pg.id
 				LEFT JOIN person_group_membership_status pgms ON pgms.id = pgm.membership_status
 				WHERE date = '.$db->quote($this->date).'
-				AND ar.groupid = '.$db->quote((int)$this->groupid).'
+				AND ar.groupid = '.$db->quote((int) $this->groupid).'
 				';
 		if ($this->congregationid) {
 			$SQL .= '
@@ -406,21 +429,24 @@ class Attendance_Record_Set
 				GROUP BY present, '.$groupingField.'
 				ORDER BY present, '.$groupingField;
 		$res = $db->queryAll($SQL);
-		$totals = Array(0 => 0, 1 => 0);
-		$breakdowns = Array(0 => Array(), 1 => Array());
+		$totals = [0 => 0, 1 => 0];
+		$breakdowns = [0 => [], 1 => []];
 		$dummy = new Person();
 		foreach ($res as $r) {
-			if ($this->congregationid) $r['status'] = $dummy->getFormattedValue('status', $r['status']);
+			if ($this->congregationid) {
+				$r['status'] = $dummy->getFormattedValue('status', $r['status']);
+			}
 			$totals[$r['present']] += $r['total'];
 			$breakdowns[$r['present']][] = $r;
 		}
-		return Array($totals, $breakdowns);
+
+		return [$totals, $breakdowns];
 	}
 
 	public function printStats()
 	{
-		list($totals, $breakdowns) = $this->getStats();
-		if ((int)$this->congregationid) {
+		[$totals, $breakdowns] = $this->getStats();
+		if ((int) $this->congregationid) {
 			$headcount = Headcount::fetch('congregation', $this->date, $this->congregationid);
 		} else {
 			$headcount = Headcount::fetch('person_group', $this->date, $this->groupid);
@@ -437,13 +463,13 @@ class Attendance_Record_Set
 					<b>
 					<?php
 					echo $headcount;
-					?>
+			?>
 					</b>
 				</td>
 			</tr>
 			<?php
 		}
-		foreach (Array(1 => 'Present', 0 => 'Absent') as $present => $label) {
+		foreach ([1 => 'Present', 0 => 'Absent'] as $present => $label) {
 			?>
 			<tr class="<?php echo strtolower($label); ?>">
 				<th rowspan="<?php echo max(1, count($breakdowns[$present])); ?>">Marked <?php echo $label; ?></th>
@@ -465,7 +491,7 @@ class Attendance_Record_Set
 			?>
 			</tr>
 			<?php
-			for ($i = 1; $i < count($breakdowns[$present]); $i++) {
+			for ($i = 1; $i < count($breakdowns[$present]); ++$i) {
 				?>
 				<tr class="<?php echo strtolower($label); ?>">
 					<td><?php echo $breakdowns[$present][$i]['status']; ?></td>
@@ -478,7 +504,7 @@ class Attendance_Record_Set
 			?>
 			<tr class="extras">
 				<th>Extras</th>
-				<td colspan="3"><b><?php echo ($headcount - $totals[1]); ?></b></td>
+				<td colspan="3"><b><?php echo $headcount - $totals[1]; ?></b></td>
 			</tr>
 			<?php
 		}
@@ -490,39 +516,37 @@ class Attendance_Record_Set
 
 	public static function getStatsForPeriod($start_date, $end_date, $cohortid)
 	{
-		$db =& $GLOBALS['db'];
+		$db = &$GLOBALS['db'];
 
-		list($type, $id) = explode('-', $cohortid);
+		[$type, $id] = explode('-', $cohortid);
 		$groupid = ($type == 'g') ? $id : 0;
 		$status_col = ($type == 'g') ? 'pgms.id' : 'p.status';
 		$cohort_joins = '';
 		if ($type == 'c') {
 			$cohort_where = 'ar.groupid = 0 ';
 			if ($id != '*') {
-				$cohort_where .= ' AND p.congregationid = '.(int)$id;
+				$cohort_where .= ' AND p.congregationid = '.(int) $id;
 			}
 		}
 		if ($type == 'g') {
-			$cohort_where = 'ar.groupid = '.(int)$groupid;
+			$cohort_where = 'ar.groupid = '.(int) $groupid;
 			$cohort_joins = '
 							LEFT JOIN person_group_membership pgm ON pgm.personid = p.id AND pgm.groupid = ar.groupid
 							LEFT JOIN person_group_membership_status pgms ON pgms.id = pgm.membership_status
 							';
-
 		}
 		if ($type == 'gc') {
-			$cohort_where = 'pg.categoryid = '.(int)$id;
+			$cohort_where = 'pg.categoryid = '.(int) $id;
 			$cohort_joins = '
 							JOIN person_group pg ON pg.id = ar.groupid
 							LEFT JOIN person_group_membership pgm ON pgm.personid = p.id AND pgm.groupid = ar.groupid
 							LEFT JOIN person_group_membership_status pgms ON pgms.id = pgm.membership_status
 							';
-
 		}
-		$stats = Array();
+		$stats = [];
 
-		foreach (Array('age_bracketid', 'status') as $groupingField) {
-			$stats[NULL]['rate'] = $stats[NULL]['avg_present'] = $stats[NULL]['avg_absent'] = 0.0;
+		foreach (['age_bracketid', 'status'] as $groupingField) {
+			$stats[null]['rate'] = $stats[null]['avg_present'] = $stats[null]['avg_absent'] = 0.0;
 			$rank = ($groupingField == 'status' && $type == 'g') ? '`rank`, ' : '';
 			$selectCol = ($groupingField == 'status') ? $status_col : $groupingField;
 
@@ -541,14 +565,14 @@ class Attendance_Record_Set
 							AND '.$cohort_where.'
 					';
 
-			$sql .=	'
+			$sql .= '
 						GROUP BY ar.personid, '.$selectCol.'
 					) indiv
 					GROUP BY '.$rank.' '.$groupingField.' WITH ROLLUP';
 			$res = $db->queryAll($sql);
 
 			foreach ($res as $row) {
-				if (NULL !== $row[$groupingField]) {
+				if (null !== $row[$groupingField]) {
 					$stats[$groupingField][$row[$groupingField]]['rate'] = round($row['avg_attendance']);
 					$stats[$groupingField][$row[$groupingField]]['avg_present'] = 0;
 					$stats[$groupingField][$row[$groupingField]]['avg_absent'] = 0;
@@ -577,12 +601,13 @@ class Attendance_Record_Set
 
 			$res = $db->queryAll($sql);
 			foreach ($res as $row) {
-				foreach (Array('avg_present', 'avg_absent') as $key) {
+				foreach (['avg_present', 'avg_absent'] as $key) {
 					$stats[$groupingField][$row[$groupingField]][$key] = $row[$key];
-					$stats[NULL][$key] += (float)$row[$key];
+					$stats[null][$key] += (float) $row[$key];
 				}
 			}
 		}
+
 		return $stats;
 	}
 
@@ -590,19 +615,25 @@ class Attendance_Record_Set
 	 * Get person data for people in the specified cohorts and params
 	 * Used for tabular/parallel view when we need to know what people we are dealing with before
 	 * handling any actual attendance records.
-	 * @param array	$cohortids	Eg c-1, g-2
-	 * @param array $params		Filters to apply to person, eg age bracket
+	 *
+	 * @param array  $cohortids Eg c-1, g-2
+	 * @param array  $params    Filters to apply to person, eg age bracket
 	 * @param string $order
+	 *
 	 * @return array
 	 */
-	public static function getPersonDataForCohorts($cohortids, $params, $order=NULL)
+	public static function getPersonDataForCohorts($cohortids, $params, $order = null)
 	{
 		$db = $GLOBALS['db'];
-		$groupids = $congids = Array();
+		$groupids = $congids = [];
 		foreach ($cohortids as $cid) {
-			list($type, $id) = explode('-', $cid);
-			if ($type == 'c') $congids[] = $id;
-			if ($type == 'g') $groupids[] = $id;
+			[$type, $id] = explode('-', $cid);
+			if ($type == 'c') {
+				$congids[] = $id;
+			}
+			if ($type == 'g') {
+				$groupids[] = $id;
+			}
 		}
 		$SQL = 'SELECT person.id, person.first_name, person.last_name, person.status, c.id as congregationid, c.name as congregation, '
 				.($groupids ? 'group_concat(pgm.groupid) as groupids' : '"" AS groupids').'
@@ -616,7 +647,7 @@ class Attendance_Record_Set
 			$SQL .= '
 				LEFT JOIN person_group_membership pgm
 					ON pgm.personid = person.id
-					AND pgm.groupid in ('.implode(', ', array_map(Array($db, 'quote'), $groupids)).')
+					AND pgm.groupid in ('.implode(', ', array_map([$db, 'quote'], $groupids)).')
 				LEFT JOIN person_group_membership_status pgms
 					ON pgms.id = pgm.membership_status
 				';
@@ -624,23 +655,27 @@ class Attendance_Record_Set
 		$SQL .= '
 				WHERE
 				';
-		$wheres = Array();
-		if ($congids) $wheres[] = '(person.congregationid IN ('.implode(', ', array_map(Array($db, 'quote'), $congids)).'))';
-		if ($groupids) $wheres[] = '(pgm.groupid IS NOT NULL)';
-		$SQL .= implode(" OR ", $wheres);
-
+		$wheres = [];
+		if ($congids) {
+			$wheres[] = '(person.congregationid IN ('.implode(', ', array_map([$db, 'quote'], $congids)).'))';
+		}
+		if ($groupids) {
+			$wheres[] = '(pgm.groupid IS NOT NULL)';
+		}
+		$SQL .= implode(' OR ', $wheres);
 
 		if (!empty($params['(age_bracketid'])) {
 			$SQL .= '
-				AND person.age_bracketid IN ('.implode(',', array_map(Array($GLOBALS['db'], 'quote'), $params['(age_bracketid'])).')';
+				AND person.age_bracketid IN ('.implode(',', array_map([$GLOBALS['db'], 'quote'], $params['(age_bracketid'])).')';
 		}
-		$statusClauses = Array();
-		foreach (array_get($params, '(status', Array()) as $status) {
+		$statusClauses = [];
+		foreach (array_get($params, '(status', []) as $status) {
 			if (strlen($status)) {
-				list($statusType, $statusID) = explode('-', $status);
+				[$statusType, $statusID] = explode('-', $status);
 				if (($statusType == 'g') && empty($groupids)) {
-					trigger_error("Cannot filter by group membership status for congregational attendance");
-					return Array(Array(), Array(), Array());
+					trigger_error('Cannot filter by group membership status for congregational attendance');
+
+					return [[], [], []];
 				}
 				switch ($statusType) {
 					case 'g':
@@ -658,47 +693,51 @@ class Attendance_Record_Set
 
 		// Since we are getting persons for multiple cohorts, "status" has to mean person status here.
 		$orderSQL = self::getOrderSQL($order, 'ps');
-		$SQL .=  " GROUP BY person.id \n";
+		$SQL .= " GROUP BY person.id \n";
 		$SQL .= '  ORDER BY '.$orderSQL."\n";
-		$res= $db->queryAll($SQL, null, null, true);
+		$res = $db->queryAll($SQL, null, null, true);
+
 		return $res;
-
-
 	}
 
 	public static function getMostRecentDate($cohort)
 	{
-		list($type, $cohortID) = explode('-', $cohort);
+		[$type, $cohortID] = explode('-', $cohort);
 		switch ($type) {
 			case 'c':
 				$SQL = 'SELECT MAX(date)
 						FROM attendance_record a
 						JOIN _person p ON p.id = a.personid
-						WHERE p.congregationid = '.(int)$cohortID.'
+						WHERE p.congregationid = '.(int) $cohortID.'
 						AND a.groupid = 0';
 				break;
 			case 'g':
 				$SQL = 'SELECT MAX(date)
 						FROM attendance_record a
-						WHERE groupid = '.(int)$cohortID;
+						WHERE groupid = '.(int) $cohortID;
 				break;
 		}
 		$res = $GLOBALS['db']->queryOne($SQL);
+
 		return $res;
 	}
 
 	/**
-	 * Get Attendance data for the specified criteria
-	 * @param array $congregationids
-	 * @param int $groupid
-	 * @param array $params		Parameters to restrict person records, eg age bracket and status
+	 * Get Attendance data for the specified criteria.
+	 *
+	 * @param array  $congregationids
+	 * @param int    $groupid
+	 * @param array  $params          Parameters to restrict person records, eg age bracket and status
 	 * @param string $start_date
 	 * @param string $end_date
+	 *
 	 * @return array
 	 */
-	public static function getAttendances($congregationids, $groupid, $params, $start_date, $end_date, $order=NULL)
+	public static function getAttendances($congregationids, $groupid, $params, $start_date, $end_date, $order = null)
 	{
-		if (empty($$order)) $order = self::getOrderDefault();
+		if (empty($$order)) {
+			$order = self::getOrderDefault();
+		}
 		$SQL = 'SELECT person.id, person.last_name, person.first_name, '.($groupid ? 'pgms.label AS membership_status, ' : '').' person.status, ar.date, ar.present, IF (pa.id IS NOT NULL, 1, 0) as planned_absence
 				FROM person person
 				JOIN age_bracket ab ON ab.id = person.age_bracketid
@@ -706,13 +745,13 @@ class Attendance_Record_Set
 				JOIN family f ON person.familyid = f.id  ';
 		if ($groupid) {
 			$SQL .= '
-				JOIN person_group_membership pgm ON pgm.personid = person.id AND pgm.groupid = '.(int)$groupid;
+				JOIN person_group_membership pgm ON pgm.personid = person.id AND pgm.groupid = '.(int) $groupid;
 		}
 		$SQL .= '
 				LEFT JOIN attendance_record ar ON (
 					ar.personid = person.id
 					AND ar.date BETWEEN '.$GLOBALS['db']->quote($start_date).' AND '.$GLOBALS['db']->quote($end_date).'
-					AND ar.groupid = '.(int)$groupid.'
+					AND ar.groupid = '.(int) $groupid.'
 				)';
 		if ($groupid) {
 			$SQL .= '
@@ -726,24 +765,25 @@ class Attendance_Record_Set
 		$SQL .= '
 				WHERE ((NOT ps.is_archived) OR (ar.present IS NOT NULL)) ';
 		if ($congregationids) {
-			 $SQL .= '
-				 AND person.congregationid IN ('.implode(', ', array_map(Array($GLOBALS['db'], 'quote'), $congregationids)).') ';
+			$SQL .= '
+				 AND person.congregationid IN ('.implode(', ', array_map([$GLOBALS['db'], 'quote'], $congregationids)).') ';
 		}
 		if (!empty($params['(age_bracketid'])) {
 			$SQL .= '
-				AND person.age_bracketid IN ('.implode(',', array_map(Array($GLOBALS['db'], 'quote'), $params['(age_bracketid'])).')';
+				AND person.age_bracketid IN ('.implode(',', array_map([$GLOBALS['db'], 'quote'], $params['(age_bracketid'])).')';
 		}
-		$statuses = array_get($params, '(status', Array());
+		$statuses = array_get($params, '(status', []);
 		if (isset($params['status'])) {
 			$statuses[] = $params['status'];
 		}
-		$statusClauses = Array();
+		$statusClauses = [];
 		foreach ($statuses as $status) {
 			if (strlen($status)) {
-				list($statusType, $statusID) = explode('-', $status);
+				[$statusType, $statusID] = explode('-', $status);
 				if (($statusType == 'g') && empty($groupid)) {
-					trigger_error("Cannot filter by group membership status for congregational attendance");
-					return Array(Array(), Array(), Array());
+					trigger_error('Cannot filter by group membership status for congregational attendance');
+
+					return [[], [], []];
 				}
 				switch ($statusType) {
 					case 'g':
@@ -755,42 +795,58 @@ class Attendance_Record_Set
 				}
 			}
 		}
-		if ($statusClauses) $SQL .= 'AND (('.implode(') OR (', $statusClauses).'))';
+		if ($statusClauses) {
+			$SQL .= 'AND (('.implode(') OR (', $statusClauses).'))';
+		}
 
 		$status_table = $congregationids ? 'ps' : 'pgms';
 		$orderSQL = self::getOrderSQL($order, $status_table);
 		$SQL .= '
 				ORDER BY '.$orderSQL;
-		$dates = Array();
-		$attendances = Array();
-		$totals = Array();
+		$dates = [];
+		$attendances = [];
+		$totals = [];
 		$res = $GLOBALS['db']->query($SQL);
 		while ($row = $res->fetch()) {
-			if (!empty($row['date'])) $dates[$row['date']] = 1;
-			foreach (Array('last_name', 'first_name', 'membership_status', 'status') as $f) {
-				if (array_key_exists($f, $row)) $attendances[$row['id']][$f] = $row[$f];
+			if (!empty($row['date'])) {
+				$dates[$row['date']] = 1;
 			}
-			$attendances[$row['id']][$row['date']] = "".$row['present'];
-			if ($row['planned_absence']) $attendances[$row['id']][$row['date']] .= '*';
+			foreach (['last_name', 'first_name', 'membership_status', 'status'] as $f) {
+				if (array_key_exists($f, $row)) {
+					$attendances[$row['id']][$f] = $row[$f];
+				}
+			}
+			$attendances[$row['id']][$row['date']] = ''.$row['present'];
+			if ($row['planned_absence']) {
+				$attendances[$row['id']][$row['date']] .= '*';
+			}
 			if (!isset($totals[$row['date']]) || !isset($totals[$row['date']][$row['present']])) {
 				$totals[$row['date']][$row['present']] = 0;
 			}
-			$totals[$row['date']][$row['present']]++;
+			++$totals[$row['date']][$row['present']];
 		}
 		$dates = array_keys($dates);
 		sort($dates);
-		return Array($dates, $attendances, $totals);
+
+		return [$dates, $attendances, $totals];
 	}
 
 	static public function printCohortChooserRow($selectedValue)
 	{
-		static $groups = NULL;
-		static $congregations = NULL;
-		if ($groups === NULL) {
-			$congregations = $GLOBALS['system']->getDBObjectData('congregation', Array('!attendance_recording_days' => 0), 'OR', 'meeting_time');
-			$groups = $GLOBALS['system']->getDBObjectData('person_group', Array('!attendance_recording_days' => 0, 'is_archived' => 0), 'AND', 'category, name');
+		static $groups = null;
+		static $congregations = null;
+		if ($groups === null) {
+			$congregations = $GLOBALS['system']->getDBObjectData('congregation', ['!attendance_recording_days' => 0], 'OR', 'meeting_time');
+			$groups = $GLOBALS['system']->getDBObjectData('person_group', ['!attendance_recording_days' => 0, 'is_archived' => 0], 'AND', 'category, name');
 			// need to preserve category too
-			uasort($groups, function($x,$y) {$r = strnatcmp($x["category"] ?? '', $y["category"] ?? ''); if ($r == 0) $r = strnatcmp($x["name"], $y["name"]); return $r;}); // to ensure natural sorting
+			uasort($groups, function ($x, $y) {
+				$r = strnatcmp($x['category'] ?? '', $y['category'] ?? '');
+				if ($r == 0) {
+					$r = strnatcmp($x['name'], $y['name']);
+				}
+
+return $r;
+			}); // to ensure natural sorting
 		}
 		$lastCategory = -1;
 		?>
@@ -806,23 +862,23 @@ class Attendance_Record_Set
 						<option value="c-<?php echo $congid; ?>" <?php echo $s; ?>><?php echo ents($cong['name']); ?></option>
 						<?php
 					}
-					?>
+		?>
 					</optgroup>
 					<optgroup label="Groups">
 					<?php
-					foreach ($groups as $groupid => $group) {
-						if ($lastCategory != $group['category']) {
-							?>
-							<option disabled="disabled">-- <?php echo ents($group['category'] ? $group['category'] : 'Uncategorised'); ?>--</option>
+		foreach ($groups as $groupid => $group) {
+			if ($lastCategory != $group['category']) {
+				?>
+							<option disabled="disabled">-- <?php echo ents($group['category'] ?: 'Uncategorised'); ?>--</option>
 							<?php
-							$lastCategory = $group['category'];
-						}
-						$s = ($selectedValue == 'g-'.$groupid) ? 'selected="selected"' : '';
-						?>
+				$lastCategory = $group['category'];
+			}
+			$s = ($selectedValue == 'g-'.$groupid) ? 'selected="selected"' : '';
+			?>
 						<option value="g-<?php echo $groupid; ?>" <?php echo $s; ?>><?php echo ents($group['name']); ?></option>
 						<?php
-					}
-					?>
+		}
+		?>
 					</optgroup>
 					</optgroup>
 				</select>
@@ -840,61 +896,60 @@ class Attendance_Record_Set
 					<?php
 					print_widget(
 						'age_brackets_all',
-						Array(
+						[
 							'type' => 'checkbox',
-							'attrs' => Array(
-								'data-toggle' => "visible",
-								'data-target' => "#agebrackets"
-							)
-						),
-						empty($age_brackets)
+							'attrs' => [
+								'data-toggle' => 'visible',
+								'data-target' => '#agebrackets',
+							],
+						],
+						empty($age_brackets),
 					);
-					?>
+		?>
 					All age brackets
 				</label>
 				<div id="agebrackets" style="<?php echo empty($age_brackets) ? 'display: none' : ''; ?>">
 					<?php
-					print_widget('age_brackets', Array(
-							'type'			=> 'reference',
-							'references'    => 'age_bracket',
-							'default'		=> '',
-							'allow_empty'	=> true,
-							'allow_multiple' => true,
-							'height' => count(Age_Bracket::getMap()),
-
-					), $age_brackets);
-					?>
+		print_widget('age_brackets', [
+			'type' => 'reference',
+			'references' => 'age_bracket',
+			'default' => '',
+			'allow_empty' => true,
+			'allow_multiple' => true,
+			'height' => count(Age_Bracket::getMap()),
+		], $age_brackets);
+		?>
 				</div>
 			</div>
 			<div class="span6">
 				<label class="checkbox nowrap">
 					<?php
-					print_widget(
-						'statuses_all',
-						Array(
-							'type' => 'checkbox',
-							'attrs' => Array(
-								'data-toggle' => "visible",
-								'data-target' => "#statuses"
-							)
-						),
-						empty($statuses)
-					);
-					?>
+		print_widget(
+			'statuses_all',
+			[
+				'type' => 'checkbox',
+				'attrs' => [
+					'data-toggle' => 'visible',
+					'data-target' => '#statuses',
+				],
+			],
+			empty($statuses),
+		);
+		?>
 					All statuses
 				</label>
 				<div id="statuses" style="<?php echo empty($statuses) ? 'display: none' : ''; ?>">
 					<?php
-					$statusOptions = self::getStatusOptions();
-					print_widget('statuses', Array(
-							'type'			=> 'select',
-							'options'		=> $statusOptions,
-							'default'		=> '',
-							'allow_empty'	=> true,
-							'allow_multiple' => true,
-							'height' => count($statusOptions),
-					), $statuses);
-					?>
+		$statusOptions = self::getStatusOptions();
+		print_widget('statuses', [
+			'type' => 'select',
+			'options' => $statusOptions,
+			'default' => '',
+			'allow_empty' => true,
+			'allow_multiple' => true,
+			'height' => count($statusOptions),
+		], $statuses);
+		?>
 				</div>
 			</div>
 		</div>
@@ -902,58 +957,57 @@ class Attendance_Record_Set
 	}
 
 	/**
-	 * Get the options for filtering people by (person or group-membership) status
+	 * Get the options for filtering people by (person or group-membership) status.
+	 *
 	 * @return array
 	 */
 	public static function getStatusOptions()
 	{
-		$statusOptions = Array();
+		$statusOptions = [];
 		foreach (Person::getStatusOptions() as $id => $val) {
 			$statusOptions['p-'.$id] = $val;
 		}
-		list($gOptions, $default) = Person_Group::getMembershipStatusOptionsAndDefault();
+		[$gOptions, $default] = Person_Group::getMembershipStatusOptionsAndDefault();
 		foreach ($gOptions as $id => $val) {
 			$statusOptions['g-'.$id] = $val;
 		}
+
 		return $statusOptions;
 	}
 
 	public static function getOrderOptions()
 	{
 		// This set is also in the setting table - ATTENDANCE_ORDER_DEFAULT
-		return Array(
+		return [
 			'status' => 'Status, then family name',
 			'status_last' => 'Status, then last name',
 			'family_name' => 'Family name, then age bracket',
-			'last_name'  => 'Last name',
+			'last_name' => 'Last name',
 			'first_name' => 'First name',
 			'age_bracket' => 'Age bracket',
-		);
+		];
 	}
 
 	public static function getOrderDefault()
 	{
 		return ifdef('ATTENDANCE_ORDER_DEFAULT', 'status');
 	}
-	
-	public static function getOrderSQL($order=NULL, $status_table='ps')
+
+	public static function getOrderSQL($order = null, $status_table = 'ps')
 	{
-		$order_options = Array(
+		$order_options = [
 			'status' => $status_table.'.`rank` ASC, family_name ASC, familyid, ab.`rank` ASC, IF (ab.is_adult, gender, 1) DESC',
 			'status_last' => $status_table.'.`rank` ASC, last_name ASC, familyid, ab.`rank` ASC, IF (ab.is_adult, gender, 1) DESC',
 			'family_name' => 'family_name ASC, familyid, ab.`rank` ASC',
-			'last_name'  => 'last_name ASC, first_name ASC, familyid',
+			'last_name' => 'last_name ASC, first_name ASC, familyid',
 			'first_name' => 'first_name ASC, last_name ASC, familyid',
 			'age_bracket' => 'ab.`rank` ASC, family_name ASC, familyid, first_name',
-		);
+		];
 		if (!isset($order_options[$order])) {
 			trigger_error("Bad order option '$order'");
 			$order = self::getOrderDefault();
 		}
+
 		return $order_options[$order];
 	}
-
-
-
-
-}//end class
+}// end class

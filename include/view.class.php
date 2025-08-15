@@ -1,4 +1,5 @@
 <?php
+
 abstract class View
 {
 	public static function getMenuPermissionLevel()
@@ -8,7 +9,7 @@ abstract class View
 
 	public static function getMenuRequiredFeature()
 	{
-		return NULL;
+		return null;
 	}
 
 	public function processView()
@@ -16,7 +17,8 @@ abstract class View
 	}
 
 	/**
-	 * Get the title that should be shown in the <head><title>
+	 * Get the title that should be shown in the <head><title>.
+	 *
 	 * @return string
 	 */
 	public function getTitle()
@@ -27,6 +29,7 @@ abstract class View
 	/**
 	 * Get the heading that should be shown as an H1 at the top of the page
 	 * Defaults to getTitle().
+	 *
 	 * @return strong
 	 */
 	public function getPageHeading()
@@ -36,14 +39,14 @@ abstract class View
 
 	/**
 	 * Whether the main nav should be shown when this is the current view.
-	 * (Allows some public views to appear as a standalone page)
-	 * @return boolean
+	 * (Allows some public views to appear as a standalone page).
+	 *
+	 * @return bool
 	 */
 	public function shouldShowNavigation()
 	{
-		return TRUE;
+		return true;
 	}
 
 	abstract public function printView();
-
-}//end class
+}// end class

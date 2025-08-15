@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<?php include dirname(dirname(dirname(__FILE__))).'/templates/head.template.php' ?>
+	<?php include dirname(__DIR__, 2).'/templates/head.template.php'; ?>
 </head>
 <body id="login">
-	<form method="post" id="login-box" class="well disable-submit-buttons" action="<?php echo build_url(Array('logout' => NULL)); ?>" target="_top">
+	<form method="post" id="login-box" class="well disable-submit-buttons" action="<?php echo build_url(['logout' => null]); ?>" target="_top">
 		<input type="hidden" name="login_key" value="<?php echo $login_key; ?>" />
-		<?php 
+		<?php
 		require_once 'include/size_detector.class.php';
-		SizeDetector::printFormFields();
-		?>
+	SizeDetector::printFormFields();
+	?>
 		<div id="login-header">
 			<h1><?php echo ents(SYSTEM_NAME); ?></h1>
 		</div>
@@ -18,12 +18,12 @@
 				<div class="alert"><strong>Error: Javascript is Disabled</strong><br />For Jethro to function correctly you must enable javascript, which is done most simply by lowering the security level your browser uses for this website</div>
 			</noscript>
 			<?php
-			if (!empty($this->_error)) {
-				echo '<div class="alert alert-error">'.$this->_error.'</div>';
-			} else {
-				echo ' <h3>Member Login</h3>';
-			}
-			?>
+		if (!empty($this->_error)) {
+			echo '<div class="alert alert-error">'.$this->_error.'</div>';
+		} else {
+			echo ' <h3>Member Login</h3>';
+		}
+	?>
 			<label class="">
 				<p>What is your email address? </p>
 				<input type="email" name="email" autofocus="autofocus" class="compulsory" value="<?php echo ents(array_get($_REQUEST, 'email', '')); ?>" placeholder="Email" />
@@ -53,7 +53,7 @@
 		if (defined('MEMBER_LOGIN_NOTE') && MEMBER_LOGIN_NOTE) {
 			echo '<p>'.MEMBER_LOGIN_NOTE.'</p>';
 		}
-		?>
+	?>
 		</div>
 	</form>
 </body>

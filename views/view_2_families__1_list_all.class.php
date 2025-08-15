@@ -8,27 +8,26 @@ class View_Families__List_All extends View
 	function processView()
 	{
 		if (!empty($_REQUEST['search'])) {
-			
-			$search_params = Array('family_name' => $_REQUEST['search']);
+			$search_params = ['family_name' => $_REQUEST['search']];
 			if (!empty($search_params)) {
-				$this->_family_data = ($GLOBALS['system']->getDBObjectData('family', $search_params, 'AND', 'family_name'));
+				$this->_family_data = $GLOBALS['system']->getDBObjectData('family', $search_params, 'AND', 'family_name');
 			}
 			if (empty($this->_family_data)) {
-				$search_params['family_name'] = $search_params['family_name'].'%';
-				$this->_family_data = ($GLOBALS['system']->getDBObjectData('family', $search_params, 'AND', 'family_name'));
+				$search_params['family_name'] .= '%';
+				$this->_family_data = $GLOBALS['system']->getDBObjectData('family', $search_params, 'AND', 'family_name');
 			}
 			if (empty($this->_family_data)) {
 				$search_params['family_name'] = '%'.$search_params['family_name'].'%';
-				$this->_family_data = ($GLOBALS['system']->getDBObjectData('family', $search_params, 'AND', 'family_name'));
+				$this->_family_data = $GLOBALS['system']->getDBObjectData('family', $search_params, 'AND', 'family_name');
 			}
 
 			if (count($this->_family_data) == 1) {
 				add_message('One matching family found');
-				redirect('families', Array('familyid' => key($this->_family_data), 'name' => NULL)); //exits
+				redirect('families', ['familyid' => key($this->_family_data), 'name' => null]); // exits
 			}
 
 			// Put all the archived ones last
-			$archiveds = Array();
+			$archiveds = [];
 			if (!empty($this->_family_data)) {
 				foreach ($this->_family_data as $k => $v) {
 					if ($v['status'] == 'archived') {
@@ -41,7 +40,7 @@ class View_Families__List_All extends View
 				$this->_family_data[$k] = $v;
 			}
 		} else {
-			$params = Array();
+			$params = [];
 			if (empty($_REQUEST['show_archived'])) {
 				$params['!status'] = 'archived';
 			}
@@ -49,18 +48,17 @@ class View_Families__List_All extends View
 				$_SESSION['total_families'] = $GLOBALS['db']->queryOne('SELECT count(familyid) from family f join person p on p.familyid = f.id');
 			}
 			if (!empty($_REQUEST['slice_size'])) {
-				$this->_paginator = new Paginator((float)$_REQUEST['slice_size'], (int)$_REQUEST['slice_num']);
+				$this->_paginator = new Paginator((float) $_REQUEST['slice_size'], (int) $_REQUEST['slice_num']);
 				$params['-SUBSTRING(family.family_name, 1, 1)'] = $this->_paginator->getCurrentSliceStartEnd();
-			} else if ($_SESSION['total_families'] > CHUNK_SIZE) {
+			} elseif ($_SESSION['total_families'] > CHUNK_SIZE) {
 				$num_chunks = ceil($_SESSION['total_families'] / CHUNK_SIZE);
 				$this->_paginator = new Paginator(26 / $num_chunks, 1);
 				$params['-SUBSTRING(family.family_name, 1, 1)'] = $this->_paginator->getCurrentSliceStartEnd();
 			}
-			$this->_family_data = ($GLOBALS['system']->getDBObjectData('family', $params, 'AND', 'family_name'));
+			$this->_family_data = $GLOBALS['system']->getDBObjectData('family', $params, 'AND', 'family_name');
 		}
 	}
 
-	
 	function getTitle()
 	{
 		if (!empty($_REQUEST['search'])) {
@@ -68,10 +66,8 @@ class View_Families__List_All extends View
 		} else {
 			return _('All Families');
 		}
-
 	}
 
-	
 	function printView()
 	{
 		// Search form - show top right if not yet searching
@@ -86,10 +82,10 @@ class View_Families__List_All extends View
 			<?php
 			if (!empty($_REQUEST['search'])) {
 				?>
-				<a class="btn" href="<?php echo build_url(Array('search'=>NULL));?>"><i class="icon-remove"></i></a>
+				<a class="btn" href="<?php echo build_url(['search' => null]); ?>"><i class="icon-remove"></i></a>
 				<?php
 			}
-			?>			
+		?>			
 			</span>
 		</form>
 		<?php
@@ -100,38 +96,38 @@ class View_Families__List_All extends View
 			}
 			// show/hide archived - show on right under search box
 			if (empty($_REQUEST['show_archived'])) {
-				echo '<a class="soft pull-right hidden-phone"href="'.build_url(Array('show_archived' => 1)).'"><i class="icon-eye-open"></i>'._('Include Archived').'</a>';
+				echo '<a class="soft pull-right hidden-phone"href="'.build_url(['show_archived' => 1]).'"><i class="icon-eye-open"></i>'._('Include Archived').'</a>';
 			} else {
-				echo '<a class="soft pull-right hidden-phone" href="'.build_url(Array('show_archived' => NULL)).'"><i class="icon-eye-close"></i>'._('Exclude Archived').'</a>';
+				echo '<a class="soft pull-right hidden-phone" href="'.build_url(['show_archived' => null]).'"><i class="icon-eye-close"></i>'._('Exclude Archived').'</a>';
 			}
 		}
 
 		// count - show on left under pagination
 		$GLOBALS['system']->includeDBClass('family');
-		$families =& $this->_family_data;
+		$families = &$this->_family_data;
 		if (empty($families)) {
 			if ($this->_paginator) {
 				?>
-				<p><strong><?php echo _('No families in this range')?></strong></p>
+				<p><strong><?php echo _('No families in this range'); ?></strong></p>
 				<?php
-			} else if (!empty($_REQUEST['search'])) {
+			} elseif (!empty($_REQUEST['search'])) {
 				?>
-				<p><strong><?php echo _('No matching families were found')?></strong></p>			
+				<p><strong><?php echo _('No matching families were found'); ?></strong></p>			
 				<?php
 			} else {
 				?>
-				<p><strong><?php echo _('No families were found')?></strong></p>
-				<a href="<?php echo build_url(Array('show_archived' => 1)); ?>"><?php echo _('Include Archived families')?></a>
+				<p><strong><?php echo _('No families were found'); ?></strong></p>
+				<a href="<?php echo build_url(['show_archived' => 1]); ?>"><?php echo _('Include Archived families'); ?></a>
 				<?php
 			}
 		} else {
 			if ($this->_paginator) {
 				echo '<p class="nowrap"><strong>'.count($families).' '._('families in this range').'</strong></p>';
-			} else if (!empty($_REQUEST['search'])) {
+			} elseif (!empty($_REQUEST['search'])) {
 				?>
-				<p><strong><?php echo count($families).' '._('matching families found').':';?></strong></p>			
+				<p><strong><?php echo count($families).' '._('matching families found').':'; ?></strong></p>			
 				<?php
-			} else  {
+			} else {
 				echo '<p class="strong"><strong>'.count($families).' '._('families in total').'</strong></p>';
 			}
 		}
@@ -139,7 +135,7 @@ class View_Families__List_All extends View
 		</div>
 		<?php
 		if ($families) {
-			include dirname(dirname(__FILE__)).'/templates/family_list.template.php';
+			include dirname(__DIR__).'/templates/family_list.template.php';
 		}
 	}
 }

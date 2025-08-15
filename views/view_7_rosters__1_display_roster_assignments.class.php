@@ -3,8 +3,8 @@ class View_Rosters__Display_Roster_Assignments extends View
 {
 	var $_start_date = '';
 	var $_end_date = '';
-	var $_view = null;
-	var $_editing = FALSE;
+	var $_view;
+	var $_editing = false;
 
 	static function getMenuPermissionLevel()
 	{
@@ -14,37 +14,37 @@ class View_Rosters__Display_Roster_Assignments extends View
 	function processView()
 	{
 		if (!empty($_REQUEST['editing']) && $_REQUEST['view'] == 'rosters__display_roster_assignments') {
-			redirect('rosters__edit_roster_assignments', Array('editing' => NULL));
+			redirect('rosters__edit_roster_assignments', ['editing' => null]);
 		}
-		$this->_start_date = process_widget('start_date', Array('type' => 'date'));
-		if (is_null($this->_start_date)) {
+		$this->_start_date = process_widget('start_date', ['type' => 'date']);
+		if (null === $this->_start_date) {
 			if (!empty($_SESSION['roster_start_date'])) {
 				$this->_start_date = $_SESSION['roster_start_date'];
 			} else {
 				$this->_start_date = date('Y-m-d');
 			}
 		}
-		$this->_end_date = process_widget('end_date', Array('type' => 'date'));
-		if (is_null($this->_end_date)) {
+		$this->_end_date = process_widget('end_date', ['type' => 'date']);
+		if (null === $this->_end_date) {
 			if (!empty($_SESSION['roster_end_date'])) {
 				$this->_end_date = $_SESSION['roster_end_date'];
 			} else {
 				$this->_end_date = date('Y-m-d', strtotime('+'.ROSTER_WEEKS_DEFAULT.' weeks'));
 			}
-
 		}
 		if (!empty($_REQUEST['viewid'])) {
-			$this->_view = $GLOBALS['system']->getDBObject('roster_view', (int)$_REQUEST['viewid']);
-		} else if (!empty($_SESSION['roster_view_id'])) {
-			$this->_view = $GLOBALS['system']->getDBObject('roster_view', (int)$_SESSION['roster_view_id']);
+			$this->_view = $GLOBALS['system']->getDBObject('roster_view', (int) $_REQUEST['viewid']);
+		} elseif (!empty($_SESSION['roster_view_id'])) {
+			$this->_view = $GLOBALS['system']->getDBObject('roster_view', (int) $_SESSION['roster_view_id']);
 		}
 		if (empty($_REQUEST['goback'])) {
 			$_SESSION['roster_start_date'] = $this->_start_date;
 			$_SESSION['roster_end_date'] = $this->_end_date;
-			if ($this->_view) $_SESSION['roster_view_id'] = $this->_view->id;
+			if ($this->_view) {
+				$_SESSION['roster_view_id'] = $this->_view->id;
+			}
 		}
 	}
-
 
 	function printView()
 	{
@@ -62,13 +62,14 @@ class View_Rosters__Display_Roster_Assignments extends View
 
 	function _printParams()
 	{
-			$views = $GLOBALS['system']->getDBObjectData('roster_view', array());
-			if (empty($views)) {
-				print_message("You need to set up some roster views before you can display or edit roster assignments", 'failure');
-				return;
-			}
-			$viewid = ($this->_view) ? $this->_view->id : null;
-			?>
+		$views = $GLOBALS['system']->getDBObjectData('roster_view', []);
+		if (empty($views)) {
+			print_message('You need to set up some roster views before you can display or edit roster assignments', 'failure');
+
+			return;
+		}
+		$viewid = ($this->_view) ? $this->_view->id : null;
+		?>
 			<form method="get" class="form-horizontal well well-small no-print">
 			<input type="hidden" name="view" value="<?php echo ents($_REQUEST['view']); ?>" />
 			<table>
@@ -76,20 +77,20 @@ class View_Rosters__Display_Roster_Assignments extends View
 					<th class="valign-middle">Roster view</th>
 					<td>
 						<?php
-						print_widget('viewid', Array('type' => 'reference', 'references' => 'roster_view', 'order_by' => 'name'), $viewid);
-						?>
+					print_widget('viewid', ['type' => 'reference', 'references' => 'roster_view', 'order_by' => 'name'], $viewid);
+		?>
 					</td>
 					<td></td>
 				</tr>
 				<tr>
 					<th class="valign-middle right">between</th>
-					<td><?php print_widget('start_date', Array('type' => 'date'), $this->_start_date); ?></td>
+					<td><?php print_widget('start_date', ['type' => 'date'], $this->_start_date); ?></td>
 					<td></td>
 				</tr>
 				<tr>
 					<th class="valign-middle right">and</th>
 					<td>
-						<?php print_widget('end_date', Array('type' => 'date'), $this->_end_date); ?> &nbsp;
+						<?php print_widget('end_date', ['type' => 'date'], $this->_end_date); ?> &nbsp;
 						<button type="submit" name="viewing" value="1" class="btn">View Assignments</button>
 					<?php
 					if ($GLOBALS['user_system']->havePerm(PERM_EDITROSTER)) {
@@ -97,7 +98,7 @@ class View_Rosters__Display_Roster_Assignments extends View
 						<button type="submit" name="editing" value="1" class="btn">Edit Assignments</button>
 						<?php
 					}
-					?>
+		?>
 					</td>
 				</tr>
 			</table>
@@ -111,15 +112,16 @@ class View_Rosters__Display_Roster_Assignments extends View
 
 					if (SMS_Sender::canSend()) {
 						$assignees = $this->_view->getAssignees($this->_start_date, $this->_end_date);
-						echo '<a  class="nowrap" href="#send-sms-modal" data-personid="'.implode(',', array_keys($assignees)).'" data-toggle="sms-modal" data-name="'.count($assignees).' assignees in '.ents($this->_view->getValue('name')).'"><i class="icon-envelope"></i>SMS all assignees</a> &nbsp; ' ;
-
+						echo '<a  class="nowrap" href="#send-sms-modal" data-personid="'.implode(',', array_keys($assignees)).'" data-toggle="sms-modal" data-name="'.count($assignees).' assignees in '.ents($this->_view->getValue('name')).'"><i class="icon-envelope"></i>SMS all assignees</a> &nbsp; ';
 					}
 					if ($this->_view->getValue('visibility') != '') {
 						echo '<a target="_rosterview"  class="nowrap" href="'.BASE_PATH.'/members/?view=rosters&roster_view='.$this->_view->id.'"><i class="icon-share"></i>View in members area</a> &nbsp; ';
 					}
 					if ($this->_view->getValue('visibility') == 'public') {
 						$url = BASE_PATH.'/public/?view=display_roster&roster_view='.$this->_view->id;
-						if (PUBLIC_ROSTER_SECRET) $url .= '&secret='.PUBLIC_ROSTER_SECRET;
+						if (PUBLIC_ROSTER_SECRET) {
+							$url .= '&secret='.PUBLIC_ROSTER_SECRET;
+						}
 						echo '<a  class="nowrap" target="_rosterview" href="'.$url.'"><i class="icon-share"></i>View in public site</a> &nbsp; ';
 					}
 
@@ -137,7 +139,6 @@ class View_Rosters__Display_Roster_Assignments extends View
 					}
 					echo '</div>';
 
-
 					if (!SizeDetector::isNarrow()) {
 						?>
 						<div id="merge-modal" class="modal sms-modal hide fade" role="dialog" aria-hidden="true">
@@ -148,11 +149,11 @@ class View_Rosters__Display_Roster_Assignments extends View
 							<div class="modal-body">
 								<?php
 								echo _('Source Document').':';
-								print_hidden_field('roster_view', $viewid);
-								print_hidden_field('roster_view_name', $this->_view->getValue('name'));
-								print_hidden_field('start_date', $this->_start_date);
-								print_hidden_field('end_date', $this->_end_date);
-								?>
+						print_hidden_field('roster_view', $viewid);
+						print_hidden_field('roster_view_name', $this->_view->getValue('name'));
+						print_hidden_field('start_date', $this->_start_date);
+						print_hidden_field('end_date', $this->_end_date);
+						?>
 								<input class="compulsory" type="file" name="source_document" />
 								<span class="smallprint"><a target="roster-merge-help" class="med-newwin" href="<?php echo BASE_PATH; ?>/?call=document_merge_help"><i class="icon-print"></i>Help and examples</a><br></span>
 							</div>
@@ -163,9 +164,9 @@ class View_Rosters__Display_Roster_Assignments extends View
 							</form>
 						</div>
 					<?php
+					}
 				}
 			}
-		}
 	}
 
 	function getTitle()
@@ -175,7 +176,5 @@ class View_Rosters__Display_Roster_Assignments extends View
 		} else {
 			return 'Display Roster Assignments';
 		}
-
 	}
-
 }

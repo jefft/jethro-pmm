@@ -2,29 +2,29 @@
 include_once 'include/db_object.class.php';
 class Person_Query extends DB_Object
 {
-	private $_field_details = Array();
-	private $_query_fields = Array('p.status', 'p.congregationid', 'p.age_bracketid', 'p.gender', 'f.address_suburb', 'f.address_state', 'f.address_postcode', 'p.creator', 'p.created', 'p.status_last_changed');
-	private $_show_fields = Array(
-		'p.first_name', 'p.last_name', 'f.family_name', 'p.age_bracketid', 'p.gender', 'p.status', 'p.congregationid', NULL,
+	private $_field_details = [];
+	private $_query_fields = ['p.status', 'p.congregationid', 'p.age_bracketid', 'p.gender', 'f.address_suburb', 'f.address_state', 'f.address_postcode', 'p.creator', 'p.created', 'p.status_last_changed'];
+	private $_show_fields = [
+		'p.first_name', 'p.last_name', 'f.family_name', 'p.age_bracketid', 'p.gender', 'p.status', 'p.congregationid', null,
 		'p.email', 'p.mobile_tel', 'p.work_tel', 'f.home_tel', 'p.remarks',
-		'f.address_street', 'f.address_suburb', 'f.address_state', 'f.address_postcode', NULL,
-		'p.id', 'f.id', 'p.creator', 'p.created', 'f.created', 'p.status_last_changed', );
-	private $_dummy_family = NULL;
-	private $_dummy_person = NULL;
-	private $_dummy_custom_field = NULL;
-	private $_group_chooser_options_cache = NULL;
+		'f.address_street', 'f.address_suburb', 'f.address_state', 'f.address_postcode', null,
+		'p.id', 'f.id', 'p.creator', 'p.created', 'f.created', 'p.status_last_changed', ];
+	private $_dummy_family;
+	private $_dummy_person;
+	private $_dummy_custom_field;
+	private $_group_chooser_options_cache;
 
-	private $_custom_fields = Array();
+	private $_custom_fields = [];
 
 	const CUSTOMFIELDVAL_SEP = '__next__';
 	const CUSTOMFIELD_PREFIX = 'CUSTOMFIELD---';
 
-	function __construct($id=0)
+	function __construct($id = 0)
 	{
 		if (empty($GLOBALS['JETHRO_INSTALLING']) && !empty($GLOBALS['system'])) {
 			$GLOBALS['system']->includeDBClass('person');
 			$GLOBALS['system']->includeDBClass('family');
- 			$this->_dummy_person = new Person();
+			$this->_dummy_person = new Person();
 			foreach ($this->_dummy_person->fields as $i => $v) {
 				unset($this->_dummy_person->fields[$i]['readonly']);
 			}
@@ -36,8 +36,12 @@ class Person_Query extends DB_Object
 				if ($v['type'] == 'serialise') {
 					continue;
 				}
-				if ($i == 'familyid') continue;
-				if (empty($v['label'])) $v['label'] = $this->_dummy_person->getFieldLabel($i);
+				if ($i == 'familyid') {
+					continue;
+				}
+				if (empty($v['label'])) {
+					$v['label'] = $this->_dummy_person->getFieldLabel($i);
+				}
 				$this->_field_details['p.'.$i] = $v;
 				$this->_field_details['p.'.$i]['allow_empty'] = true;
 			}
@@ -45,23 +49,26 @@ class Person_Query extends DB_Object
 				if ($v['type'] == 'serialise') {
 					continue;
 				}
-				if (empty($v['label'])) $v['label'] = $this->_dummy_family->getFieldLabel($i);
-				if (in_array($i, Array('status', 'created', 'creator'))) {
+				if (empty($v['label'])) {
+					$v['label'] = $this->_dummy_family->getFieldLabel($i);
+				}
+				if (in_array($i, ['status', 'created', 'creator'], true)) {
 					$v['label'] = "Family's ".$v['label'];
 				}
 				$this->_field_details['f.'.$i] = $v;
 				$this->_field_details['f.'.$i]['allow_empty'] = true;
 			}
-			$this->_field_details['p.id'] = Array('label' => 'Person ID');
-			$this->_field_details['f.id'] = Array('label' => 'Family ID');
+			$this->_field_details['p.id'] = ['label' => 'Person ID'];
+			$this->_field_details['f.id'] = ['label' => 'Family ID'];
 
-			$this->_custom_fields = $GLOBALS['system']->getDBObjectData('custom_field', Array(), 'OR', 'rank');
+			$this->_custom_fields = $GLOBALS['system']->getDBObjectData('custom_field', [], 'OR', 'rank');
 			$this->_dummy_custom_field = new Custom_Field();
 		}
+
 		return parent::__construct($id);
 	}
 
-	function getInitSQL($table_name=NULL)
+	function getInitSQL($table_name = null)
 	{
 		return "
 			CREATE TABLE `person_query` (
@@ -80,68 +87,67 @@ class Person_Query extends DB_Object
 
 	protected static function _getFields()
 	{
-		$default_params = Array(
-							'rules'			=> Array('p.status' => Array()),
-							'show_fields'	=> Array('p.first_name', 'p.last_name', '', '', 'view_link', 'checkbox'),
-							'group_by'		=> '',
-							'sort_by'		=> 'p.last_name',
-							'include_groups'	=> Array(),
-							'exclude_groups'	=> Array(),
-						  );
+		$default_params = [
+			'rules' => ['p.status' => []],
+			'show_fields' => ['p.first_name', 'p.last_name', '', '', 'view_link', 'checkbox'],
+			'group_by' => '',
+			'sort_by' => 'p.last_name',
+			'include_groups' => [],
+			'exclude_groups' => [],
+		];
 		if (empty($GLOBALS['JETHRO_INSTALLING'])) {
-			foreach (Person_Status::getActive(FALSE) as $sid => $details) {
+			foreach (Person_Status::getActive(false) as $sid => $details) {
 				$default_params['rules']['p.status'][] = $sid;
 			}
 		}
-		return Array(
-			'name'	=> Array(
-									'type'		=> 'text',
-									'width'		=> 30,
-									'maxlength'	=> 128,
-									'allow_empty'	=> false,
-									'initial_cap'	=> true,
-								   ),
-			'created'			=> Array(
-									'type'			=> 'datetime',
-									'readonly'		=> true,
-									'show_in_summary'	=> false,
-								   ),
-			'creator'			=> Array(
-									'type'			=> 'reference',
-									'editable'		=> false,
-									'references'	=> 'staff_member',
-									'show_in_summary'	=> false,
-								   ),
-			'owner'			=> Array(
-									'type'			=> 'reference',
-									'references'	=> 'staff_member',
-									'show_in_summary'	=> false,
-								   ),
-			'params'			=> Array(
-									'type'			=> 'serialise',
-									'editable'		=> false,
-									'show_in_summary'	=> false,
-									'default'		=> $default_params,
 
-								   ),
-			'mailchimp_list_id' => Array(
-									'type'		=> 'text',
-									'editable' => true,
-									'default' => '',
-									'placeholder' => '('._('Optional').')',
-									'tooltip' => _('If you have a MailChimp list you would like to synchronise with the results of this report, enter the relevant List ID here and wait until the sync script runs.'),
-			),
-			'show_on_homepage' => Array(
-									'type' => 'select',
-									'editable'=> true,
-									'default' => NULL,
-									'options' => Array(
-													'' => 'No',
-													'auth' => 'Show for users with access to this report',
-													'all' => 'Show for all users'),
-
-			),
-		);
+		return [
+			'name' => [
+				'type' => 'text',
+				'width' => 30,
+				'maxlength' => 128,
+				'allow_empty' => false,
+				'initial_cap' => true,
+			],
+			'created' => [
+				'type' => 'datetime',
+				'readonly' => true,
+				'show_in_summary' => false,
+			],
+			'creator' => [
+				'type' => 'reference',
+				'editable' => false,
+				'references' => 'staff_member',
+				'show_in_summary' => false,
+			],
+			'owner' => [
+				'type' => 'reference',
+				'references' => 'staff_member',
+				'show_in_summary' => false,
+			],
+			'params' => [
+				'type' => 'serialise',
+				'editable' => false,
+				'show_in_summary' => false,
+				'default' => $default_params,
+			],
+			'mailchimp_list_id' => [
+				'type' => 'text',
+				'editable' => true,
+				'default' => '',
+				'placeholder' => '('._('Optional').')',
+				'tooltip' => _('If you have a MailChimp list you would like to synchronise with the results of this report, enter the relevant List ID here and wait until the sync script runs.'),
+			],
+			'show_on_homepage' => [
+				'type' => 'select',
+				'editable' => true,
+				'default' => null,
+				'options' => [
+					'' => 'No',
+					'auth' => 'Show for users with access to this report',
+					'all' => 'Show for all users'],
+			],
+		];
 	}
 
 	function toString()
@@ -149,12 +155,11 @@ class Person_Query extends DB_Object
 		return $this->values['name'];
 	}
 
-
-	function printForm($prefix='', $fields=NULL)
+	function printForm($prefix = '', $fields = null)
 	{
 		$GLOBALS['system']->includeDBClass('person_group');
 		$params = $this->_convertParams($this->getValue('params'));
-		if (!$GLOBALS['user_system']->havePerm(PERM_MANAGEREPORTS) && ($this->getValue('owner') == NULL)) {
+		if (!$GLOBALS['user_system']->havePerm(PERM_MANAGEREPORTS) && ($this->getValue('owner') == null)) {
 			// we are editing a shared report, but don't have permission to save a shared report
 			// so we treat this as if it's a new private report
 			$this->id = 0;
@@ -168,13 +173,15 @@ class Person_Query extends DB_Object
 		foreach ($this->_query_fields as $i) {
 			$v = $this->_field_details[$i];
 			unset($v['filter']); // remove the holds_persons restriction for congregations; there might be inactive congregations we want to analyse.
-			if (in_array($v['type'], Array('select', 'reference', 'datetime', 'text'))
-				&& !in_array($i, Array('p.first_name', 'p.last_name', 'f.family_name', 'p.remarks', 'p.email'))) {
+			if (in_array($v['type'], ['select', 'reference', 'datetime', 'text'], true)
+				&& !in_array($i, ['p.first_name', 'p.last_name', 'f.family_name', 'p.remarks', 'p.email'], true)) {
 				?>
 				<tr>
 					<td>
 						<label class="checkbox">
-							<input autofocus="1" type="checkbox" name="enable_rule[]" value="<?php echo $i; ?>" id="enable_rule_<?php echo $i; ?>" class="select-rule-toggle" <?php if (isset($params['rules'][$i])) echo 'checked="checked" '; ?>/>
+							<input autofocus="1" type="checkbox" name="enable_rule[]" value="<?php echo $i; ?>" id="enable_rule_<?php echo $i; ?>" class="select-rule-toggle" <?php if (isset($params['rules'][$i])) {
+								echo 'checked="checked" ';
+							} ?>/>
 							<strong><?php echo $v['label']; ?></strong>
 							<?php
 							if ($v['type'] == 'datetime') {
@@ -182,23 +189,25 @@ class Person_Query extends DB_Object
 							} else {
 								echo 'is...';
 							}
-							?>
+				?>
 						</label>
 					</td>
 					<td>
-						<div class="select-rule-options" <?php if (!isset($params['rules'][$i])) echo 'style="display: none" '; ?>>
+						<div class="select-rule-options" <?php if (!isset($params['rules'][$i])) {
+							echo 'style="display: none" ';
+						} ?>>
 							<?php
 							$key = str_replace('.', '_', $i);
-							if ($v['type'] == 'datetime') {
-								$value = array_get($params['rules'], $i, Array('from' => '2000-01-01', 'to' => date('Y-m-d')));
-								print_widget('params_'.$key.'_from', Array('type' => 'date'), $value['from']);
-								echo ' and ';
-								print_widget('params_'.$i.'_to', Array('type' => 'date'), $value['to']);
-							} else {
-								$v['allow_multiple'] = TRUE;
-								print_widget('params_'.$key, $v, array_get($params['rules'], $i, $v['type'] == 'select' ? Array() : ''));
-							}
-							?>
+				if ($v['type'] == 'datetime') {
+					$value = array_get($params['rules'], $i, ['from' => '2000-01-01', 'to' => date('Y-m-d')]);
+					print_widget('params_'.$key.'_from', ['type' => 'date'], $value['from']);
+					echo ' and ';
+					print_widget('params_'.$i.'_to', ['type' => 'date'], $value['to']);
+				} else {
+					$v['allow_multiple'] = true;
+					print_widget('params_'.$key, $v, array_get($params['rules'], $i, $v['type'] == 'select' ? [] : ''));
+				}
+				?>
 						</div>
 					</td>
 				</tr>
@@ -214,18 +223,20 @@ class Person_Query extends DB_Object
 
 			<h4>who have
 				<?php
-				$dlParams = Array(
+				$dlParams = [
 					'type' => 'select',
-					'options' => Array('OR' => 'any', 'AND' => 'all'),
-				);
-				print_widget('params_custom_field_logic', $dlParams, array_get($params, 'custom_field_logic', 'AND'));
-				?>
+					'options' => ['OR' => 'any', 'AND' => 'all'],
+				];
+			print_widget('params_custom_field_logic', $dlParams, array_get($params, 'custom_field_logic', 'AND'));
+			?>
 				of the following custom fields...</h4>
 
 			<table class="table table-border table-auto-width indent-left table-condensed">
 
 			<?php
-			if (empty($params['custom_fields'])) $params['custom_fields'] = Array();
+			if (empty($params['custom_fields'])) {
+				$params['custom_fields'] = [];
+			}
 			$dummyField = new Custom_Field();
 			foreach ($this->_custom_fields as $fieldid => $fieldDetails) {
 				$dummyField->populate($fieldid, $fieldDetails);
@@ -239,34 +250,38 @@ class Person_Query extends DB_Object
 									   class="select-rule-toggle"
 									   data-toggle="enable"
 									   data-target="#custom-value-<?php echo $fieldid; ?> *"
-									   <?php if (isset($params['custom_fields'][$fieldid])) echo 'checked="checked" '; ?>
+									   <?php if (isset($params['custom_fields'][$fieldid])) {
+									   	echo 'checked="checked" ';
+									   } ?>
 								/>
 								<strong><?php echo ents($fieldDetails['name']); ?></strong>
 							</label>
 						</td>
 						<td id="custom-value-<?php echo $fieldid; ?>">
-							<div class="select-rule-options" <?php if (!isset($params['custom_fields'][$fieldid])) echo 'style="display: none" '; ?>>
+							<div class="select-rule-options" <?php if (!isset($params['custom_fields'][$fieldid])) {
+								echo 'style="display: none" ';
+							} ?>>
 							<?php
-							$value = array_get($params['custom_fields'], $fieldid, Array());
-							switch ($fieldDetails['type']) {
-								case 'date':
-									$cparams = Array(
-												'type' => 'select',
-												'options' => Array(
-													'any' => 'filled in with any value',
-													'empty' => 'not filled in at all',
-													'exact' => 'with exact value within the period...',
-													'anniversary' => 'with exact value or anniversary within the period...',
-													'not' => 'withOUT a value within the period...',
-												),
-												'attrs' => Array(
-													'data-toggle' => 'visible',
-													'data-target' => 'row .datefield-rule-period',
-													'data-match-attr' => 'data-select-rule-type'
-												),
-											);
-									print_widget('params_custom_field_'.$fieldid.'_criteria', $cparams, array_get($value, 'criteria'));
-									?>
+							$value = array_get($params['custom_fields'], $fieldid, []);
+				switch ($fieldDetails['type']) {
+					case 'date':
+						$cparams = [
+							'type' => 'select',
+							'options' => [
+								'any' => 'filled in with any value',
+								'empty' => 'not filled in at all',
+								'exact' => 'with exact value within the period...',
+								'anniversary' => 'with exact value or anniversary within the period...',
+								'not' => 'withOUT a value within the period...',
+							],
+							'attrs' => [
+								'data-toggle' => 'visible',
+								'data-target' => 'row .datefield-rule-period',
+								'data-match-attr' => 'data-select-rule-type',
+							],
+						];
+						print_widget('params_custom_field_'.$fieldid.'_criteria', $cparams, array_get($value, 'criteria'));
+						?>
 									<div class="datefield-rule-period" data-select-rule-type="exact anniversary not">
 										<table class="table-no-borders">
 											<tr>
@@ -281,69 +296,69 @@ class Person_Query extends DB_Object
 									</div>
 
 									<?php
-									break;
-								case 'select':
-									$cparams = Array(
-												'type' => 'select',
-												'options' => Array(
-													'any' => 'filled in with any value',
-													'empty' => 'not filled in',
-													'contains' => 'with value that contains',
-												),
-												'attrs' => Array(
-													'data-toggle' => 'visible',
-													'data-target' => 'row .multi-select',
-													'data-match-attr' => 'data-select-rule-type'
-												),
-											);
-									print_widget('params_custom_field_'.$fieldid.'_criteria', $cparams, array_get($value, 'criteria'));
-									$vparams = Array(
-										'type' => 'select',
-										'options' => $dummyField->getOptions(),
-										'allow_multiple' => true,
-										'attrs' => Array(
-											'data-select-rule-type' => 'contains'
-										)
-									);
-									if (!empty($fieldDetails['params']['allow_other'])) {
-										$vparams['options'][0] = '[Other]';
-									}
-									print_widget(
-										'params_custom_field_'.$fieldid.'_val',
-										$vparams,
-										array_get($value, 'val')
-									);
-									break;
-								case 'text':
-								case 'link':
-									$cparams = Array(
-												'type' => 'select',
-												'options' => Array(
-													'any' => 'filled in with any value',
-													'empty' => 'not filled in',
-													'equal' => 'with value equal to',
-												),
-												'attrs' => Array(
-													'data-toggle' => 'visible',
-													'data-target' => 'row input[data-select-rule-type]',
-													'data-match-attr' => 'data-select-rule-type'
-												),
-											);
-									print_widget('params_custom_field_'.$fieldid.'_criteria', $cparams, array_get($value, 'criteria'));
-									$vparams = Array(
-										'type' => 'text',
-										'attrs' => Array(
-											'data-select-rule-type' => 'equal'
-										)
-									);
-									print_widget(
-										'params_custom_field_'.$fieldid.'_val',
-										$vparams,
-										array_get(array_get($params['custom_fields'], $fieldid, Array()), 'val')
-									);
-									break;
-							}
-							?>
+						break;
+					case 'select':
+						$cparams = [
+							'type' => 'select',
+							'options' => [
+								'any' => 'filled in with any value',
+								'empty' => 'not filled in',
+								'contains' => 'with value that contains',
+							],
+							'attrs' => [
+								'data-toggle' => 'visible',
+								'data-target' => 'row .multi-select',
+								'data-match-attr' => 'data-select-rule-type',
+							],
+						];
+						print_widget('params_custom_field_'.$fieldid.'_criteria', $cparams, array_get($value, 'criteria'));
+						$vparams = [
+							'type' => 'select',
+							'options' => $dummyField->getOptions(),
+							'allow_multiple' => true,
+							'attrs' => [
+								'data-select-rule-type' => 'contains',
+							],
+						];
+						if (!empty($fieldDetails['params']['allow_other'])) {
+							$vparams['options'][0] = '[Other]';
+						}
+						print_widget(
+							'params_custom_field_'.$fieldid.'_val',
+							$vparams,
+							array_get($value, 'val'),
+						);
+						break;
+					case 'text':
+					case 'link':
+						$cparams = [
+							'type' => 'select',
+							'options' => [
+								'any' => 'filled in with any value',
+								'empty' => 'not filled in',
+								'equal' => 'with value equal to',
+							],
+							'attrs' => [
+								'data-toggle' => 'visible',
+								'data-target' => 'row input[data-select-rule-type]',
+								'data-match-attr' => 'data-select-rule-type',
+							],
+						];
+						print_widget('params_custom_field_'.$fieldid.'_criteria', $cparams, array_get($value, 'criteria'));
+						$vparams = [
+							'type' => 'text',
+							'attrs' => [
+								'data-select-rule-type' => 'equal',
+							],
+						];
+						print_widget(
+							'params_custom_field_'.$fieldid.'_val',
+							$vparams,
+							array_get(array_get($params['custom_fields'], $fieldid, []), 'val'),
+						);
+						break;
+				}
+				?>
 							</div>
 						</td>
 					</tr>
@@ -362,20 +377,24 @@ class Person_Query extends DB_Object
 
 
 			<?php
-			$gotGroups = Person_Group::printMultiChooser('include_groupids', array_get($params, 'include_groups', Array()), Array(), TRUE);
+			$gotGroups = Person_Group::printMultiChooser('include_groupids', array_get($params, 'include_groups', []), [], true);
 
-			if ($gotGroups) {
-				?>
+		if ($gotGroups) {
+			?>
 				<div class="indent-left">
 					<label class="checkbox" style="margin-top: 1ex">
 						<input type="checkbox" name="enable_group_membership_status" value="1"
 							   data-toggle="visible" data-target="#group-membership-status"
-								<?php if (!empty($params['group_membership_status'])) echo 'checked="checked"'; ?>
+								<?php if (!empty($params['group_membership_status'])) {
+									echo 'checked="checked"';
+								} ?>
 						/>
 						with membership status of...
 					</label>
 					<span id="group-membership-status"
-							<?php if (empty($params['group_membership_status'])) echo 'style="display:none"'; ?>
+							<?php if (empty($params['group_membership_status'])) {
+								echo 'style="display:none"';
+							} ?>
 					>
 						<?php Person_Group::printMembershipStatusChooser('group_membership_status', array_get($params, 'group_membership_status'), true); ?>
 					</span>
@@ -383,20 +402,24 @@ class Person_Query extends DB_Object
 					<label class="checkbox" style="margin-top: 1ex">
 						<input type="checkbox" name="enable_group_join_date" value="1"
 							   data-toggle="visible" data-target="#group-join-dates"
-								<?php if (!empty($params['group_join_date_from'])) echo 'checked="checked"'; ?>
+								<?php if (!empty($params['group_join_date_from'])) {
+									echo 'checked="checked"';
+								} ?>
 						/>
 						and joined the group between...
 					</label>
 					<span id="group-join-dates"
-								<?php if (empty($params['group_join_date_from'])) echo 'style="display:none"'; ?>
+								<?php if (empty($params['group_join_date_from'])) {
+									echo 'style="display:none"';
+								} ?>
 						  >
-					<?php print_widget('group_join_date_from', Array('type' => 'date'), array_get($params, 'group_join_date_from')); ?>
-					and <?php print_widget('group_join_date_to', Array('type' => 'date'), array_get($params, 'group_join_date_to')); ?>
+					<?php print_widget('group_join_date_from', ['type' => 'date'], array_get($params, 'group_join_date_from')); ?>
+					and <?php print_widget('group_join_date_to', ['type' => 'date'], array_get($params, 'group_join_date_to')); ?>
 					</span>
 				</div>
 				<?php
-			}
-			?>
+		}
+		?>
 		</div>
 
 	<?php
@@ -408,18 +431,22 @@ class Person_Query extends DB_Object
 		</h4>
 		<div class="indent-left">
 			<?php
-			Person_Group::printMultiChooser('exclude_groupids', array_get($params, 'exclude_groups', Array()), Array(), TRUE);
-			?>
+			Person_Group::printMultiChooser('exclude_groupids', array_get($params, 'exclude_groups', []), [], true);
+		?>
 			<div class="indent-left">
 				<label class="checkbox" style="margin-top: 1ex">
 					<input type="checkbox" name="enable_exclude_group_membership_status" value="1"
 						   data-toggle="visible" data-target="#exclude-group-membership-status"
-							<?php if (!empty($params['exclude_group_membership_status'])) echo 'checked="checked"'; ?>
+							<?php if (!empty($params['exclude_group_membership_status'])) {
+								echo 'checked="checked"';
+							} ?>
 					/>
 					with membership status of...
 				</label>
 				<span id="exclude-group-membership-status"
-						<?php if (empty($params['exclude_group_membership_status'])) echo 'style="display:none"'; ?>
+						<?php if (empty($params['exclude_group_membership_status'])) {
+							echo 'style="display:none"';
+						} ?>
 				>
 					<?php Person_Group::printMembershipStatusChooser('exclude_group_membership_status', array_get($params, 'exclude_group_membership_status'), true); ?>
 				</span>
@@ -427,7 +454,7 @@ class Person_Query extends DB_Object
 		</div>
 		<?php
 	}
-?>
+		?>
 
         <h4>who <strong>have a family member</strong> in one or more of these groups:
             <i class="clickable icon-question-sign" data-toggle="visible" data-target="#grouptooltip3"></i><div class="help-block custom-field-tooltip" id="grouptooltip3" style="display: none; font-weight: normal">For example, find the family of Youth Group members. In the "Show me" section, you may add 'Names of family member in the specified group' to see the family member who is in the picked group.</div>
@@ -436,21 +463,25 @@ class Person_Query extends DB_Object
 
 
 			<?php
-            // Logic identical to 'include_groups' above, but with 'familymember' in field names
-			$gotGroups = Person_Group::printMultiChooser('include_familymember_groupids', array_get($params, 'include_familymember_groups', Array()), Array(), TRUE);
+					// Logic identical to 'include_groups' above, but with 'familymember' in field names
+					$gotGroups = Person_Group::printMultiChooser('include_familymember_groupids', array_get($params, 'include_familymember_groups', []), [], true);
 
-			if ($gotGroups) {
-				?>
+		if ($gotGroups) {
+			?>
                 <div class="indent-left">
                     <label class="checkbox" style="margin-top: 1ex">
                         <input type="checkbox" name="enable_familymember_group_membership_status" value="1"
                                data-toggle="visible" data-target="#familymember-membership-status"
-							<?php if (!empty($params['familymember_group_membership_status'])) echo 'checked="checked"'; ?>
+							<?php if (!empty($params['familymember_group_membership_status'])) {
+								echo 'checked="checked"';
+							} ?>
                         />
                         with membership status of...
                     </label>
                     <span id="familymember-membership-status"
-							<?php if (empty($params['familymember_group_membership_status'])) echo 'style="display:none"'; ?>
+							<?php if (empty($params['familymember_group_membership_status'])) {
+								echo 'style="display:none"';
+							} ?>
 					>
 						<?php Person_Group::printMembershipStatusChooser('familymember_group_membership_status', array_get($params, 'familymember_group_membership_status'), true); ?>
 					</span>
@@ -458,44 +489,48 @@ class Person_Query extends DB_Object
                     <label class="checkbox" style="margin-top: 1ex">
                         <input type="checkbox" name="enable_familymember_group_join_date" value="1"
                                data-toggle="visible" data-target="#familymember-group-join-dates"
-							<?php if (!empty($params['familymember_group_join_date_from'])) echo 'checked="checked"'; ?>
+							<?php if (!empty($params['familymember_group_join_date_from'])) {
+								echo 'checked="checked"';
+							} ?>
                         />
                         and joined the group between...
                     </label>
                     <span id="familymember-group-join-dates"
-								<?php if (empty($params['familymember_group_join_date_from'])) echo 'style="display:none"'; ?>
+								<?php if (empty($params['familymember_group_join_date_from'])) {
+									echo 'style="display:none"';
+								} ?>
 						  >
-					<?php print_widget('familymember_group_join_date_from', Array('type' => 'date'), array_get($params, 'familymember_group_join_date_from')); ?>
-					and <?php print_widget('familymember_group_join_date_to', Array('type' => 'date'), array_get($params, 'familymember_group_join_date_to')); ?>
+					<?php print_widget('familymember_group_join_date_from', ['type' => 'date'], array_get($params, 'familymember_group_join_date_from')); ?>
+					and <?php print_widget('familymember_group_join_date_to', ['type' => 'date'], array_get($params, 'familymember_group_join_date_to')); ?>
 					</span>
                 </div>
 				<?php
-			}
-			?>
+		}
+		?>
         </div>
 
 		<?php
 		if ($GLOBALS['user_system']->havePerm(PERM_VIEWNOTE)) {
-		?>
+			?>
 		<h4>who have a person/family note containing the phrase:</h4>
 		<div class="indent-left">
-			<input type="text" name="note_phrase" size="60" value="<?php echo (isset($params["note_phrase"])?$params["note_phrase"]:""); ?>">
+			<input type="text" name="note_phrase" size="60" value="<?php echo $params['note_phrase'] ?? ''; ?>">
 		</div>
 		<?php
-	}
+		}
 
-	if ($GLOBALS['user_system']->havePerm(PERM_VIEWATTENDANCE)) {
-		?>
+		if ($GLOBALS['user_system']->havePerm(PERM_VIEWATTENDANCE)) {
+			?>
 		<h4>whose attendance...</h4>
 		<div class="indent-left">
 			at
 			<?php
-			$groupid_params = Array(
-				'type' => 'select',
-				'options' => Array(null => '', '__cong__' => 'their congregation'),
-				'attrs' => Array('data-toggle' => 'enable', 'data-target' => '.attendance-input'),
-			);
-			$groups = $GLOBALS['system']->getDBObjectData('person_group', Array('!attendance_recording_days' => 0, 'is_archived' => 0), 'AND');
+				$groupid_params = [
+					'type' => 'select',
+					'options' => [null => '', '__cong__' => 'their congregation'],
+					'attrs' => ['data-toggle' => 'enable', 'data-target' => '.attendance-input'],
+				];
+			$groups = $GLOBALS['system']->getDBObjectData('person_group', ['!attendance_recording_days' => 0, 'is_archived' => 0], 'AND');
 			foreach ($groups as $id => $groupdata) {
 				$groupid_params['options'][$id] = $groupdata['name'];
 			}
@@ -506,25 +541,25 @@ class Person_Query extends DB_Object
 			has been
 
 			<?php
-			$operator_params = Array(
-							'type'		=> 'select',
-							'options'	=> Array('<' => 'less than', '>' => 'more than'),
-							'class' => 'attendance-input',
-						   );
+			$operator_params = [
+				'type' => 'select',
+				'options' => ['<' => 'less than', '>' => 'more than'],
+				'class' => 'attendance-input',
+			];
 			print_widget('attendance_operator', $operator_params, array_get($params, 'attendance_operator', '<')); ?>
-			<input name="attendance_percent" type="number" size="2" class="attendance-input" value="<?php echo (int)array_get($params, 'attendance_percent', 50); ?>" />%
+			<input name="attendance_percent" type="number" size="2" class="attendance-input" value="<?php echo (int) array_get($params, 'attendance_percent', 50); ?>" />%
 			<i class="clickable icon-question-sign" data-toggle="visible" data-target="#attendancetooltip"></i><div class="help-block custom-field-tooltip" id="attendancetooltip" style="display: none; font-weight: normal">Note: Percentages are based on when people are marked 'present' vs 'absent'. Dates with <i>blank</i> attendance are ignored altogether.</div>
 
 
-			<br />over the last <input name="attendance_weeks" type="number" size="2" class="attendance-input" value="<?php echo (int)array_get($params, 'attendance_weeks', 2); ?>" /> weeks
+			<br />over the last <input name="attendance_weeks" type="number" size="2" class="attendance-input" value="<?php echo (int) array_get($params, 'attendance_weeks', 2); ?>" /> weeks
 		</div>
 		<?php
-	}
-	?>
+		}
+		?>
 
 		<h3 id="showme">For each person found, show me...</h3>
 		<?php
-		$show_fields = array_get($params, 'show_fields', Array());
+			$show_fields = array_get($params, 'show_fields', []);
 		?>
 
 		<table class="table-condensed expandable indent-left">
@@ -537,57 +572,57 @@ class Person_Query extends DB_Object
 				</td>
 				<td>
 					<?php
-					$options = Array(
-								''			=> '',
-							   );
-					foreach ($this->_show_fields as $i => $opt) {
-						if (is_null($opt)) {
-							$options['--'.$i] = '-----';
-						} else {
-							$options[$opt] = $this->_field_details[$opt]['label'];
-						}
-					}
+					$options = [
+						'' => '',
+					];
+			foreach ($this->_show_fields as $i => $opt) {
+				if (null === $opt) {
+					$options['--'.$i] = '-----';
+				} else {
+					$options[$opt] = $this->_field_details[$opt]['label'];
+				}
+			}
 
-					if ($GLOBALS['user_system']->havePerm(PERM_VIEWATTENDANCE)) {
-						$options['--Z'] = '-----';
-						$options['attendance_percent'] = 'Attendance rate during specified period';
-						$options['attendance_numabsences'] = 'Number of absences since last marked present';
-					}
+			if ($GLOBALS['user_system']->havePerm(PERM_VIEWATTENDANCE)) {
+				$options['--Z'] = '-----';
+				$options['attendance_percent'] = 'Attendance rate during specified period';
+				$options['attendance_numabsences'] = 'Number of absences since last marked present';
+			}
 
-					if ($GLOBALS['user_system']->havePerm(PERM_VIEWNOTE)) {
-						$options['--Y'] = '-----';
-						$options['notes.subjects'] = 'Person/family notes matching the phrase above';
-						$options['actionnotes.subjects'] = 'Person/family notes requiring action';
-					}
+			if ($GLOBALS['user_system']->havePerm(PERM_VIEWNOTE)) {
+				$options['--Y'] = '-----';
+				$options['notes.subjects'] = 'Person/family notes matching the phrase above';
+				$options['actionnotes.subjects'] = 'Person/family notes requiring action';
+			}
 
-					if ($this->_custom_fields) {
-						$options['--A'] = '-----';
-						foreach ($this->_custom_fields as $fieldid => $fielddetails) {
-							$options[self::CUSTOMFIELD_PREFIX.$fieldid] = ucfirst($fielddetails['name']);
-						}
-					}
-					$options['--B'] = '-----';
-					if ($GLOBALS['system']->featureEnabled('PHOTOS')) {
-						$options['photo'] = 'Photo';
-					}
-					$options['groups']	= 'Which of the selected groups they are in';
-					$options['membershipstatus'] = 'Group membership status';
+			if ($this->_custom_fields) {
+				$options['--A'] = '-----';
+				foreach ($this->_custom_fields as $fieldid => $fielddetails) {
+					$options[self::CUSTOMFIELD_PREFIX.$fieldid] = ucfirst($fielddetails['name']);
+				}
+			}
+			$options['--B'] = '-----';
+			if ($GLOBALS['system']->featureEnabled('PHOTOS')) {
+				$options['photo'] = 'Photo';
+			}
+			$options['groups'] = 'Which of the selected groups they are in';
+			$options['membershipstatus'] = 'Group membership status';
 
-					$options['all_members'] = 'Names of all their family members';
-					$options['adult_members'] = 'Names of their adult family members';
-					$options['familymember_group_members'] = 'Names of family member in the specified group';
-					if ($GLOBALS['system']->featureEnabled('PHOTOS')) {
-						$options['photo'] = 'Photo';
-					}
-					$options['--D'] = '-----';
-					$options['view_link'] = 'A link to view person details';
-					$options['edit_link'] = 'A link to edit the person';
-					if ($GLOBALS['user_system']->havePerm(PERM_EDITNOTE)) {
-						$options['note_link'] = 'A link to add a note';
-					}
-					$options['checkbox'] = 'A checkbox for bulk actions';
-					print_widget('show_fields[]', Array('options' => $options, 'type' => 'select', 'disabled_prefix' => '--'), $chosen_field);
-					?>
+			$options['all_members'] = 'Names of all their family members';
+			$options['adult_members'] = 'Names of their adult family members';
+			$options['familymember_group_members'] = 'Names of family member in the specified group';
+			if ($GLOBALS['system']->featureEnabled('PHOTOS')) {
+				$options['photo'] = 'Photo';
+			}
+			$options['--D'] = '-----';
+			$options['view_link'] = 'A link to view person details';
+			$options['edit_link'] = 'A link to edit the person';
+			if ($GLOBALS['user_system']->havePerm(PERM_EDITNOTE)) {
+				$options['note_link'] = 'A link to add a note';
+			}
+			$options['checkbox'] = 'A checkbox for bulk actions';
+			print_widget('show_fields[]', ['options' => $options, 'type' => 'select', 'disabled_prefix' => '--'], $chosen_field);
+			?>
 				</td>
 				<td class="nowrap">
 					<img src="/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move this item up" />
@@ -603,26 +638,28 @@ class Person_Query extends DB_Object
 		<h3>Group the results by...</h3>
 		<div class="indent-left">
 			<?php
-			$options = Array(
-						'' => _('Nothing - one big group'),
-						'groupid' => _('Which person groups they are in'),
-			);
-			foreach ($this->_query_fields as $i) {
-				$v = $this->_field_details[$i];
-				if (in_array($v['type'], Array('select', 'reference'))) {
-					$options[$i] = _($v['label']);
-				}
+			$options = [
+				'' => _('Nothing - one big group'),
+				'groupid' => _('Which person groups they are in'),
+			];
+		foreach ($this->_query_fields as $i) {
+			$v = $this->_field_details[$i];
+			if (in_array($v['type'], ['select', 'reference'], true)) {
+				$options[$i] = _($v['label']);
 			}
-			foreach ($this->_custom_fields as $id => $f) {
-				if ($f['type'] != 'select') continue; // restrict it to option fields for now.
-				$options['custom-'.$id] = $f['name'];
-			}
-			print_widget(
-					'group_by',
-					Array('type' => 'select', 'options' => $options),
-					array_get($params, 'group_by', '')
-			);
-			?>
+		}
+		foreach ($this->_custom_fields as $id => $f) {
+			if ($f['type'] != 'select') {
+				continue;
+			} // restrict it to option fields for now.
+			$options['custom-'.$id] = $f['name'];
+		}
+		print_widget(
+			'group_by',
+			['type' => 'select', 'options' => $options],
+			array_get($params, 'group_by', ''),
+		);
+		?>
 			<p class="smallprint">Note: Result groups that do not contain any persons will not be shown</p>
 		</div>
 
@@ -632,31 +669,41 @@ class Person_Query extends DB_Object
 		<?php
 		$sb = array_get($params, 'sort_by');
 		foreach ($this->_show_fields as $name) {
-			if (is_null($name)) {
+			if (null === $name) {
 				?>
 				<option disabled="disabled">------</option>
 				<?php
 			} else {
 				?>
-				<option value="<?php echo $name; ?>"<?php if ($sb == $name) echo ' selected="selected"'; ?>><?php echo ents($this->_field_details[$name]['label']); ?></option>
+				<option value="<?php echo $name; ?>"<?php if ($sb == $name) {
+					echo ' selected="selected"';
+				} ?>><?php echo ents($this->_field_details[$name]['label']); ?></option>
 				<?php
 			}
 		}
 		?>
 		<option disabled="disabled">------</option>
-		<option value="attendance_percent"<?php if ($sb == "attendance_percent") echo ' selected="selected"'; ?>>Attendance rate during the specified period</option>
-		<option value="attendance_numabsences"<?php if ($sb == "attendance_numabsences") echo ' selected="selected"'; ?>>Number of absences since last marked present</option>
+		<option value="attendance_percent"<?php if ($sb == 'attendance_percent') {
+			echo ' selected="selected"';
+		} ?>>Attendance rate during the specified period</option>
+		<option value="attendance_numabsences"<?php if ($sb == 'attendance_numabsences') {
+			echo ' selected="selected"';
+		} ?>>Number of absences since last marked present</option>
 		<option disabled="disabled">------</option>
-		<option value="membershipstatus"<?php if ($sb == "membershipstatus") echo ' selected="selected"'; ?>>Group membership status</option>
+		<option value="membershipstatus"<?php if ($sb == 'membershipstatus') {
+			echo ' selected="selected"';
+		} ?>>Group membership status</option>
 		<?php
 		if ($this->_custom_fields) {
 			?>
 			<option disabled="disabled">------</option>
 			<?php
 			foreach ($this->_custom_fields as $fieldid => $fielddetails) {
-				$selected = ($sb == self::CUSTOMFIELD_PREFIX.$fieldid) || ($sb == 'date---'.$fieldid)
+				$selected = ($sb == self::CUSTOMFIELD_PREFIX.$fieldid) || ($sb == 'date---'.$fieldid);
 				?>
-				<option value="<?php echo self::CUSTOMFIELD_PREFIX.$fieldid; ?>"<?php if ($selected) echo ' selected="selected"'; ?>><?php echo ents($fielddetails['name']); ?></option>
+				<option value="<?php echo self::CUSTOMFIELD_PREFIX.$fieldid; ?>"<?php if ($selected) {
+					echo ' selected="selected"';
+				} ?>><?php echo ents($fielddetails['name']); ?></option>
 				<?php
 			}
 		}
@@ -674,10 +721,12 @@ class Person_Query extends DB_Object
 				as a new report
 			</label>
 		<?php
-		if (($this->id != 0) && ($this->canSave())) {
+		if (($this->id != 0) && $this->canSave()) {
 			?>
 			<label type="radio">
-				<input type="radio" name="save_option" value="replace" id="save_option_replace" <?php if ($this->id && ($this->id != 'TEMP')) echo 'checked="checked"'; ?>
+				<input type="radio" name="save_option" value="replace" id="save_option_replace" <?php if ($this->id && ($this->id != 'TEMP')) {
+					echo 'checked="checked"';
+				} ?>
 					 data-toggle="enable"
 					 />
 				in place of its previous version
@@ -690,7 +739,9 @@ class Person_Query extends DB_Object
 				<input type="radio" name="save_option"
 					   value="temp"
 					   id="save_option_temp"
-						  <?php if (empty($this->id) || $this->id == 'TEMP') echo ' checked="checked"'; ?>
+						  <?php if (empty($this->id) || $this->id == 'TEMP') {
+						  	echo ' checked="checked"';
+						  } ?>
 					   data-toggle="disable"
 					   data-target="#save-options input, #save-options select"
 				/>
@@ -710,23 +761,23 @@ class Person_Query extends DB_Object
 					<td>
 						<?php
 						if ($GLOBALS['user_system']->havePerm(PERM_MANAGEREPORTS)) {
-							$visibilityParams = Array(
+							$visibilityParams = [
 								'type' => 'select',
-								'options' => Array(0 => 'Visible to everyone', 1 => 'visible only to me'),
-							);
-							print_widget('is_private', $visibilityParams, $this->getValue('owner') !== NULL);
+								'options' => [0 => 'Visible to everyone', 1 => 'visible only to me'],
+							];
+							print_widget('is_private', $visibilityParams, $this->getValue('owner') !== null);
 						} else {
 							echo _('Only visible to me');
 						}
-						?>
+		?>
 					</td>
 				</tr>
 				<tr>
 					<td>Show on home page?</td>
 					<td>
 						<?php
-						$this->printFieldInterface('show_on_homepage');
-						?>
+		$this->printFieldInterface('show_on_homepage');
+		?>
 					</td>
 				</tr>
 			<?php
@@ -738,20 +789,18 @@ class Person_Query extends DB_Object
 				</tr>
 				<?php
 			}
-			?>
+		?>
 			</table>
 		</div>
 		<?php
 
-
 	}
-
 
 	private function _printDateRangeBoundaryChooser($fieldname, $value)
 	{
 		static $counter = 0;
-		$counter++;
-		
+		++$counter;
+
 		// NOTE: we just put the raw value as the value of the option element,
 		// and the javascript takes it from there - setting the visible label and populating all the inputs within the dropdown.
 		$textValue = '(Choose date)'; // Will be updated by JS if there is an existing value.
@@ -779,7 +828,7 @@ class Person_Query extends DB_Object
 						<strong>exact date</strong>
 						</label>
 					</td>
-					<td><?php print_widget('drp_exact', Array('type'=>'date'), $exactDate); ?></td>
+					<td><?php print_widget('drp_exact', ['type' => 'date'], $exactDate); ?></td>
 				</tr>
 				<tr>
 					<td>
@@ -792,13 +841,13 @@ class Person_Query extends DB_Object
 						<input type="number" name="drp_relative_y"> years, <input  style="width: 4.5ex !important"  name="drp_relative_m" type="number"> months and <input name="drp_relative_d" type="number"> days 
 						<br />
 						<?php print_widget('drp_relative_direction',
-											Array(
-												'type'=>'select',
-												'options' => Array('-'=>'before', '+'=>'after')
-											),
-											null
-							);
-						?>
+							[
+								'type' => 'select',
+								'options' => ['-' => 'before', '+' => 'after'],
+							],
+							null,
+						);
+		?>
 						the report date
 					</td>
 				</tr>
@@ -810,11 +859,11 @@ class Person_Query extends DB_Object
 		<?php
 	}
 
-	function processForm($prefix='', $fields=NULL)
+	function processForm($prefix = '', $fields = null)
 	{
 		switch ($_POST['save_option']) {
 			case 'new':
-				$this->populate(0, Array());
+				$this->populate(0, []);
 				$this->processFieldInterface('name');
 				if ($GLOBALS['user_system']->havePerm(PERM_SYSADMIN)) {
 					$this->processFieldInterface('mailchimp_list_id');
@@ -823,14 +872,15 @@ class Person_Query extends DB_Object
 				if ($GLOBALS['user_system']->havePerm(PERM_MANAGEREPORTS)) {
 					// Only those with mange-reports permission can save shared reports.
 					if (empty($_POST['is_private'])) {
-						$this->setValue('owner', NULL);
+						$this->setValue('owner', null);
 					}
 				}
 				$this->processFieldInterface('show_on_homepage');
 				break;
 			case 'replace':
-				if (($this->getValue('owner') === NULL) && !$GLOBALS['user_system']->havePerm(PERM_MANAGEREPORTS)) {
-					throw new \RuntimeException("You do not have permission to overwrite saved reports"); exit;
+				if (($this->getValue('owner') === null) && !$GLOBALS['user_system']->havePerm(PERM_MANAGEREPORTS)) {
+					throw new RuntimeException('You do not have permission to overwrite saved reports');
+					exit;
 				}
 				$this->processFieldInterface('name');
 				if ($GLOBALS['user_system']->havePerm(PERM_SYSADMIN)) {
@@ -840,21 +890,20 @@ class Person_Query extends DB_Object
 				if ($GLOBALS['user_system']->havePerm(PERM_MANAGEREPORTS)) {
 					// Only those with mange-reports permission can save shared reports.
 					if (empty($_POST['is_private'])) {
-						$this->setValue('owner', NULL);
+						$this->setValue('owner', null);
 					}
 				}
 				$this->processFieldInterface('show_on_homepage');
 				break;
 			case 'temp':
 				$this->id = 'TEMP';
-			break;
+				break;
 		}
-
 
 		$params = $this->_convertParams($this->getValue('params'));
 
 		// FIELD RULES
-		$rules = Array();
+		$rules = [];
 		if (!empty($_POST['enable_rule'])) {
 			foreach ($_POST['enable_rule'] as $field) {
 				$rules[$field] = $this->_processRuleDetails($field);
@@ -863,24 +912,24 @@ class Person_Query extends DB_Object
 		$params['rules'] = $rules;
 
 		// CUSTOM FIELD RULES
-		$params['custom_fields'] = Array();
+		$params['custom_fields'] = [];
 		foreach ($this->_custom_fields as $fieldid => $fieldDetails) {
-			if (in_array($fieldid, array_get($_REQUEST, 'enable_custom_field', Array()))) {
+			if (in_array($fieldid, array_get($_REQUEST, 'enable_custom_field', []), true)) {
 				switch ($this->_custom_fields[$fieldid]['type']) {
 					case 'date':
-						$params['custom_fields'][$fieldid] = Array(
+						$params['custom_fields'][$fieldid] = [
 							'criteria' => $_REQUEST['params_custom_field_'.$fieldid.'_criteria'],
 							'from' => $_REQUEST['params_custom_field_'.$fieldid.'_from'],
 							'to' => $_REQUEST['params_custom_field_'.$fieldid.'_to'],
-						);
+						];
 						break;
 					case 'select':
 					case 'text':
 					case 'link':
-						$params['custom_fields'][$fieldid] = Array(
+						$params['custom_fields'][$fieldid] = [
 							'criteria' => $_REQUEST['params_custom_field_'.$fieldid.'_criteria'],
-							'val' => array_get($_REQUEST, 'params_custom_field_'.$fieldid.'_val')
-						);
+							'val' => array_get($_REQUEST, 'params_custom_field_'.$fieldid.'_val'),
+						];
 						break;
 				}
 			}
@@ -890,32 +939,31 @@ class Person_Query extends DB_Object
 		}
 
 		// GROUP RULES
-		$params['include_groups'] = array_remove_empties(array_get($_POST, 'include_groupids', Array()));
+		$params['include_groups'] = array_remove_empties(array_get($_POST, 'include_groupids', []));
 		if (!empty($_REQUEST['enable_group_membership_status'])) {
 			$params['group_membership_status'] = array_get($_POST, 'group_membership_status');
 		} else {
-			$params['group_membership_status'] = Array();
+			$params['group_membership_status'] = [];
 		}
-		$params['group_join_date_from'] = empty($_POST['enable_group_join_date']) ? NULL : process_widget('group_join_date_from', Array('type' => 'date'));
-		$params['group_join_date_to'] = empty($_POST['enable_group_join_date']) ? NULL : process_widget('group_join_date_to', Array('type' => 'date'));
+		$params['group_join_date_from'] = empty($_POST['enable_group_join_date']) ? null : process_widget('group_join_date_from', ['type' => 'date']);
+		$params['group_join_date_to'] = empty($_POST['enable_group_join_date']) ? null : process_widget('group_join_date_to', ['type' => 'date']);
 
-		$params['exclude_groups'] = array_remove_empties(array_get($_POST, 'exclude_groupids', Array()));
+		$params['exclude_groups'] = array_remove_empties(array_get($_POST, 'exclude_groupids', []));
 		if (!empty($_REQUEST['enable_exclude_group_membership_status'])) {
 			$params['exclude_group_membership_status'] = array_get($_POST, 'exclude_group_membership_status');
 		} else {
-			$params['exclude_group_membership_status'] = Array();
+			$params['exclude_group_membership_status'] = [];
 		}
 
-        // FAMILY MEMBER GROUP RULES
-		$params['include_familymember_groups'] = array_remove_empties(array_get($_POST, 'include_familymember_groupids', Array()));
+		// FAMILY MEMBER GROUP RULES
+		$params['include_familymember_groups'] = array_remove_empties(array_get($_POST, 'include_familymember_groupids', []));
 		if (!empty($_REQUEST['enable_familymember_group_membership_status'])) {
 			$params['familymember_group_membership_status'] = array_get($_POST, 'familymember_group_membership_status');
 		} else {
-			$params['familymember_group_membership_status'] = Array();
+			$params['familymember_group_membership_status'] = [];
 		}
-		$params['familymember_group_join_date_from'] = empty($_POST['enable_familymember_group_join_date']) ? NULL : process_widget('familymember_group_join_date_from', Array('type' => 'date'));
-		$params['familymember_group_join_date_to'] = empty($_POST['enable_familymember_group_join_date']) ? NULL : process_widget('familymember_group_join_date_to', Array('type' => 'date'));
-        
+		$params['familymember_group_join_date_from'] = empty($_POST['enable_familymember_group_join_date']) ? null : process_widget('familymember_group_join_date_from', ['type' => 'date']);
+		$params['familymember_group_join_date_to'] = empty($_POST['enable_familymember_group_join_date']) ? null : process_widget('familymember_group_join_date_to', ['type' => 'date']);
 
 		// NOTE RULES
 		$params['note_phrase'] = array_get($_POST, 'note_phrase');
@@ -938,9 +986,9 @@ class Person_Query extends DB_Object
 
 		// SORT BY
 		$params['sort_by'] = $_POST['sort_by'];
-		if (in_array($params['sort_by'], Array('attendance_percent', 'attendance_numabsences', 'membershipstatus'))) {
-			if (!in_array($params['sort_by'], $params['show_fields'])) {
-				add_message("In order to sort by the requested field, it will also be displayed as a column", 'notice');
+		if (in_array($params['sort_by'], ['attendance_percent', 'attendance_numabsences', 'membershipstatus'], true)) {
+			if (!in_array($params['sort_by'], $params['show_fields'], true)) {
+				add_message('In order to sort by the requested field, it will also be displayed as a column', 'notice');
 				$params['show_fields'][] = $params['sort_by'];
 			}
 		}
@@ -953,71 +1001,83 @@ class Person_Query extends DB_Object
 
 	function _processRuleDetails($field)
 	{
-		$res = Array();
+		$res = [];
 		switch ($this->_field_details[$field]['type']) {
 			case 'datetime':
 				// todo: add fancy date range support here
-				$res['from'] = process_widget('params_'.str_replace('.', '_', $field).'_from', Array('type' => 'date'));
-				$res['to'] = process_widget('params_'.str_replace('.', '_', $field).'_to', Array('type' => 'date'));
+				$res['from'] = process_widget('params_'.str_replace('.', '_', $field).'_from', ['type' => 'date']);
+				$res['to'] = process_widget('params_'.str_replace('.', '_', $field).'_to', ['type' => 'date']);
 				break;
 			case 'select':
 			case 'reference':
-				$res = array_remove_empties(array_get($_POST, 'params_'.str_replace('.', '_', $field), Array()));
+				$res = array_remove_empties(array_get($_POST, 'params_'.str_replace('.', '_', $field), []));
 				break;
 			default:
 				$res = array_get($_POST, 'params_'.str_replace('.', '_', $field));
-			break;
+				break;
 		}
+
 		return $res;
 	}
 
 	/**
-	 * Return a formatted version of custom field values
-	 * @param string	$str		Raw value(s) of custom field from DB query
-	 * @param int		$fieldid	Custom field ID
+	 * Return a formatted version of custom field values.
+	 *
+	 * @param string $str     Raw value(s) of custom field from DB query
+	 * @param int    $fieldid Custom field ID
+	 *
 	 * @return string
 	 */
 	private function _formatCustomFieldValue($str, $fieldid)
 	{
-		$out = Array();
-		if (!strlen($str)) return ;
+		$out = [];
+		if (!strlen($str)) {
+			return;
+		}
 		$this->_dummy_custom_field->populate($fieldid, $this->_custom_fields[$fieldid]);
 		$rows = explode(self::CUSTOMFIELDVAL_SEP, $str);
 		foreach ($rows as $row) {
 			$out[] = $this->_dummy_custom_field->formatValue($row);
 		}
+
 		return implode("\n", $out);
 	}
 
 	/**
-	 * Print HTML version of a custom field value
-	 * @param string	$str		Raw value(s) of custom field from DB query
-	 * @param int		$fieldid	Custom field ID
+	 * Print HTML version of a custom field value.
+	 *
+	 * @param string $str     Raw value(s) of custom field from DB query
+	 * @param int    $fieldid Custom field ID
+	 *
 	 * @return void
 	 */
 	private function _printCustomFieldValue($str, $fieldid)
 	{
-		if (!strlen($str)) return ;
+		if (!strlen($str)) {
+			return;
+		}
 		$this->_dummy_custom_field->populate($fieldid, $this->_custom_fields[$fieldid]);
 		$rows = explode(self::CUSTOMFIELDVAL_SEP, $str);
 		foreach ($rows as $i => $row) {
-			if ($i > 0) echo "<br />";
+			if ($i > 0) {
+				echo '<br />';
+			}
 			$this->_dummy_custom_field->printFormattedValue($row);
 		}
 	}
 
-	function _getGroupAndCategoryRestrictionSQL($submitted_groupids, $from_date=NULL, $to_date=NULL, $membership_status=NULL)
+	function _getGroupAndCategoryRestrictionSQL($submitted_groupids, $from_date = null, $to_date = null, $membership_status = null)
 	{
 		global $db;
-		$int_groupids = Array();
-		$int_categoryids = Array();
+		$int_groupids = [];
+		$int_categoryids = [];
 
 		// sepearate the group IDs from cateogry IDs
 		foreach ($submitted_groupids as $groupid) {
 			if (substr($groupid, 0, 1) == 'c') {
-				$int_categoryids[] = (int)substr($groupid, 1);
+				$int_categoryids[] = (int) substr($groupid, 1);
 			} else {
-				$int_groupids[] = (int)$groupid;
+				$int_groupids[] = (int) $groupid;
 			}
 		}
 
@@ -1027,13 +1087,15 @@ class Person_Query extends DB_Object
 			do {
 				$sql = 'SELECT id FROM person_group_category WHERE parent_category IN ('.implode(',', $prevsubids).')';
 				$subids = $db->queryCol($sql);
-				foreach ($subids as $id) $int_categoryids[] = (int)$id;
+				foreach ($subids as $id) {
+					$int_categoryids[] = (int) $id;
+				}
 				$prevsubids = $subids;
 			} while (!empty($subids));
 		}
 
 		// assemble the SQL clause to restrict group and category IDs
-		$groupid_comps = Array();
+		$groupid_comps = [];
 		if (!empty($int_groupids)) {
 			$groupid_comps[] = '(pgm.groupid IN ('.implode(',', $int_groupids).'))';
 		}
@@ -1043,39 +1105,38 @@ class Person_Query extends DB_Object
 
 		$res = '('.implode(' OR ', $groupid_comps).')';
 
-
 		if (!empty($from_date)) {
 			// restrict the join date too
 			$res = '('.$res.') AND pgm.created BETWEEN '.$db->quote($from_date).' AND '.$db->quote($to_date);
 		}
 
 		if (!empty($membership_status)) {
-			$res .= ' AND pgm.membership_status IN ('.implode(',', array_map(Array($db, 'quote'), (array)$membership_status)).')';
+			$res .= ' AND pgm.membership_status IN ('.implode(',', array_map([$db, 'quote'], (array) $membership_status)).')';
 		}
 
 		return $res;
 	}
 
-
-	function getSQL($custom_select_fields=NULL)
+	function getSQL($custom_select_fields = null)
 	{
-		$db =& $GLOBALS['db'];
+		$db = &$GLOBALS['db'];
 
 		$params = $this->_convertParams($this->getValue('params'));
-		if (empty($params)) return null;
-		$query = Array();
+		if (empty($params)) {
+			return null;
+		}
+		$query = [];
 		$query['from'] = 'person p
 						JOIN family f ON p.familyid = f.id
 						';
-		$query['where'] = Array();
-		$query['group_by'] = Array('p.id');
+		$query['where'] = [];
+		$query['group_by'] = ['p.id'];
 
 		// BASIC FILTERS
 		foreach ($params['rules'] as $field => $values) {
 			if ($field == 'date') {
 				continue;
-
-			} else if (is_array($values) && isset($values['from'])) {
+			} elseif (is_array($values) && isset($values['from'])) {
 				if (($this->_field_details[$field]['type'] == 'datetime') && (strlen($values['from']) == 10)) {
 					// we're searching on a datetime field using only date values
 					// so extend them to prevent boundary errors
@@ -1084,7 +1145,7 @@ class Person_Query extends DB_Object
 				}
 				$query['where'][] = $field.' BETWEEN '.$db->quote($values['from']).' AND '.$db->quote($values['to']);
 			} else {
-				$values = (array)$values;
+				$values = (array) $values;
 				switch (count($values)) {
 					case 0:
 						$query['where'][] = '(('.$field.' = 0) OR ('.$field.' IS NULL))';
@@ -1093,7 +1154,7 @@ class Person_Query extends DB_Object
 						$query['where'][] = $field.' = '.$db->quote(reset($values));
 						break;
 					default:
-						$quoted_vals = Array();
+						$quoted_vals = [];
 						foreach ($values as $val) {
 							$quoted_vals[] = $db->quote($val);
 						}
@@ -1103,9 +1164,9 @@ class Person_Query extends DB_Object
 		}
 
 		// CUSTOM FIELD FILTERS
-		$customFieldWheres = Array();
-		foreach (array_get($params, 'custom_fields', Array()) as $fieldid => $values) {
-			$query['from'] .= ' LEFT JOIN custom_field_value pd'.$fieldid.' ON pd'.$fieldid.'.personid = p.id AND pd'.$fieldid.'.fieldid = '.(int)$fieldid."\n";
+		$customFieldWheres = [];
+		foreach (array_get($params, 'custom_fields', []) as $fieldid => $values) {
+			$query['from'] .= ' LEFT JOIN custom_field_value pd'.$fieldid.' ON pd'.$fieldid.'.personid = p.id AND pd'.$fieldid.'.fieldid = '.(int) $fieldid."\n";
 			switch ($this->_custom_fields[$fieldid]['type']) {
 				case 'date':
 					if ($values['criteria'] == 'between') {
@@ -1123,26 +1184,25 @@ class Person_Query extends DB_Object
 						case 'exact':
 						case 'not':
 						case 'anniversary':
-
-							$from = $to = NULL;
-							foreach (Array('from','to') as $k) {
+							$from = $to = null;
+							foreach (['from', 'to'] as $k) {
 								$v = $values[$k];
-								$matches = Array();
+								$matches = [];
 								if ($v == '*') {
-									$$k = NULL;
-								} else if (preg_match(("/([-+])(\d+)y(\d+)m(\d+)d/"), $v, $matches)) {
+									$$k = null;
+								} elseif (preg_match("/([-+])(\d+)y(\d+)m(\d+)d/", $v, $matches)) {
 									// relative date - convert it to an absolute now.
-									$sym=$matches[1]; // + or -
+									$sym = $matches[1]; // + or -
 									$$k = date('Y-m-d', strtotime($sym.($matches[2] ?? 0).' years '.$sym.($matches[3] ?? 0).' months '.$sym.($matches[4] ?? 0).' days'));
 								} else {
 									// absolute date
 									$$k = $v;
 								}
-								//bam("$k date $v = ".$$k);
+								// bam("$k date $v = ".$$k);
 							}
 
-						    $valExp = 'pd'.$fieldid.'.value_date';
-						    if ($from && $to) {
+							$valExp = 'pd'.$fieldid.'.value_date';
+							if ($from && $to) {
 								$betweenExp = 'BETWEEN '.$db->quote($from).' AND '.$db->quote($to);
 							} elseif ($from) {
 								$betweenExp = '>= '.$db->quote($from);
@@ -1151,9 +1211,8 @@ class Person_Query extends DB_Object
 							} else {
 								// from unlimited to unlimited
 								$betweenExp = ' IS NOT NULL';
-
 							}
-							$w = Array();
+							$w = [];
 							if ($values['criteria'] == 'not') {
 								// date is either unset or not in the specified range
 								$w[] = "$valExp IS NULL";
@@ -1175,7 +1234,6 @@ class Person_Query extends DB_Object
 							}
 							$customFieldWheres[] = '(('.implode("\n) OR (\n", $w).'))';
 							break;
-
 					}
 					break;
 
@@ -1183,9 +1241,9 @@ class Person_Query extends DB_Object
 					switch (array_get($values, 'criteria', 'contains')) {
 						case 'contains':
 							if ($values['val']) {
-								$ids = implode(',', array_map(Array($db, 'quote'), $values['val']));
+								$ids = implode(',', array_map([$db, 'quote'], $values['val']));
 								$xrule = '(pd'.$fieldid.'.value_optionid IN ('.$ids.'))';
-								if (in_array(0, $values['val'])) {
+								if (in_array(0, $values['val'], true)) {
 									// 'other' option
 									$xrule = '('.$xrule.' OR (pd'.$fieldid.'.value_text IS NOT NULL))';
 								}
@@ -1194,14 +1252,14 @@ class Person_Query extends DB_Object
 								// No options were picked for a select list custom field. Same as 'empty' ('not filled in')
 								$customFieldWheres[] = '(pd'.$fieldid.'.value_optionid IS NULL AND pd'.$fieldid.'.value_text IS NULL)';
 							}
-								break;
-							case 'any':
-								$customFieldWheres[] = '(pd'.$fieldid.'.value_optionid IS NOT NULL OR pd'.$fieldid.'.value_text IS NOT NULL)';
-								break;
-							case 'empty':
-								$customFieldWheres[] = '(pd'.$fieldid.'.value_optionid IS NULL AND pd'.$fieldid.'.value_text IS NULL)';
-								break;
-						}
+							break;
+						case 'any':
+							$customFieldWheres[] = '(pd'.$fieldid.'.value_optionid IS NOT NULL OR pd'.$fieldid.'.value_text IS NOT NULL)';
+							break;
+						case 'empty':
+							$customFieldWheres[] = '(pd'.$fieldid.'.value_optionid IS NULL AND pd'.$fieldid.'.value_text IS NULL)';
+							break;
+					}
 					break;
 
 				case 'text':
@@ -1228,32 +1286,33 @@ class Person_Query extends DB_Object
 
 		// GROUP MEMBERSHIP FILTERS
 		if (!empty($params['include_groups'])) {
-
 			$include_groupids_clause = $this->_getGroupAndCategoryRestrictionSQL(
-												$params['include_groups'],
-												array_get($params, 'group_join_date_from'),
-												array_get($params, 'group_join_date_to'),
-												array_get($params, 'group_membership_status'));
+				$params['include_groups'],
+				array_get($params, 'group_join_date_from'),
+				array_get($params, 'group_join_date_to'),
+				array_get($params, 'group_membership_status'),
+			);
 			$group_members_sql = 'SELECT personid
 								FROM person_group_membership pgm
 								JOIN person_group pg ON pgm.groupid = pg.id
 								WHERE ('.$include_groupids_clause.')';
 			$query['where'][] = 'p.id IN ('.$group_members_sql.')';
 		}
-        
+
 		if (!empty($params['include_familymember_groups'])) {
-            // "have a family member in one or more of these groups". E.g. family members (e.g. parents) of Youth Group members. #1104
+			// "have a family member in one or more of these groups". E.g. family members (e.g. parents) of Youth Group members. #1104
 
-            // Logic identical to 'include_groups' above
+			// Logic identical to 'include_groups' above
 			$include_familymember_groupids_clause = $this->_getGroupAndCategoryRestrictionSQL(
-												$params['include_familymember_groups'],
-												array_get($params, 'familymember_group_join_date_from'),
-												array_get($params, 'familymember_group_join_date_to'),
-												array_get($params, 'familymember_group_membership_status'));
+				$params['include_familymember_groups'],
+				array_get($params, 'familymember_group_join_date_from'),
+				array_get($params, 'familymember_group_join_date_to'),
+				array_get($params, 'familymember_group_membership_status'),
+			);
 
-            // subquery returning <personid, familymember_name> for every familymember in the <include_familymember_groups> groups.
-            // E.g. if little Jimmy (id 3) in Youth Group has parents with ids 1 and 2, this returns (1,"Jimmy"),(2,"Jimmy").
-            // Note, Jimmy himself is excluded, i.e. we treat "being the family member in the group" (Jimmy) as different to "having a family member in the group" (his parents), and assume we usually want the latter.
+			// subquery returning <personid, familymember_name> for every familymember in the <include_familymember_groups> groups.
+			// E.g. if little Jimmy (id 3) in Youth Group has parents with ids 1 and 2, this returns (1,"Jimmy"),(2,"Jimmy").
+			// Note, Jimmy himself is excluded, i.e. we treat "being the family member in the group" (Jimmy) as different to "having a family member in the group" (his parents), and assume we usually want the latter.
 			$familymember_group_members_sql = "SELECT p.id AS personid, concat(familyperson.first_name, ' ',familyperson.last_name) AS familymember_name
 								FROM person p
 								JOIN person familyperson USING (familyid)
@@ -1264,15 +1323,16 @@ class Person_Query extends DB_Object
 								AND (".$include_familymember_groupids_clause.')';
 
 			$query['from'] .= ' JOIN ('.$familymember_group_members_sql.') familymember_in_required_group ON (familymember_in_required_group.personid = p.id)';
-//			$query['where'][] = 'familymember_in_required_group IN ('.$familymember_group_members_sql.')';
+			//			$query['where'][] = 'familymember_in_required_group IN ('.$familymember_group_members_sql.')';
 		}
 
 		if (!empty($params['exclude_groups'])) {
-
 			$exclude_groupids_clause = $this->_getGroupAndCategoryRestrictionSQL(
-												$params['exclude_groups'],
-												NULL, NULL,
-												array_get($params, 'exclude_group_membership_status'));
+				$params['exclude_groups'],
+				null,
+				null,
+				array_get($params, 'exclude_group_membership_status'),
+			);
 			$query['where'][] = 'p.id NOT IN (
 									SELECT personid
 									FROM person_group_membership pgm
@@ -1281,7 +1341,7 @@ class Person_Query extends DB_Object
 								)';
 		}
 
-		//NOTE FILTERS
+		// NOTE FILTERS
 		if (!empty($params['note_phrase'])) {
 			$note_sql = 'SELECT p.id as personid, GROUP_CONCAT(an.Subject SEPARATOR "\n") as subjects
 						FROM abstract_note an
@@ -1297,13 +1357,13 @@ class Person_Query extends DB_Object
 		// ATTENDANCE FILTERS
 		if (!empty($params['attendance_groupid'])) {
 			$groupid = $params['attendance_groupid'] == '__cong__' ? 0 : $params['attendance_groupid'];
-			$min_date = date('Y-m-d', strtotime('-'.(int)$params['attendance_weeks'].' weeks'));
+			$min_date = date('Y-m-d', strtotime('-'.(int) $params['attendance_weeks'].' weeks'));
 			$operator = ($params['attendance_operator'] == '>') ? '>' : '<'; // nb whitelist because it will be used in the query directly
 			$query['where'][] = '(SELECT SUM(present)/COUNT(*)*100
 									FROM attendance_record
 									WHERE date >= '.$GLOBALS['db']->quote($min_date).'
-									AND groupid = '.(int)$groupid.'
-									AND personid = p.id) '.$operator.' '.(int)$params['attendance_percent'];
+									AND groupid = '.(int) $groupid.'
+									AND personid = p.id) '.$operator.' '.(int) $params['attendance_percent'];
 		}
 
 		// GROUPING
@@ -1311,28 +1371,28 @@ class Person_Query extends DB_Object
 		$grouping_field = '';
 		if (!$this->hasGroupingField($params)) {
 			$grouping_field = '';
-		} else if ($params['group_by'] == 'groupid') {
+		} elseif ($params['group_by'] == 'groupid') {
 			if (!empty($params['include_groups'])) {
 				$grouping_field = 'CONCAT(pg.name, '.$db->quote(' (#').', pg.id, '.$db->quote(')').'), ';
 				$query['from'] .= ' JOIN person_group_membership pgm ON p.id = pgm.personid
 									JOIN person_group pg ON pg.id = pgm.groupid
 									';
 				$query['where'][] = $this->_getGroupAndCategoryRestrictionSQL(
-											$params['include_groups'],
-											array_get($params, 'group_join_date_from'),
-											array_get($params, 'group_join_date_to'),
-											array_get($params, 'group_membership_status')
-									);
+					$params['include_groups'],
+					array_get($params, 'group_join_date_from'),
+					array_get($params, 'group_join_date_to'),
+					array_get($params, 'group_membership_status'),
+				);
 				$grouping_order = 'pg.name, ';
 				$query['group_by'][] = 'pg.id';
 			} else {
 				$grouping_field = '';
 			}
-		} else if (0 === strpos($params['group_by'], 'custom-')) {
-			list($null, $fieldid) = explode('-', $params['group_by']);
+		} elseif (str_starts_with($params['group_by'], 'custom-')) {
+			[$null, $fieldid] = explode('-', $params['group_by']);
 			$query['from'] .= ' LEFT JOIN custom_field_value cfvgroup
 									ON cfvgroup.personid = p.id
-										AND cfvgroup.fieldid = '.(int)$fieldid.'
+										AND cfvgroup.fieldid = '.(int) $fieldid.'
 							';
 			$query['from'] .= ' LEFT JOIN custom_field_option cfogroup
 									ON cfogroup.id = cfvgroup.value_optionid
@@ -1342,15 +1402,15 @@ class Person_Query extends DB_Object
 			$grouping_order = 'IF(cfvgroup.personid IS NULL, 1, 0), '.Custom_Field::getSortValueSQLExpr('cfvgroup', 'cfogroup').', ';
 			$grouping_field = Custom_Field::getRawValueSQLExpr('cfvgroup', 'cfgroup').', ';
 			$query['group_by'][] = Custom_Field::getRawValueSQLExpr('cfvgroup', 'cfgroup');
-		} else if ($params['group_by'] == 'p.congregationid') {
+		} elseif ($params['group_by'] == 'p.congregationid') {
 			$query['from'] .= ' LEFT JOIN congregation csort ON csort.id = p.congregationid
 								';
 			$grouping_order = 'csort.meeting_time, ';
 			$grouping_field = $params['group_by'].', ';
-		} else if ($params['group_by'] == 'p.age_bracketid') {
+		} elseif ($params['group_by'] == 'p.age_bracketid') {
 			$grouping_order = 'absort.`rank`, ';
 			$grouping_field = 'p.age_bracketid, ';
-		} else if ($params['group_by'] == 'p.status') {
+		} elseif ($params['group_by'] == 'p.status') {
 			$query['from'] .= ' JOIN person_status psgsort ON psgsort.id = p.status
 								';
 			$grouping_order = 'psgsort.`rank`, ';
@@ -1361,7 +1421,7 @@ class Person_Query extends DB_Object
 		}
 
 		// DISPLAY FIELDS
-		$joined_groups = FALSE;
+		$joined_groups = false;
 		if ($custom_select_fields) {
 			$select_fields = $custom_select_fields;
 		} else {
@@ -1371,27 +1431,30 @@ class Person_Query extends DB_Object
 			 * results.  There is client-side code to deal with this,
 			 * but this check here is for extra robustness.
 			 */
-			if (($params['sort_by'] == 'attendance_percent') && !in_array('attendance_percent', $params['show_fields'])) {
-				array_push($params['show_fields'],'attendance_percent');
-			} else if (($params['sort_by'] == 'attendance_numabsences') && !in_array('attendance_numabsences', $params['show_fields'])){
-				array_push($params['show_fields'],'attendance_numabsences');
+			if (($params['sort_by'] == 'attendance_percent') && !in_array('attendance_percent', $params['show_fields'], true)) {
+				$params['show_fields'][] = 'attendance_percent';
+			} elseif (($params['sort_by'] == 'attendance_numabsences') && !in_array('attendance_numabsences', $params['show_fields'], true)) {
+				$params['show_fields'][] = 'attendance_numabsences';
 			}
 			if (empty($params['show_fields'])) {
-				$params['show_fields'] = Array('p.first_name', 'p.last_name');
+				$params['show_fields'] = ['p.first_name', 'p.last_name'];
 			}
 			foreach ($params['show_fields'] as $field) {
-				if (substr($field, 0, 2) == '--') continue; // they selected a separator
+				if (substr($field, 0, 2) == '--') {
+					continue;
+				} // they selected a separator
 				switch ($field) {
-
 					case 'groups':
 					case 'membershipstatus':
-						if (empty($params['include_groups'])) continue 2; // https://www.php.net/manual/en/migration73.incompatible.php
+						if (empty($params['include_groups'])) {
+							continue 2;
+						} // https://www.php.net/manual/en/migration73.incompatible.php
 
 						if ($params['group_by'] == 'groupid') {
 							/* pg and pgm already joined for grouping purposes */
 							if ($field == 'groups') {
 								$query['select'][] = 'GROUP_CONCAT(pg.name ORDER BY pg.name SEPARATOR "\n") as person_groups';
-							} else if ($field == 'membershipstatus') {
+							} elseif ($field == 'membershipstatus') {
 								$query['from'] .= ' LEFT JOIN person_group_membership_status pgms ON pgms.id = pgm.membership_status';
 								$query['select'][] = 'pgms.label as `Membership Status`';
 							}
@@ -1401,15 +1464,15 @@ class Person_Query extends DB_Object
 													JOIN person_group pg ON pg.id = pgm.groupid
 													';
 								$query['where'][] = $this->_getGroupAndCategoryRestrictionSQL(
-															$params['include_groups'],
-															array_get($params, 'group_join_date_from'),
-															array_get($params, 'group_join_date_to')
-													);
-								$joined_groups = TRUE;
+									$params['include_groups'],
+									array_get($params, 'group_join_date_from'),
+									array_get($params, 'group_join_date_to'),
+								);
+								$joined_groups = true;
 							}
 							if ($field == 'groups') {
 								$query['select'][] = 'GROUP_CONCAT(DISTINCT pg.name ORDER BY pg.name SEPARATOR "\n") as person_groups';
-							} else if ($field == 'membershipstatus') {
+							} elseif ($field == 'membershipstatus') {
 								$query['from'] .= ' LEFT JOIN person_group_membership_status pgms ON pgms.id = pgm.membership_status';
 								$query['select'][] = 'GROUP_CONCAT(DISTINCT pgms.label ORDER BY pg.name SEPARATOR "\n") as `Membership Status`';
 							}
@@ -1472,11 +1535,11 @@ class Person_Query extends DB_Object
 						break;
 					case 'attendance_percent':
 						$groupid = $params['attendance_groupid'] == '__cong__' ? 0 : $params['attendance_groupid'];
-						$min_date = date('Y-m-d', strtotime('-'.(int)$params['attendance_weeks'].' weeks'));
+						$min_date = date('Y-m-d', strtotime('-'.(int) $params['attendance_weeks'].' weeks'));
 						$query['select'][] = '(SELECT ROUND(SUM(present)/COUNT(*)*100)
 												FROM attendance_record ar
 												WHERE date >= '.$GLOBALS['db']->quote($min_date).'
-												AND groupid = '.(int)$groupid.'
+												AND groupid = '.(int) $groupid.'
 												AND personid = p.id) AS `Attendance`';
 						$query['from'] .= ' LEFT JOIN planned_absence pa
 												ON pa.personid = p.id
@@ -1487,13 +1550,13 @@ class Person_Query extends DB_Object
 
 						break;
 					case 'attendance_numabsences':
-						/* The number of "absents" recorded since the last "present".*/
+						/* The number of "absents" recorded since the last "present". */
 						$groupid = $params['attendance_groupid'] == '__cong__' ? 0 : $params['attendance_groupid'];
 						$query['select'][] = '(SELECT COUNT(*)
 												FROM attendance_record ar
-												WHERE  groupid = '.(int)$groupid.'
+												WHERE  groupid = '.(int) $groupid.'
 												AND personid = p.id
-												AND date > (SELECT COALESCE(MAX(date), "2000-01-01") FROM attendance_record ar2 WHERE ar2.personid = ar.personid AND present = 1 AND groupid='.(int)$groupid.')) AS `Running Absences`';
+												AND date > (SELECT COALESCE(MAX(date), "2000-01-01") FROM attendance_record ar2 WHERE ar2.personid = ar.personid AND present = 1 AND groupid='.(int) $groupid.')) AS `Running Absences`';
 						break;
 					case 'actionnotes.subjects':
 						$query['select'][] = '(SELECT GROUP_CONCAT(CONCAT(subject, " [", substr(asn.first_name, 1, 1), substr(asn.last_name, 1, 1),"]") SEPARATOR "\n")
@@ -1512,12 +1575,13 @@ class Person_Query extends DB_Object
 							break;
 						}
 						// else deliberate fallthrough...
+						// no break
 					default:
-						$customFieldID = NULL;
+						$customFieldID = null;
 						if (substr($field, 0, 7) == 'date---') {
 							// backwards compat
 							$customFieldID = substr($field, 7);
-						} else if (0 === strpos($field, self::CUSTOMFIELD_PREFIX)) {
+						} elseif (str_starts_with($field, self::CUSTOMFIELD_PREFIX)) {
 							$customFieldID = substr($field, 14);
 						}
 						if ($customFieldID) {
@@ -1544,31 +1608,31 @@ class Person_Query extends DB_Object
 			// Make sure the ORDER BY isn't relying on some fancy column from the original query (Issue #592)
 			$query['order_by'] = '1';
 		} else {
-			$customOrder = NULL;
+			$customOrder = null;
 			if (substr($params['sort_by'], 0, 7) == 'date---') {
 				// backwards compatibility
 				$customOrder = substr($params['sort_by'], 8);
-			} else if (0 === strpos($params['sort_by'], self::CUSTOMFIELD_PREFIX)) {
+			} elseif (str_starts_with($params['sort_by'], self::CUSTOMFIELD_PREFIX)) {
 				$customOrder = substr($params['sort_by'], 14);
 			}
 			if ($customOrder) {
 				$query['from'] .= ' LEFT JOIN custom_field_value cfvorder ON cfvorder.personid = p.id AND cfvorder.fieldid = '.$db->quote($customOrder)."\n";
 				$query['from'] .= " LEFT JOIN custom_field_option cfoorder ON cfoorder.id = cfvorder.value_optionid \n";
-				$order = Array();
+				$order = [];
 				$order[] = 'IF(cfvorder.personid IS NULL, 1, 0)'; // put those without a value last
 				if ($this->_custom_fields[$customOrder]['type'] == 'date') {
 					$order[] = 'IF(cfvorder.value_date LIKE "-%", 1, 0)'; // put full dates before partial dates
 				}
 				$order[] = 'GROUP_CONCAT('.Custom_Field::getSortValueSQLExpr('cfvorder', 'cfoorder').')';
 				$query['order_by'] = implode(', ', $order);
-			} else if ($params['sort_by'] == 'p.congregationid') {
+			} elseif ($params['sort_by'] == 'p.congregationid') {
 				// Order by congregation meeting time then congregation name
 				$query['from'] .= '
 					LEFT JOIN congregation cord ON p.congregationid = cord.id ';
 				$query['order_by'] = 'IF(cord.id IS NULL, 1, 0), IF(LENGTH(cord.meeting_time)>0, 0, 1), cord.meeting_time, cord.name';
-			} else if ($params['sort_by'] == 'p.age_bracketid') {
+			} elseif ($params['sort_by'] == 'p.age_bracketid') {
 				$query['order_by'] = 'absort.`rank`';
-			} else if ($params['sort_by'] == 'p.status') {
+			} elseif ($params['sort_by'] == 'p.status') {
 				$query['from'] .= '
 					JOIN person_status pssort ON pssort.id = p.status ';
 				$query['order_by'] = 'pssort.`rank`';
@@ -1591,13 +1655,15 @@ class Person_Query extends DB_Object
 			 * because we have already ensured they will appear
 			 * the select clause.
 			 */
-			$rewrites = Array(
-						'`attendance_percent`' => '`Attendance` ASC',
-						'`attendance_numabsences`' => '`Running Absences` DESC',
-						'`membershipstatus`' => 'pgms.`rank`',
-			);
+			$rewrites = [
+				'`attendance_percent`' => '`Attendance` ASC',
+				'`attendance_numabsences`' => '`Running Absences` DESC',
+				'`membershipstatus`' => 'pgms.`rank`',
+			];
 			$query['order_by'] = str_replace(array_keys($rewrites), array_values($rewrites), $query['order_by']);
-			if (!strlen(trim($query['order_by'], '`'))) $query['order_by'] = 1;
+			if (!strlen(trim($query['order_by'], '`'))) {
+				$query['order_by'] = 1;
+			}
 		}
 
 		// Build SQL
@@ -1615,51 +1681,57 @@ class Person_Query extends DB_Object
 		return $sql;
 	}
 
-
 	function getResultCount()
 	{
-		$db =& $GLOBALS['db'];
+		$db = &$GLOBALS['db'];
 		$sql = $this->getSQL();
-		if (is_null($sql)) return 0;
+		if (null === $sql) {
+			return 0;
+		}
 		$res = $db->query($sql);
 		$result = $res->numRows();
+
 		return $result;
 	}
 
-
 	function getResultPersonIDs()
 	{
-		$db =& $GLOBALS['db'];
+		$db = &$GLOBALS['db'];
 		$sql = $this->getSQL('p.id');
-		if (is_null($sql)) return Array();
+		if (null === $sql) {
+			return [];
+		}
 		$res = $db->queryCol($sql);
+
 		return $res;
 	}
 
-
-	function printResults($format='html')
+	function printResults($format = 'html')
 	{
-		$db =& $GLOBALS['db'];
+		$db = &$GLOBALS['db'];
 		$params = $this->_convertParams($this->getValue('params'));
 
 		$sql = $this->getSQL();
-		if (is_null($sql)) return;
+		if (null === $sql) {
+			return;
+		}
 
-		if ($format == 'html' && in_array('checkbox', $params['show_fields'])) {
+		if ($format == 'html' && in_array('checkbox', $params['show_fields'], true)) {
 			echo '<form method="post" enctype="multipart/form-data" class="bulk-person-action">';
 		}
 
-		$data = array();
+		$data = [];
 
 		if (!empty($_REQUEST['debug'])) {
 			bam($params);
 			bam($sql);
 		}
 
-
 		if (!$this->hasGroupingField($params)) {
 			$res = $db->queryAll($sql, null, null, true, true);
-			if (array_get($_REQUEST, 'debug') > 1) bam($res);
+			if (array_get($_REQUEST, 'debug') > 1) {
+				bam($res);
+			}
 			if ($format == 'array') {
 				$data = $this->_printResultSet($res, $format);
 			} else {
@@ -1667,7 +1739,9 @@ class Person_Query extends DB_Object
 			}
 		} else {
 			$res = $db->queryAll($sql, null, null, true, false, true);
-			if (array_get($_REQUEST, 'debug') > 1) bam($res);
+			if (array_get($_REQUEST, 'debug') > 1) {
+				bam($res);
+			}
 			if ($format == 'array') {
 				$data = $this->_printResultGroups($res, $params, $format);
 			} else {
@@ -1675,7 +1749,7 @@ class Person_Query extends DB_Object
 			}
 		}
 
-		if ($res && ($format == 'html') && in_array('checkbox', $params['show_fields'])) {
+		if ($res && ($format == 'html') && in_array('checkbox', $params['show_fields'], true)) {
 			echo '<div class="no-print">';
 			include 'templates/bulk_actions.template.php';
 			echo '</div>';
@@ -1684,21 +1758,23 @@ class Person_Query extends DB_Object
 
 		if ($format == 'array') {
 			return $data;
-		} 
+		}
 	}
 
 	function _printResultGroups($res, $params, $format)
 	{
 		if ($format == 'array') {
-			$data = array();
+			$data = [];
 		}
 		foreach ($res as $i => $v) {
-			if (0 === strpos($params['group_by'], 'custom-')) {
+			if (str_starts_with($params['group_by'], 'custom-')) {
 				$gb_bits = explode('-', $params['group_by']);
 				$field = $GLOBALS['system']->getDBObject('custom_field', end($gb_bits));
 				$heading = $field->formatValue($i);
-				if (!strlen($heading)) $heading = '(Blank)';
-			} else if ($params['group_by'] == 'groupid') {
+				if (!strlen($heading)) {
+					$heading = '(Blank)';
+				}
+			} elseif ($params['group_by'] == 'groupid') {
 				$heading = $i;
 			} else {
 				$var = $params['group_by'][0] == 'p' ? '_dummy_person' : '_dummy_family';
@@ -1707,7 +1783,7 @@ class Person_Query extends DB_Object
 				$heading = $this->$var->getFormattedValue($fieldname);
 			}
 			// We need to get the person ID as the array keys before calling _printResultSet
-			$set = Array();
+			$set = [];
 			foreach ($v as $vv) {
 				$set[$vv['ID']] = $vv;
 				unset($set[$vv['ID']]['ID']);
@@ -1723,13 +1799,12 @@ class Person_Query extends DB_Object
 		}
 	}
 
-
 	/*
 	 * @param $dataset	Results keyed by personID
 	 * @param $format	csv, array or html
 	 * @param $heading
 	 */
-	function _printResultSet($dataset, $format, $heading=NULL)
+	function _printResultSet($dataset, $format, $heading = null)
 	{
 		if ($format == 'csv') {
 			$this->_printResultSetCsv($dataset, $heading);
@@ -1743,20 +1818,24 @@ class Person_Query extends DB_Object
 	function _printResultSetCsv($x, $groupingname)
 	{
 		$fp = fopen('php://output', 'w');
-		if (empty($x)) return;
+		if (empty($x)) {
+			return;
+		}
 		static $headerprinted = false;
 		if (!$headerprinted) {
-			$hr = Array();
+			$hr = [];
 			$headers = array_keys(reset($x));
 			if (reset($headers) == 'ID') {
 				// https://superuser.com/questions/210027/why-does-excel-think-csv-files-are-sylk
-				fputs($fp, '"ID",');
+				fwrite($fp, '"ID",');
 				array_shift($headers);
 			}
 
 			foreach ($headers as $heading) {
-				if (in_array($heading, Array('view_link', 'edit_link', 'note_link', 'checkbox'))) continue;
-				switch($heading) {
+				if (in_array($heading, ['view_link', 'edit_link', 'note_link', 'checkbox'], true)) {
+					continue;
+				}
+				switch ($heading) {
 					case 'person_groups':
 						$hr[] = 'Groups';
 						break;
@@ -1767,37 +1846,43 @@ class Person_Query extends DB_Object
 					default:
 						if (isset($this->_field_details[$heading])) {
 							$hr[] = $this->_field_details[$heading]['label'];
-						} else if (0 === strpos($heading, self::CUSTOMFIELD_PREFIX)) {
+						} elseif (str_starts_with($heading, self::CUSTOMFIELD_PREFIX)) {
 							$hr[] = $this->_custom_fields[substr($heading, strlen(self::CUSTOMFIELD_PREFIX))]['name'];
 						} else {
 							$hr[] = ucfirst($heading);
 						}
 				}
 			}
-			if ($groupingname) $hr[] = 'GROUPING';
+			if ($groupingname) {
+				$hr[] = 'GROUPING';
+			}
 
 			fputcsv($fp, $hr);
-			$headerprinted = TRUE;
+			$headerprinted = true;
 		}
 		foreach ($x as $row) {
-			$r = Array();
+			$r = [];
 			foreach ($row as $label => $val) {
-				if (in_array($label, Array('view_link', 'edit_link', 'note_link', 'checkbox'))) continue;
+				if (in_array($label, ['view_link', 'edit_link', 'note_link', 'checkbox'], true)) {
+					continue;
+				}
 				if (isset($this->_field_details[$label])) {
 					$var = $label[0] == 'p' ? '_dummy_person' : '_dummy_family';
 					$fieldname = substr($label, 2);
 					if ($fieldname == 'id') {
-							$r[] = $val;
+						$r[] = $val;
 					} else {
-							$r[] = $this->$var->getFormattedValue($fieldname, $val);
+						$r[] = $this->$var->getFormattedValue($fieldname, $val);
 					}
-				} else if (0 === strpos($label, self::CUSTOMFIELD_PREFIX)) {
+				} elseif (str_starts_with($label, self::CUSTOMFIELD_PREFIX)) {
 					$r[] = $this->_formatCustomFieldValue($val, substr($label, strlen(self::CUSTOMFIELD_PREFIX)));
 				} else {
 					$r[] = $val;
 				}
 			}
-			if ($groupingname) $r[] = str_replace('"', '""', $groupingname);
+			if ($groupingname) {
+				$r[] = str_replace('"', '""', $groupingname);
+			}
 			fputcsv($fp, $r);
 		}
 		fclose($fp);
@@ -1805,16 +1890,20 @@ class Person_Query extends DB_Object
 
 	function _printResultSetArray($x, $groupingname)
 	{
-		if (empty($x)) return;
-//		return $x;
-		$data = array();
-		$hr = Array();
+		if (empty($x)) {
+			return;
+		}
+		//		return $x;
+		$data = [];
+		$hr = [];
 		$headers = array_keys(reset($x));
 		$personid_found = false;
 		$i = 0;
 		foreach ($headers as $heading) {
-			if (in_array($heading, Array('view_link', 'edit_link', 'checkbox'))) continue;
-			switch($heading) {
+			if (in_array($heading, ['view_link', 'edit_link', 'checkbox'], true)) {
+				continue;
+			}
+			switch ($heading) {
 				case 'person_groups':
 					$i++;
 					$hr[$i] = 'Groups';
@@ -1828,7 +1917,7 @@ class Person_Query extends DB_Object
 					$i++;
 					if (isset($this->_field_details[$heading])) {
 						$hr[$i] = $this->_field_details[$heading]['label'];
-					} else if (0 === strpos($heading, self::CUSTOMFIELD_PREFIX)) {
+					} elseif (str_starts_with($heading, self::CUSTOMFIELD_PREFIX)) {
 						$hr[$i] = $this->_custom_fields[substr($heading, strlen(self::CUSTOMFIELD_PREFIX))]['name'];
 					} else {
 						$hr[$i] = ucfirst($heading);
@@ -1839,38 +1928,40 @@ class Person_Query extends DB_Object
 			}
 		}
 		if ($groupingname) {
-			$i++;
+			++$i;
 			$hr[$i] = 'GROUPING';
 		}
 
 		foreach ($x as $id => $row) {
-			$r = Array();
+			$r = [];
 			$i = 0;
 			foreach ($row as $label => $val) {
-				if (in_array($label, Array('view_link', 'edit_link', 'checkbox'))) continue;
+				if (in_array($label, ['view_link', 'edit_link', 'checkbox'], true)) {
+					continue;
+				}
 				if (isset($this->_field_details[$label])) {
 					$var = $label[0] == 'p' ? '_dummy_person' : '_dummy_family';
 					$fieldname = substr($label, 2);
 					if ($fieldname == 'id') {
-							$i++;
-							$r[$hr[$i]] = $val;
+						++$i;
+						$r[$hr[$i]] = $val;
 					} else {
-							$i++;
-							$r[$hr[$i]] = $this->$var->getFormattedValue($fieldname, $val);
+						++$i;
+						$r[$hr[$i]] = $this->$var->getFormattedValue($fieldname, $val);
 					}
-				} else if (0 === strpos($label, self::CUSTOMFIELD_PREFIX)) {
-					$i++;
+				} elseif (str_starts_with($label, self::CUSTOMFIELD_PREFIX)) {
+					++$i;
 					$r[$hr[$i]] = $this->_formatCustomFieldValue($val, substr($label, strlen(self::CUSTOMFIELD_PREFIX)));
 				} else {
-					$i++;
+					++$i;
 					$r[$hr[$i]] = $val;
 				}
 			}
 			if ($groupingname) {
-				$i++;
+				++$i;
 				$r[$hr[$i]] = str_replace('"', '""', $groupingname);
 			}
-			if (! $personid_found) {
+			if (!$personid_found) {
 				$r['Person ID'] = $id;
 			}
 			$data[] = $r;
@@ -1897,11 +1988,13 @@ class Person_Query extends DB_Object
 				<tr>
 				<?php
 				foreach ($headers as $heading) {
-					if ($heading[0] == '_') continue;
+					if ($heading[0] == '_') {
+						continue;
+					}
 					?>
 					<th<?php echo $this->_getColClasses($heading); ?>>
 						<?php
-						switch($heading) {
+						switch ($heading) {
 							case 'person_groups':
 								echo 'Groups';
 								break;
@@ -1918,17 +2011,17 @@ class Person_Query extends DB_Object
 							default:
 								if (isset($this->_field_details[$heading])) {
 									echo $this->_field_details[$heading]['label'];
-								} else if (0 === strpos($heading, self::CUSTOMFIELD_PREFIX)) {
+								} elseif (str_starts_with($heading, self::CUSTOMFIELD_PREFIX)) {
 									echo ents($this->_custom_fields[substr($heading, strlen(self::CUSTOMFIELD_PREFIX))]['name']);
 								} else {
 									echo ucfirst($heading);
 								}
 						}
-						?>
+					?>
 					</th>
 					<?php
 				}
-				?>
+		?>
 				</tr>
 			</thead>
 			<tbody>
@@ -1938,7 +2031,9 @@ class Person_Query extends DB_Object
 				<tr data-personid="<?php echo $personid; ?>">
 				<?php
 				foreach ($row as $label => $val) {
-					if ($label[0] == '_') continue;
+					if ($label[0] == '_') {
+						continue;
+					}
 					?>
 					<td <?php echo $this->_getColClasses($label); ?>>
 						<?php
@@ -1955,10 +2050,10 @@ class Person_Query extends DB_Object
 								break;
 							case 'note_link':
 								// if notes are shown on this report, we want to refresh after adding a new one
-								$then = in_array('Notes', $headers) ? '&then=refresh_opener' : '';
+								$then = in_array('Notes', $headers, true) ? '&then=refresh_opener' : '';
 								if ($GLOBALS['user_system']->havePerm(PERM_EDITNOTE)) {
 									?>
-									<a class="med-popup no-print" href="?view=_add_note_to_person&personid=<?php echo $row[$label].$then ?>"><i class="icon-pencil"></i>Add&nbsp;Note</a>
+									<a class="med-popup no-print" href="?view=_add_note_to_person&personid=<?php echo $row[$label].$then; ?>"><i class="icon-pencil"></i>Add&nbsp;Note</a>
 									<?php
 								}
 								break;
@@ -1989,7 +2084,7 @@ class Person_Query extends DB_Object
 								break;
 							case 'Notes':
 								$val = ents($val);
-								$val = preg_replace('/(\[[A-Z][A-Z]\])/', "<small class=\"soft\">$1</small>", $val);
+								$val = preg_replace('/(\[[A-Z][A-Z]\])/', '<small class="soft">$1</small>', $val);
 								echo nl2br($val);
 								break;
 							default:
@@ -1999,13 +2094,13 @@ class Person_Query extends DB_Object
 									$fieldname = substr($label, 2);
 									$this->$var->setValue($fieldname, $val);
 									$this->$var->printFieldValue($fieldname);
-								} else if (0 === strpos($label, self::CUSTOMFIELD_PREFIX)) {
+								} elseif (str_starts_with($label, self::CUSTOMFIELD_PREFIX)) {
 									$this->_printCustomFieldValue($val, substr($label, strlen(self::CUSTOMFIELD_PREFIX)));
 								} else {
 									echo nl2br(ents($val));
 								}
 						}
-						?>
+					?>
 					</td>
 					<?php
 				}
@@ -2013,7 +2108,7 @@ class Person_Query extends DB_Object
 				</tr>
 				<?php
 			}
-			?>
+		?>
 			</tbody>
 			<tfoot>
 				<tr>
@@ -2031,38 +2126,44 @@ class Person_Query extends DB_Object
 		<?php
 	}
 
-
 	function validateFields()
 	{
-		if (!parent::validateFields()) return FALSE;
+		if (!parent::validateFields()) {
+			return false;
+		}
 
-		return TRUE;
+		return true;
 	}
 
-
-	private function canSave($throwErrors=FALSE)
+	private function canSave($throwErrors = false)
 	{
-		if (!($this->getValue('owner'))
+		if (!$this->getValue('owner')
 			&& (!$GLOBALS['user_system']->havePerm(PERM_MANAGEREPORTS))
 		) {
-			if ($throwErrors) throw new \RuntimeException('You do not have permission to save shared reports');
-			return FALSE;
-		} else if (($this->getValue('owner')) && ($this->getValue('owner') != $GLOBALS['user_system']->getCurrentUser('id'))
+			if ($throwErrors) {
+				throw new RuntimeException('You do not have permission to save shared reports');
+			}
+
+			return false;
+		} elseif ($this->getValue('owner') && ($this->getValue('owner') != $GLOBALS['user_system']->getCurrentUser('id'))
 		) {
-			if ($throwErrors) throw new \RuntimeException('Cannot save report that belongs to another user!');
-			return FALSE;
+			if ($throwErrors) {
+				throw new RuntimeException('Cannot save report that belongs to another user!');
+			}
+
+			return false;
 		} else {
-			return TRUE;
+			return true;
 		}
 	}
-
 
 	function save()
 	{
 		if ($this->id == 'TEMP') {
 			$_SESSION['saved_query'] = serialize($this);
-			return TRUE;
-		} else if (!$this->canSave(TRUE)) {
+
+			return true;
+		} elseif (!$this->canSave(true)) {
 			exit;
 		} else {
 			return parent::save();
@@ -2076,7 +2177,8 @@ class Person_Query extends DB_Object
 				$x = unserialize($_SESSION['saved_query']);
 				$this->populate($x->id, $x->values);
 			}
-			return TRUE;
+
+			return true;
 		} else {
 			$res = parent::load($id);
 			$user = $GLOBALS['user_system']->getCurrentUser('id');
@@ -2084,19 +2186,22 @@ class Person_Query extends DB_Object
 			if (!empty($user) && !empty($owner) && ($owner != $user)) {
 				// Somebody trying to open a report that belongs to another
 				$this->reset();
-				return FALSE;
+
+				return false;
 			}
+
 			return $res;
 		}
 	}
 
 	function _getColClasses($heading)
 	{
-		$class_list = Array();
+		$class_list = [];
 		switch ($heading) {
 			case 'checkbox':
 				$class_list[] = 'selector';
 				// fallthrough
+				// no break
 			case 'edit_link':
 			case 'view_link':
 			case 'note_link':
@@ -2112,6 +2217,7 @@ class Person_Query extends DB_Object
 				$class_list[] = 'nowrap';
 		}
 		$classes = empty($class_list) ? '' : ' class="'.implode(' ', $class_list).'"';
+
 		return $classes;
 	}
 
@@ -2122,18 +2228,21 @@ class Person_Query extends DB_Object
 		if (count($bits) == 1) {
 			return $db->quoteIdentifier($field);
 		} else {
-			list ($t, $f) = $bits;
+			[$t, $f] = $bits;
+
 			return $db->quoteIdentifier($t).'.'.$db->quoteIdentifier($f);
 		}
 	}
 
 	/**
 	 * Convert an older version of the params to new format
-	 * and clean up any stupidities
+	 * and clean up any stupidities.
 	 */
 	private function _convertParams($params)
 	{
-		if (empty($params)) return Array();
+		if (empty($params)) {
+			return [];
+		}
 		if (!empty($params['dates'])) {
 			foreach ($params['dates'] as $rule) {
 				$params['custom_fields'][$rule['typeid']] = $rule;
@@ -2145,8 +2254,8 @@ class Person_Query extends DB_Object
 			$params['custom_field_logic'] = $params['date_logic'];
 			unset($params['date_logic']);
 		}
-		foreach (array_get($params, 'show_fields', Array()) as $i => $v) {
-			if (0 === strpos($v, 'date---')) {
+		foreach (array_get($params, 'show_fields', []) as $i => $v) {
+			if (str_starts_with($v, 'date---')) {
 				$params['show_fields'][$i] = self::CUSTOMFIELD_PREFIX.substr($v, strlen('date---'));
 			}
 			if ($v == 'p.age_bracket') {
@@ -2154,7 +2263,7 @@ class Person_Query extends DB_Object
 			}
 		}
 
-		if (0 === strpos($params['sort_by'], 'date---')) {
+		if (str_starts_with($params['sort_by'], 'date---')) {
 			$params['sort_by'] = self::CUSTOMFIELD_PREFIX.substr($params['sort_by'], strlen('date---'));
 		}
 		if ($params['sort_by'] == 'p.age_bracket') {
@@ -2170,7 +2279,9 @@ class Person_Query extends DB_Object
 		if ($params['group_by'] == 'p.age_bracket') {
 			$params['group_by'] = 'p.age_bracketid';
 		}
-		if (!isset($params['rules'])) $params['rules'] = Array();
+		if (!isset($params['rules'])) {
+			$params['rules'] = [];
+		}
 
 		// Convert the old 'periodtype=relative/fixed' to new format.
 		if (!empty($params['custom_fields'])) {
@@ -2179,7 +2290,7 @@ class Person_Query extends DB_Object
 					$days = $rule['periodlength'];
 					$months = 0;
 					$years = floor($days / 365); // never mind leap years
-					$days = $days % 365;
+					$days %= 365;
 					switch ($rule['periodanchor']) {
 						case 'ending':
 							$rule['to'] = '-0y0m0d';
@@ -2187,26 +2298,28 @@ class Person_Query extends DB_Object
 							break;
 						case 'before':
 							$rule['to'] = '-0y0m1d';
-							$rule['from'] = '-'.$years.'y0m'.($days+1).'d';
+							$rule['from'] = '-'.$years.'y0m'.($days + 1).'d';
 							break;
 						case 'starting':
 							$rule['from'] = '+0y0m0d';
-							$rule['to'] = '+'.$years.'y0m'.($days).'d';
+							$rule['to'] = '+'.$years.'y0m'.$days.'d';
 							break;
 						case 'after':
 							$rule['from'] = '+0y0m1d';
-							$rule['to'] = '+'.$years.'y0m'.($days+1).'d';
+							$rule['to'] = '+'.$years.'y0m'.($days + 1).'d';
 							break;
 					}
-				} else if (array_get($rule, 'periodtype') == 'fixed') {
+				} elseif (array_get($rule, 'periodtype') == 'fixed') {
 					// make open-ended values explicit.
-					if (empty($rule['from'])) $rule['from'] = '*';
-					if (empty($rule['from'])) $rule['to'] = '*';
+					if (empty($rule['from'])) {
+						$rule['from'] = '*';
+					}
+					if (empty($rule['from'])) {
+						$rule['to'] = '*';
+					}
 				}
 
-				unset($rule['periodtype']); // Now captured with special values for 'from' and 'to'.
-				unset($rule['periodlength']); 
-				unset($rule['periodanchor']); 
+				unset($rule['periodtype'], $rule['periodlength'], $rule['periodanchor']); // Now captured with special values for 'from' and 'to'.
 			}
 		}
 
@@ -2217,14 +2330,19 @@ class Person_Query extends DB_Object
 	private function hasGroupingField(array $params): bool
 	{
 		$grouping_field = $params['group_by'];
-		if (empty($grouping_field)) return false;
+		if (empty($grouping_field)) {
+			return false;
+		}
 		if ($grouping_field) {
-			if (0 === strpos($grouping_field, 'custom-')) {
+			if (str_starts_with($grouping_field, 'custom-')) {
 				$gb_bits = explode('-', $params['group_by']);
 				$field = $GLOBALS['system']->getDBObject('custom_field', end($gb_bits));
-				if (empty($field)) return false;
+				if (empty($field)) {
+					return false;
+				}
 			}
 		}
+
 		return true;
 	}
 }

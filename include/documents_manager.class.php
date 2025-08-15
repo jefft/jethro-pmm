@@ -1,6 +1,6 @@
 <?php
-class Documents_Manager {
-
+class Documents_Manager
+{
 	public static function getRootPath()
 	{
 		if (ifdef('DOCUMENTS_ROOT_PATH') && is_dir(DOCUMENTS_ROOT_PATH)) {
@@ -12,20 +12,25 @@ class Documents_Manager {
 
 	// If $filename is an acceptable filename (extension not prohibited, no leading dot, no slashes)
 	// returns it intact; else triggers an error and returns blank string
-	public static function validateFileName($filename) {
+	public static function validateFileName($filename)
+	{
 		$ext = self::getExtension($filename);
-		if (in_array($ext, Array('php', 'php3', 'php4', 'inc', 'act'))) {
+		if (in_array($ext, ['php', 'php3', 'php4', 'inc', 'act'], true)) {
 			trigger_error('File extension "'.$ext.'" is not allowed');
+
 			return '';
 		}
 		if ($filename[0] == '.') {
 			trigger_error('Files beginning with dot are not allowed');
+
 			return '';
 		}
-		if (FALSE !== strpos($filename, '/') || FALSE !== strpos($filename, '\\')) {
+		if (str_contains($filename, '/') || str_contains($filename, '\\')) {
 			trigger_error('Files containing slashes are not allowed');
+
 			return '';
 		}
+
 		return $filename;
 	}
 
@@ -33,32 +38,35 @@ class Documents_Manager {
 	public static function validateDirPath($path)
 	{
 		$bits = explode('/', $path);
-		if (in_array('.', $bits) || in_array('..', $bits)) {
-			throw new \RuntimeException('Dot or double-dot not allowed in directory parameter'); //exits
+		if (in_array('.', $bits, true) || in_array('..', $bits, true)) {
+			throw new RuntimeException('Dot or double-dot not allowed in directory parameter'); // exits
 		}
 		$res = self::getRootPath().implode('/', $bits);
 		if (!is_dir($res)) {
-			throw new \RuntimeException("Specified folder does not exist"); // exits
+			throw new RuntimeException('Specified folder does not exist'); // exits
 		}
+
 		return $res;
 	}
 
 	// If $name is a valid dir name, returns a cleaned version of it (spaces to underscores)
 	// Else triggers an error and returns empty string
-	public static function validateDirName($name) {
+	public static function validateDirName($name)
+	{
 		$name = str_replace(' ', '_', $name);
 		if (!preg_match('/[-_A-Za-z0-9&]+/', $name)) {
-			trigger_error("Invalid folder name");
+			trigger_error('Invalid folder name');
+
 			return '';
 		}
+
 		return $name;
 	}
-	
-	
+
 	public static function serveFile($filename)
 	{
 		$filename = realpath($filename); // resolve any trickiness like ../..
-		if (0 !== strpos($filename, self::getRootPath())) {
+		if (!str_starts_with($filename, self::getRootPath())) {
 			trigger_error("Illegal file path requested: $filename");
 			exit;
 		}
@@ -71,31 +79,37 @@ class Documents_Manager {
 						<title><?php echo ents($filename); ?></title>
 					</head>
 					<body>
-						<img src="<?php echo build_url(Array('bin'=>1)); ?>" style="max-width: 100%" />
+						<img src="<?php echo build_url(['bin' => 1]); ?>" style="max-width: 100%" />
 					</body>
 				</html>
 				<?php
 			} else {
-				if (empty($mime)) $mime = 'image/'.self::getExtension($filename);
+				if (empty($mime)) {
+					$mime = 'image/'.self::getExtension($filename);
+				}
 				header('Content-type: '.$mime);
 				readfile($filename);
 			}
-		} else if (self::isHTML($filename)) {
+		} elseif (self::isHTML($filename)) {
 			// No extra headers needed for HTML docs
 			readfile($filename);
-		} else if (self::isPDF($filename)) {
+		} elseif (self::isPDF($filename)) {
 			// PDFs can often be displayed inline
-			if (empty($mime)) $mime = 'application/pdf';
+			if (empty($mime)) {
+				$mime = 'application/pdf';
+			}
 			header('Content-type: '.$mime);
 			readfile($filename);
 		} else {
 			// download
-			if (empty($mime)) $mime = self::_guessContentType($filename);
-			header("Pragma: public"); // required
-			header("Expires: 0");
-			header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
-			header("Cache-Control: private",false); // required for certain browsers
-			header("Content-Transfer-Encoding: binary");
+			if (empty($mime)) {
+				$mime = self::_guessContentType($filename);
+			}
+			header('Pragma: public'); // required
+			header('Expires: 0');
+			header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+			header('Cache-Control: private', false); // required for certain browsers
+			header('Content-Transfer-Encoding: binary');
 			header('Content-type: '.$mime);
 			header('Content-Disposition: attachment; filename="'.basename($filename).'"');
 			readfile($filename);
@@ -105,41 +119,49 @@ class Documents_Manager {
 	private static function _guessContentType($filename)
 	{
 		switch (self::getExtension($filename)) {
-			case "pdf": $ctype="application/pdf"; break;
-			case "exe": $ctype="application/octet-stream"; break;
-			case "zip": $ctype="application/zip"; break;
-			case "doc":
-			case "docx": $ctype="application/msword"; break;
-			case "xls": $ctype="application/vnd.ms-excel"; break;
-			case "ppt": $ctype="application/vnd.ms-powerpoint"; break;
-			case "gif": $ctype="image/gif"; break;
-			case "png": $ctype="image/png"; break;
-			case "jpeg":
-			case "jpg": $ctype="image/jpg"; break;
-			default: $ctype="application/force-download";
+			case 'pdf': $ctype = 'application/pdf';
+				break;
+			case 'exe': $ctype = 'application/octet-stream';
+				break;
+			case 'zip': $ctype = 'application/zip';
+				break;
+			case 'doc':
+			case 'docx': $ctype = 'application/msword';
+				break;
+			case 'xls': $ctype = 'application/vnd.ms-excel';
+				break;
+			case 'ppt': $ctype = 'application/vnd.ms-powerpoint';
+				break;
+			case 'gif': $ctype = 'image/gif';
+				break;
+			case 'png': $ctype = 'image/png';
+				break;
+			case 'jpeg':
+			case 'jpg': $ctype = 'image/jpg';
+				break;
+			default: $ctype = 'application/force-download';
 		}
+
 		return $ctype;
 	}
 
 	private static function getExtension($filename)
 	{
-		return strtolower(substr($filename, strrpos($filename, '.')+1));
+		return strtolower(substr($filename, strrpos($filename, '.') + 1));
 	}
 
 	public static function isHTML($filename)
 	{
-		return in_array(self::getExtension($filename), Array('html', 'htm'));
+		return in_array(self::getExtension($filename), ['html', 'htm'], true);
 	}
 
 	public static function isImage($filename)
 	{
-		return in_array(self::getExtension($filename), Array('png', 'jpg', 'jpeg', 'gif'));
+		return in_array(self::getExtension($filename), ['png', 'jpg', 'jpeg', 'gif'], true);
 	}
 
-	public static function isPDF($filename) {
+	public static function isPDF($filename)
+	{
 		return self::getExtension($filename) == 'pdf';
 	}
-
-
-
 }

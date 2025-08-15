@@ -1,7 +1,7 @@
 <?php
 class View_Admin__Custom_Fields extends View
 {
-	private $fields = Array();
+	private $fields = [];
 
 	static function getMenuPermissionLevel()
 	{
@@ -15,19 +15,20 @@ class View_Admin__Custom_Fields extends View
 
 	function processView()
 	{
-		$fields = $GLOBALS['system']->getDBObjectData('custom_field', Array(), 'OR', 'rank');
+		$fields = $GLOBALS['system']->getDBObjectData('custom_field', [], 'OR', 'rank');
 		foreach ($fields as $id => $details) {
 			$x = new Custom_field($id);
 			if (!$x->acquireLock()) {
-				$this->fields = NULL;
-				add_message("Somebody else is currently editing the custom fields.  Please try again later", 'error');
+				$this->fields = null;
+				add_message('Somebody else is currently editing the custom fields.  Please try again later', 'error');
+
 				return;
 			}
 			$this->fields[$id] = $x;
 		}
 
 		$i = 0;
-		$ranks = array_flip(array_get($_REQUEST, 'index', Array()));
+		$ranks = array_flip(array_get($_REQUEST, 'index', []));
 		while (array_key_exists('fields_'.$i.'_id', $_REQUEST)) {
 			$prefix = 'fields_'.$i.'_';
 			if (empty($_REQUEST[$prefix.'id'])) {
@@ -52,29 +53,28 @@ class View_Admin__Custom_Fields extends View
 					$this->fields[$fieldID]->save();
 				}
 			}
-			$i++;
+			++$i;
 		}
 
-
-
-		uasort($this->fields, function($x,$y) {return ((int)$x->getValue("rank") > (int)$y->getValue("rank")) ? 1 : 0;});
+		uasort($this->fields, function ($x, $y) {return ((int) $x->getValue('rank') > (int) $y->getValue('rank')) ? 1 : 0; });
 
 		if ($i > 0) {
-			add_message("Custom fields updated", 'success');
+			add_message('Custom fields updated', 'success');
 		}
-
 	}
 
 	function printView()
 	{
-		if (is_null($this->fields)) return;
+		if (null === $this->fields) {
+			return;
+		}
 		?>
 		<p class="text alert alert-info">
-			<?php 
+			<?php
 			echo _("When you define a custom field here, you'll then be able to enter a value for that field when editing a person record.");
-			echo '<br />';
-			echo _("Custom fields are useful for recording dates of birth, accreditations and medical details.");
-			?>
+		echo '<br />';
+		echo _('Custom fields are useful for recording dates of birth, accreditations and medical details.');
+		?>
 		</p>
 		<?php
 
@@ -101,17 +101,17 @@ class View_Admin__Custom_Fields extends View
 			<tbody>
 			<?php
 			$i = 0;
-			foreach ($this->fields as $field) {
-				$prefix = 'fields_'.$i.'_';
-				$class = $field->getValue('divider_before') ? 'class="divider-before"' : '';
-				?>
+		foreach ($this->fields as $field) {
+			$prefix = 'fields_'.$i.'_';
+			$class = $field->getValue('divider_before') ? 'class="divider-before"' : '';
+			?>
 				<tr <?php echo $class; ?>>
 					<td class="cursor-move">
 						<?php
-						echo $field->id;
-						print_hidden_field($prefix.'id', $field->id);
-						print_hidden_field('index[]', $i);
-						?>
+					echo $field->id;
+			print_hidden_field($prefix.'id', $field->id);
+			print_hidden_field('index[]', $i);
+			?>
 					</td>
 					<td class="name">
 						<?php $field->printFieldInterface('heading_before', $prefix); ?>
@@ -119,12 +119,12 @@ class View_Admin__Custom_Fields extends View
 					</td>
 					<td>
 						<?php
-						if ($field->id) {
-							$field->printFieldValue('type');
-						} else {
-							$field->printFieldInterface('type', $prefix);
-						}
-						?>
+			if ($field->id) {
+				$field->printFieldValue('type');
+			} else {
+				$field->printFieldInterface('type', $prefix);
+			}
+			?>
 					</td>
 					<td>
 						<label class="radio">
@@ -144,7 +144,7 @@ class View_Admin__Custom_Fields extends View
 						</label>
 						<?php
 					}
-					?>
+			?>
 						<label class="radio toggle-divider">
 							<?php $field->printFieldInterface('divider_before', $prefix); ?>
 							Divider Before
@@ -162,26 +162,26 @@ class View_Admin__Custom_Fields extends View
 						
 					</td>
 					<td>
-						<?php 
-						$field->printFieldInterface('params', $prefix);
-						?>
+						<?php
+				$field->printFieldInterface('params', $prefix);
+			?>
 					</td>
 					<td class="center">
 						<?php
-						if ($field->id) {
-							?>
+			if ($field->id) {
+				?>
 							<input type="checkbox" name="<?php echo $prefix; ?>delete" value="1"
 								   data-toggle="strikethrough" data-target="row"
 								   title="Click to delete this field" />
 							<?php
-						}
-						?>
+			}
+			?>
 					</td>
 				</tr>
 				<?php
-				$i++;
-			}
-			?>
+				++$i;
+		}
+		?>
 			</tbody>
 		</table>
 		<input type="submit" class="btn" value="Save" />

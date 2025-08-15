@@ -8,10 +8,9 @@ class View__Change_Password extends View
 
 	function processView()
 	{
-			// This is handled by member_user_system
-
+		// This is handled by member_user_system
 	}
-	
+
 	function printView()
 	{
 		?>
@@ -29,5 +28,4 @@ class View__Change_Password extends View
 		<?php
 
 	}
-
 }

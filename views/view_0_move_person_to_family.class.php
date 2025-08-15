@@ -10,43 +10,42 @@ class View__Move_Person_To_Family extends View
 
 	function processView()
 	{
-		$GLOBALS['system']->setFriendlyErrors(TRUE);
-		$this->_person = $GLOBALS['system']->getDBObject('person', (int)$_REQUEST['personid']);
+		$GLOBALS['system']->setFriendlyErrors(true);
+		$this->_person = $GLOBALS['system']->getDBObject('person', (int) $_REQUEST['personid']);
 		if (!empty($_REQUEST['move_to'])) {
 			if ($_REQUEST['move_to'] == 'new') {
 				$old_familyid = $this->_person->getValue('familyid');
-				$family = $GLOBALS['system']->getDBObject('family', (int)$this->_person->getValue('familyid'));
+				$family = $GLOBALS['system']->getDBObject('family', (int) $this->_person->getValue('familyid'));
 				$family->id = 0;
 				$family->create();
 				$this->_person->setValue('familyid', $family->id);
 				$this->_person->save();
 				add_message('New family created with same details as old family.  You should update the new family\'s details as required');
 				$this->_annotateOldEmptyFamily($old_familyid, $family);
-				redirect('_edit_family', Array('familyid' => $family->id)); // exits
+				redirect('_edit_family', ['familyid' => $family->id]); // exits
 			} else {
 				if (empty($_REQUEST['familyid'])) {
-					trigger_error("You must select a new family to move to, or choose to create a new family");
+					trigger_error('You must select a new family to move to, or choose to create a new family');
+
 					return false;
 				}
-				$family = $GLOBALS['system']->getDBObject('family', (int)$_REQUEST['familyid']);
+				$family = $GLOBALS['system']->getDBObject('family', (int) $_REQUEST['familyid']);
 				if ($family) {
 					$old_familyid = $this->_person->getValue('familyid');
-					$this->_person->setValue('familyid', (int)$_REQUEST['familyid']);
+					$this->_person->setValue('familyid', (int) $_REQUEST['familyid']);
 					if ($this->_person->save()) {
 						add_message('Person moved to family "'.$family->toString().'"');
 						$this->_annotateOldEmptyFamily($old_familyid, $family);
-						redirect('persons', Array('personid' => $this->_person->id)); // exits
-
+						redirect('persons', ['personid' => $this->_person->id]); // exits
 					}
 				}
 			}
-
 		}
 	}
 
 	private function _annotateOldEmptyFamily($old_familyid, $new_family)
 	{
-		$remaining_members = $GLOBALS['system']->getDBObjectData('person', Array('familyid' => $old_familyid));
+		$remaining_members = $GLOBALS['system']->getDBObjectData('person', ['familyid' => $old_familyid]);
 		if (empty($remaining_members)) {
 			$old_family = new Family($old_familyid);
 			if ($GLOBALS['user_system']->havePerm(PERM_EDITNOTE)) {
@@ -62,15 +61,14 @@ class View__Move_Person_To_Family extends View
 
 			// archive the family record
 			$old_family->setValue('status', 'archived');
-			$old_family->save(FALSE);
-		}		
+			$old_family->save(false);
+		}
 	}
 
 	function getTitle()
 	{
 		return 'Editing '.$this->_person->toString();
 	}
-
 
 	function printView()
 	{
@@ -106,7 +104,7 @@ class View__Move_Person_To_Family extends View
 		}
 		if ($show_form) {
 			?>
-			<form method="post" class="form-horizontal" data-lock-length="<?php echo db_object::getLockLength() ?>">
+			<form method="post" class="form-horizontal" data-lock-length="<?php echo db_object::getLockLength(); ?>">
 				<div class="control-group">
 					<label class="control-label">Current Family</label>
 					<div class="controls controls-text">

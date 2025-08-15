@@ -1,7 +1,7 @@
 <?php
 class bible_ref
 {
-	private $med_names = Array(
+	private $med_names = [
 		'genesis',
 		'exodus',
 		'leviticus',
@@ -67,10 +67,10 @@ class bible_ref
 		'2 john',
 		'3 john',
 		'jude',
-		'revelation'
-	);
+		'revelation',
+	];
 
-	private $short_names = Array(
+	private $short_names = [
 		'Gen',
 		'Ex',
 		'Lev',
@@ -136,190 +136,190 @@ class bible_ref
 		'2 Jn',
 		'3 Jn',
 		'Jude',
-		'Rev'
-	);
+		'Rev',
+	];
 
-	private $names_to_numbers = Array(
-		'genesis'=>0,
-		'gen'=>0,
-		'genes'=>0,
-		'exodus'=>1,
-		'exod'=>1,
-		'ex'=>1,
-		'leviticus'=>2,
-		'levit'=>2,
-		'lev'=>2,
-		'numbers'=>3,
-		'nums'=>3,
-		'num'=>3,
-		'deuteronomy'=>4,
-		'deut'=>4,
-		'joshua'=>5,
-		'josh'=>5,
-		'judges'=>6,
-		'judg'=>6,
-		'ruth'=>7,
-		'1samuel'=>8,
-		'1sam'=>8,
-		'1sam'=>8,
-		'2samuel'=>9,
-		'2sam'=>9,
-		'2sam'=>9,
-		'1kings'=>10,
-		'1ki'=>10,
-		'1ki'=>10,
-		'2kings'=>11,
-		'2ki'=>11,
-		'2ki'=>11,
-		'1chronicles'=>12,
-		'1chron'=>12,
-		'1chr'=>12,
-		'1chron'=>12,
-		'1chr'=>12,
-		'2chronicles'=>13,
-		'2chron'=>13,
-		'2chr'=>13,
-		'2chr'=>13,
-		'2chron'=>13,
-		'ezra'=>14,
-		'nehemiah'=>15,
-		'nehem'=>15,
-		'neh'=>15,
-		'esther'=>16,
-		'esth'=>16,
-		'est'=>16,
-		'job'=>17,
-		'psalms'=>18,
-		'psalm'=>18,
-		'pss'=>18,
-		'ps'=>18,
-		'proverbs'=>19,
-		'prov'=>19,
-		'pr'=>19,
-		'ecclesiastes'=>20,
-		'eccles'=>20,
-		'eccl'=>20,
-		'ecc'=>20,
-		'song'=>21,
-		'sng'=>21,
-		'sg'=>21,
-		'songsol'=>21,
-		'songofsolomon'=>21,
-		'songofsongs'=>21,
-		'songofsong'=>21,
-		'sos'=>21,
-		'songofsol'=>21,
-		'isaiah'=>22,
-		'isa'=>22,
-		'jeremiah'=>23,
-		'jerem'=>23,
-		'jer'=>23,
-		'lamentations'=>24,
-		'lam'=>24,
-		'ezekiel'=>25,
-		'ezek'=>25,
-		'daniel'=>26,
-		'dan'=>26,
-		'hosea'=>27,
-		'hos'=>27,
-		'joel'=>28,
-		'jl'=>28,
-		'jo'=>28,
-		'amos'=>29,
-		'am'=>29,
-		'obadiah'=>30,
-		'obad'=>30,
-		'obd'=>30,
-		'ob'=>30,
-		'jonah'=>31,
-		'jon'=>31,
-		'micah'=>32,
-		'mic'=>32,
-		'nahum'=>33,
-		'nah'=>33,
-		'habakkuk'=>34,
-		'hab'=>34,
-		'zephaniah'=>35,
-		'zeph'=>35,
-		'haggai'=>36,
-		'hag'=>36,
-		'zechariah'=>37,
-		'zech'=>37,
-		'zec'=>37,
-		'malachi'=>38,
-		'mal'=>38,
-		'matthew'=>39,
-		'mathew'=>39,
-		'matt'=>39,
-		'mat'=>39,
-		'mark'=>40,
-		'mk'=>40,
-		'luke'=>41,
-		'lk'=>41,
-		'john'=>42,
-		'jn'=>42,
-		'actsoftheapostles'=>43,
-		'acts'=>43,
-		'ac'=>43,
-		'romans'=>44,
-		'rom'=>44,
-		'1corinthians'=>45,
-		'1cor'=>45,
-		'1cor'=>45,
-		'2corinthians'=>46,
-		'2cor'=>46,
-		'2cor'=>46,
-		'galatians'=>47,
-		'gal'=>47,
-		'ephesians'=>48,
-		'eph'=>48,
-		'philippians'=>49,
-		'phil'=>49,
-		'colossians'=>50,
-		'col'=>50,
-		'1thessalonians'=>51,
-		'1thess'=>51,
-		'1thes'=>51,
-		'1thes'=>51,
-		'2thessalonians'=>52,
-		'2thess'=>52,
-		'2thes'=>52,
-		'2thes'=>52,
-		'1timothy'=>53,
-		'1tim'=>53,
-		'1tim'=>53,
-		'2timothy'=>54,
-		'2tim'=>54,
-		'2tim'=>54,
-		'titus'=>55,
-		'tit'=>55,
-		'ti'=>55,
-		'philemon'=>56,
-		'hebrews'=>57,
-		'heb'=>57,
-		'james'=>58,
-		'jam'=>58,
-		'1peter'=>59,
-		'1pet'=>59,
-		'1pet'=>59,
-		'2peter'=>60,
-		'2pet'=>60,
-		'2pet'=>60,
-		'1john'=>61,
-		'1jn'=>61,
-		'1jn'=>61,
-		'2john'=>62,
-		'2jn'=>62,
-		'2jn'=>62,
-		'3john'=>63,
-		'3jn'=>63,
-		'3jn'=>63,
-		'jude'=>64,
-		'revelation'=>65,
-		'rev'=>65
-	);
+	private $names_to_numbers = [
+		'genesis' => 0,
+		'gen' => 0,
+		'genes' => 0,
+		'exodus' => 1,
+		'exod' => 1,
+		'ex' => 1,
+		'leviticus' => 2,
+		'levit' => 2,
+		'lev' => 2,
+		'numbers' => 3,
+		'nums' => 3,
+		'num' => 3,
+		'deuteronomy' => 4,
+		'deut' => 4,
+		'joshua' => 5,
+		'josh' => 5,
+		'judges' => 6,
+		'judg' => 6,
+		'ruth' => 7,
+		'1samuel' => 8,
+		'1sam' => 8,
+		'1sam' => 8,
+		'2samuel' => 9,
+		'2sam' => 9,
+		'2sam' => 9,
+		'1kings' => 10,
+		'1ki' => 10,
+		'1ki' => 10,
+		'2kings' => 11,
+		'2ki' => 11,
+		'2ki' => 11,
+		'1chronicles' => 12,
+		'1chron' => 12,
+		'1chr' => 12,
+		'1chron' => 12,
+		'1chr' => 12,
+		'2chronicles' => 13,
+		'2chron' => 13,
+		'2chr' => 13,
+		'2chr' => 13,
+		'2chron' => 13,
+		'ezra' => 14,
+		'nehemiah' => 15,
+		'nehem' => 15,
+		'neh' => 15,
+		'esther' => 16,
+		'esth' => 16,
+		'est' => 16,
+		'job' => 17,
+		'psalms' => 18,
+		'psalm' => 18,
+		'pss' => 18,
+		'ps' => 18,
+		'proverbs' => 19,
+		'prov' => 19,
+		'pr' => 19,
+		'ecclesiastes' => 20,
+		'eccles' => 20,
+		'eccl' => 20,
+		'ecc' => 20,
+		'song' => 21,
+		'sng' => 21,
+		'sg' => 21,
+		'songsol' => 21,
+		'songofsolomon' => 21,
+		'songofsongs' => 21,
+		'songofsong' => 21,
+		'sos' => 21,
+		'songofsol' => 21,
+		'isaiah' => 22,
+		'isa' => 22,
+		'jeremiah' => 23,
+		'jerem' => 23,
+		'jer' => 23,
+		'lamentations' => 24,
+		'lam' => 24,
+		'ezekiel' => 25,
+		'ezek' => 25,
+		'daniel' => 26,
+		'dan' => 26,
+		'hosea' => 27,
+		'hos' => 27,
+		'joel' => 28,
+		'jl' => 28,
+		'jo' => 28,
+		'amos' => 29,
+		'am' => 29,
+		'obadiah' => 30,
+		'obad' => 30,
+		'obd' => 30,
+		'ob' => 30,
+		'jonah' => 31,
+		'jon' => 31,
+		'micah' => 32,
+		'mic' => 32,
+		'nahum' => 33,
+		'nah' => 33,
+		'habakkuk' => 34,
+		'hab' => 34,
+		'zephaniah' => 35,
+		'zeph' => 35,
+		'haggai' => 36,
+		'hag' => 36,
+		'zechariah' => 37,
+		'zech' => 37,
+		'zec' => 37,
+		'malachi' => 38,
+		'mal' => 38,
+		'matthew' => 39,
+		'mathew' => 39,
+		'matt' => 39,
+		'mat' => 39,
+		'mark' => 40,
+		'mk' => 40,
+		'luke' => 41,
+		'lk' => 41,
+		'john' => 42,
+		'jn' => 42,
+		'actsoftheapostles' => 43,
+		'acts' => 43,
+		'ac' => 43,
+		'romans' => 44,
+		'rom' => 44,
+		'1corinthians' => 45,
+		'1cor' => 45,
+		'1cor' => 45,
+		'2corinthians' => 46,
+		'2cor' => 46,
+		'2cor' => 46,
+		'galatians' => 47,
+		'gal' => 47,
+		'ephesians' => 48,
+		'eph' => 48,
+		'philippians' => 49,
+		'phil' => 49,
+		'colossians' => 50,
+		'col' => 50,
+		'1thessalonians' => 51,
+		'1thess' => 51,
+		'1thes' => 51,
+		'1thes' => 51,
+		'2thessalonians' => 52,
+		'2thess' => 52,
+		'2thes' => 52,
+		'2thes' => 52,
+		'1timothy' => 53,
+		'1tim' => 53,
+		'1tim' => 53,
+		'2timothy' => 54,
+		'2tim' => 54,
+		'2tim' => 54,
+		'titus' => 55,
+		'tit' => 55,
+		'ti' => 55,
+		'philemon' => 56,
+		'hebrews' => 57,
+		'heb' => 57,
+		'james' => 58,
+		'jam' => 58,
+		'1peter' => 59,
+		'1pet' => 59,
+		'1pet' => 59,
+		'2peter' => 60,
+		'2pet' => 60,
+		'2pet' => 60,
+		'1john' => 61,
+		'1jn' => 61,
+		'1jn' => 61,
+		'2john' => 62,
+		'2jn' => 62,
+		'2jn' => 62,
+		'3john' => 63,
+		'3jn' => 63,
+		'3jn' => 63,
+		'jude' => 64,
+		'revelation' => 65,
+		'rev' => 65,
+	];
 
-	private $book = null;
+	private $book;
 	private $start_ch = 0;
 	private $start_v = 0;
 	private $end_ch = 0;
@@ -329,21 +329,24 @@ class bible_ref
 
 	public function __construct($str)
 	{
-		if (empty($str)) return;
+		if (empty($str)) {
+			return;
+		}
 		if ($str[0] == '0') {
-			if (strpos($str, ',') === FALSE) {
-				list($this->book, $this->start_ch, $this->start_v, $this->end_ch, $this->end_v) = sscanf($str, '%03d_%03d:%03d-%03d:%03d');
+			if (!str_contains($str, ',')) {
+				[$this->book, $this->start_ch, $this->start_v, $this->end_ch, $this->end_v] = sscanf($str, '%03d_%03d:%03d-%03d:%03d');
 			} else {
-				list($this->book, $this->start_ch, $this->start_v, $this->end_ch, $this->end_v, $this->start_v2, $this->end_v2) = sscanf($str, '%03d_%03d:%03d-%03d:%03d,%03d-%03d');
+				[$this->book, $this->start_ch, $this->start_v, $this->end_ch, $this->end_v, $this->start_v2, $this->end_v2] = sscanf($str, '%03d_%03d:%03d-%03d:%03d,%03d-%03d');
 			}
 		} else {
 			$str = strtolower(str_replace(' ', '', $str));
 			$pattern = "/([0-9]?([^0-9]+))(([0-9]+)([\-\:.]))?(([0-9]+)([\-\:.]))?(([0-9]+)([\-\:.]))?([0-9]+)(,([0-9]+)(-([0-9]+))?)?/";
-			$matches = Array();
+			$matches = [];
 			preg_match($pattern, $str, $matches);
 			$this->book = @$this->names_to_numbers[$matches[1]];
-			if (is_null($this->book)) {
+			if (null === $this->book) {
 				trigger_error("Unknown bible book $matches[1]");
+
 				return false;
 			}
 			if (!empty($matches[10])) {
@@ -352,12 +355,12 @@ class bible_ref
 				$this->start_v = $matches[7];
 				$this->end_ch = $matches[10];
 				$this->end_v = $matches[12];
-			} else if (!empty($matches[7])) {
+			} elseif (!empty($matches[7])) {
 				// three numbers
 				$this->start_ch = $this->end_ch = $matches[4];
 				$this->start_v = $matches[7];
 				$this->end_v = $matches[12];
-			} else if (!empty($matches[4])) {
+			} elseif (!empty($matches[4])) {
 				// two numbers
 				if ($matches[5] == '-') {
 					// several whole chapters
@@ -387,9 +390,11 @@ class bible_ref
 		}
 	}
 
-	public function toString($short=false)
+	public function toString($short = false)
 	{
-		if (is_null($this->book)) return '';
+		if (null === $this->book) {
+			return '';
+		}
 		$res = $short ? $this->short_names[$this->book] : ucwords($this->med_names[$this->book]);
 		if ($this->start_ch == $this->end_ch) {
 			if ($this->start_v == $this->end_v) {
@@ -420,6 +425,7 @@ class bible_ref
 				$res .= '-'.$this->end_v2;
 			}
 		}
+
 		return $res;
 	}
 
@@ -431,6 +437,7 @@ class bible_ref
 	public function getLinkedShortString()
 	{
 		$url = str_replace('__REFERENCE__', $this->toShortString(), BIBLE_URL);
+
 		return '<a target="bible" href="'.$url.'">'.nbsp($this->toShortString()).'</a>';
 	}
 
@@ -452,7 +459,7 @@ class bible_ref
 	static function printTests()
 	{
 		echo '<table border="1">';
-		$tests = Array(
+		$tests = [
 			'1 John 23',
 			'Matthew 23:4',
 			'Matthew 23:5-6',
@@ -461,20 +468,18 @@ class bible_ref
 			'2 Thess 23:1-2, 4-5',
 			'1 Peter 2:29-3:2,5',
 			'1 Peter 2:29-3:2,5-6',
-		);
+		];
 		foreach ($tests as $str) {
-			$x = new Bible_Ref($str);
+			$x = new self($str);
 			?>
 			<tr>
 				<td><?php echo $str; ?></td>
-				<td><?php echo $x->toString(TRUE); ?></td>
+				<td><?php echo $x->toString(true); ?></td>
 				<td><?php echo $x->toCode(); ?></td>
-				<td><?php $y = new Bible_ref($x->toCode()); echo $y->toString(TRUE); ?></td>
+				<td><?php $y = new self($x->toCode());
+			echo $y->toString(true); ?></td>
 			</tr>
 			<?php
 		}
-
 	}
-
-
 }

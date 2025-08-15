@@ -3,23 +3,21 @@ include_once 'db_objects/abstract_note.class.php';
 class Person_Note extends Abstract_Note
 {
 	// A note template being used to populate this note
-	private $_template = NULL;
+	private $_template;
 
 	protected static function _getFields()
 	{
-		return Array(
-				'personid'	=> Array(
-								'type'			=> 'int',
-								'references'	=> 'person',
-								'editable'		=> false,
-								'label'			=> 'Person',
-							   ),
-			   );
-
+		return [
+			'personid' => [
+				'type' => 'int',
+				'references' => 'person',
+				'editable' => false,
+				'label' => 'Person',
+			],
+		];
 	}
 
-
-	function getInitSQL($table_name=NULL)
+	function getInitSQL($table_name = null)
 	{
 		return "
 			CREATE TABLE `person_note` (
@@ -30,16 +28,19 @@ class Person_Note extends Abstract_Note
 		";
 	}
 
-	function getForeignKeys() {
-		return Array(
+	function getForeignKeys()
+	{
+		return [
 			'personid' => '_person(id) ON DELETE CASCADE',
 			'id' => '_abstract_note(id) ON DELETE CASCADE',
-		);
+		];
 	}
 
-	function printFieldValue($name, $value=NULL)
+	function printFieldValue($name, $value = null)
 	{
-		if (is_null($value)) $value = $this->values[$name];
+		if (null === $value) {
+			$value = $this->values[$name];
+		}
 		if ($name == 'personid') {
 			if (!empty($value)) {
 				$person = $GLOBALS['system']->getDBObject('person', $value);
@@ -49,6 +50,7 @@ class Person_Note extends Abstract_Note
 				return;
 			}
 		}
+
 		return parent::printFieldValue($name, $value);
 	}
 
@@ -58,10 +60,12 @@ class Person_Note extends Abstract_Note
 		$res['from'] = '('.$res['from'].') JOIN person subject ON person_note.personid = subject.id';
 		$res['select'][] = 'subject.first_name as person_fn';
 		$res['select'][] = 'subject.last_name as person_ln';
+
 		return $res;
 	}
 
-	function printFieldInterface($name, $prefix = '') {
+	function printFieldInterface($name, $prefix = '')
+	{
 		parent::printFieldInterface($name, $prefix);
 		if ($name == 'subject') {
 			?>
@@ -70,7 +74,7 @@ class Person_Note extends Abstract_Note
 				if ($this->_template) {
 					$this->_template->printNoteFieldWidgets();
 				}
-				?>
+			?>
 			</div>
 			<?php
 		}
@@ -78,16 +82,17 @@ class Person_Note extends Abstract_Note
 
 	function setTemplate($template)
 	{
-		if (!$this->id) $this->setValue('subject', $template->getValue('subject'));
+		if (!$this->id) {
+			$this->setValue('subject', $template->getValue('subject'));
+		}
 		$this->_template = $template;
 	}
 
-	function printForm($prefix = '', $fields = NULL)
+	function printForm($prefix = '', $fields = null)
 	{
-		Note_Template::printTemplateChooserRow($this->_template ? $this->_template->id : NULL);
+		Note_Template::printTemplateChooserRow($this->_template ? $this->_template->id : null);
 		parent::printForm($prefix, $fields);
 	}
-
 
 	/**
 	 * Save this (new) note to the database IF there isn't already a note with the same subject and body.
@@ -100,12 +105,11 @@ class Person_Note extends Abstract_Note
 			JOIN person_note pn ON pn.id = an.id
 			WHERE subject = '.$db->quote($this->getValue('subject')).'
 			AND details = '.$db->quote($this->getValue('details')).'
-			AND pn.personid = '.(int)$this->getValue('personid');
-		if (!(int)$db->queryOne($SQL)) {
+			AND pn.personid = '.(int) $this->getValue('personid');
+		if (!(int) $db->queryOne($SQL)) {
 			return $this->create();
 		} else {
-			return FALSE;
+			return false;
 		}
 	}
-
 }

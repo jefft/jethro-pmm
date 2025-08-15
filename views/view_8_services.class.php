@@ -4,10 +4,10 @@
  */
 class View_services extends View
 {
-	private $date = NULL;
-	private $congregationid = NULL;
-	private $service = FALSE;
-	private $editing = FALSE;
+	private $date;
+	private $congregationid;
+	private $service = false;
+	private $editing = false;
 
 	static function getMenuPermissionLevel()
 	{
@@ -17,8 +17,10 @@ class View_services extends View
 	function processView()
 	{
 		$this->editing = !empty($_REQUEST['editing']) && $GLOBALS['user_system']->havePerm(PERM_EDITSERVICE);
-		if (!empty($_REQUEST['congregationid'])) $this->congregationid = (int)$_REQUEST['congregationid'];
-		$this->date = process_widget('date', Array('type' => 'date'));
+		if (!empty($_REQUEST['congregationid'])) {
+			$this->congregationid = (int) $_REQUEST['congregationid'];
+		}
+		$this->date = process_widget('date', ['type' => 'date']);
 		if (empty($this->date) && !empty($_SESSION['service_date'])) {
 			$this->date = $_SESSION['service_date'];
 		}
@@ -28,25 +30,27 @@ class View_services extends View
 		if ($this->congregationid && $this->date) {
 			$_SESSION['service_date'] = $this->date;
 			$_SESSION['service_congregationid'] = $this->congregationid;
-			$this->service = NULL;
-			$serviceData = $GLOBALS['system']->getDBOBjectData('service', Array(
+			$this->service = null;
+			$serviceData = $GLOBALS['system']->getDBOBjectData('service', [
 				'congregationid' => $this->congregationid,
-				'date' => $this->date
-			), 'AND');
+				'date' => $this->date,
+			], 'AND');
 			if (!empty($serviceData)) {
 				$this->service = $GLOBALS['system']->getDBObject('service', key($serviceData));
 
 				if ($this->editing) {
 					$this->service->acquireLock('items');
 					if (!$this->service->haveLock('items')) {
-						trigger_error("Your lock expired and your changes could not be saved");
+						trigger_error('Your lock expired and your changes could not be saved');
+
 						return;
 					}
 
 					if (!empty($_REQUEST['copy_service_id'])) {
-						$fromService = new Service((int)$_REQUEST['copy_service_id']);
+						$fromService = new Service((int) $_REQUEST['copy_service_id']);
 						if (!$fromService) {
-							trigger_error("Service ".(int)$_REQUEST['copy_service_id']." not found - could not copy");
+							trigger_error('Service '.(int) $_REQUEST['copy_service_id'].' not found - could not copy');
+
 							return;
 						}
 						$newItems = $fromService->getItems();
@@ -59,7 +63,7 @@ class View_services extends View
 								}
 							}
 
-							if (!in_array($v['categoryid'], $_REQUEST['copy_category_ids'])) {
+							if (!in_array($v['categoryid'], $_REQUEST['copy_category_ids'], true)) {
 								unset($newItems[$k]);
 							}
 						}
@@ -68,23 +72,23 @@ class View_services extends View
 					}
 
 					if (!empty($_REQUEST['save_service'])) {
-						$newItems = Array();
-						foreach (array_get($_POST, 'componentid', Array()) as $rank => $compid) {
-							$newItem = Array(
+						$newItems = [];
+						foreach (array_get($_POST, 'componentid', []) as $rank => $compid) {
+							$newItem = [
 								'componentid' => $compid,
 								'title' => $_POST['title'][$rank],
 								'personnel' => array_get($_POST['personnel'], $rank),
 								'show_in_handout' => $_POST['show_in_handout'][$rank],
 								'length_mins' => $_POST['length_mins'][$rank],
-								'note'        => trim($_POST['note'][$rank]),
-								'heading_text'     => trim($_POST['heading_text'][$rank]),
-							);
+								'note' => trim($_POST['note'][$rank]),
+								'heading_text' => trim($_POST['heading_text'][$rank]),
+							];
 							$newItems[] = $newItem;
 						}
 						$this->service->saveItems($newItems);
-						$this->service->saveComments(process_widget('service_comments', Array('type' => 'html')));
+						$this->service->saveComments(process_widget('service_comments', ['type' => 'html']));
 						$this->service->releaseLock('items');
-						$this->editing = FALSE;
+						$this->editing = false;
 					}
 				}
 			}
@@ -102,7 +106,8 @@ class View_services extends View
 				return 'Viewing service';
 			}
 		}
-		return NULL;
+
+		return null;
 	}
 
 	function getPageHeading()
@@ -112,13 +117,14 @@ class View_services extends View
 
 	function printView()
 	{
-		if ($this->service === NULL) {
-			print_message("No service found for this congregation and date - add one via the service program first", 'error');
+		if ($this->service === null) {
+			print_message('No service found for this congregation and date - add one via the service program first', 'error');
+
 			return;
-		} else if ($this->service) {
+		} elseif ($this->service) {
 			if ($this->editing && !$this->service->haveLock('items')) {
-				print_message("Somebody else is currently editing this service.  Please try again later.");
-				$this->editing = FALSE;
+				print_message('Somebody else is currently editing this service.  Please try again later.');
+				$this->editing = false;
 			}
 			?>
 			<h1>
@@ -132,7 +138,7 @@ class View_services extends View
 			<p class="service-details-inline">
 				<?php
 				$this->service->PrintFieldValue('summary_inline');
-				?>
+			?>
 			</p>
 			<?php
 			$this->service->printRunSheetPersonnelFlexi();
@@ -155,20 +161,20 @@ class View_services extends View
 							?>
 							<span class="pull-right">
 									<small>
-										<a href="<?php echo build_url(Array('editing' => 1)); ?>"><i class="icon-wrench"></i>Edit</a> &nbsp;
+										<a href="<?php echo build_url(['editing' => 1]); ?>"><i class="icon-wrench"></i>Edit</a> &nbsp;
 										&nbsp;
 										<a class="med-popup" href="?call=service_plan&serviceid=<?php echo $this->service->id; ?>"><i class="icon-print"></i>Printable</a>
 									</small>
 							</span>
 							<?php
 						}
-						echo _('Run Sheet');
-						?>
+				echo _('Run Sheet');
+				?>
 						</h3>
 
 						<?php
-						$this->service->printRunSheet();
-						?>
+				$this->service->printRunSheet();
+				?>
 					</div>
 
 					<div class="span6">
@@ -183,8 +189,8 @@ class View_services extends View
 						</h3>
 						<div class="service-content">
 							<?php
-							$this->service->printServiceContent();
-							?>
+					$this->service->printServiceContent();
+				?>
 						</div>
 					</div>
 				</div>
@@ -192,9 +198,7 @@ class View_services extends View
 				<?php
 
 			}
-
 		}
-
 	}
 
 	private function printRunSheetEditor()
@@ -218,10 +222,10 @@ class View_services extends View
 					</span>
 					<?php
 				}
-				?>
+		?>
 				Run Sheet
 			</h3>
-			<form method="post" id="service-planner-form" data-lock-length="<?php echo db_object::getLockLength() ?>">
+			<form method="post" id="service-planner-form" data-lock-length="<?php echo db_object::getLockLength(); ?>">
 			<div id="service-plan-container">
 			<input type="hidden" name="save_service" value="1" />
 			<table class="table table-bordered table-hover table-condensed no-autofocus" id="service-plan" data-starttime="<?php echo $startTime; ?>">
@@ -237,9 +241,9 @@ class View_services extends View
 
 				<tbody>
 				<?php
-				foreach ($items as $rank => $item) {
-					if (strlen($item['heading_text'])) {
-						?>
+		foreach ($items as $rank => $item) {
+			if (strlen($item['heading_text'])) {
+				?>
 						<tr>
 							<td colspan="4">
 								<input type="text" class="service-heading unfocused" name="" value="<?php echo ents($item['heading_text']); ?>" />
@@ -249,9 +253,11 @@ class View_services extends View
 							</td>
 						</tr>
 						<?php
-					}
-					?>
-					<tr class="service-item<?php if (empty($item['componentid'])) echo ' ad-hoc'; ?>">
+			}
+			?>
+					<tr class="service-item<?php if (empty($item['componentid'])) {
+						echo ' ad-hoc';
+					} ?>">
 						<td class="start"></td>
 						<td class="number"></td>
 						<td class="item">
@@ -264,26 +270,26 @@ class View_services extends View
 							} else {
 								$title = $item['title'];
 							}
-							echo ents($title);
-							?>
+			echo ents($title);
+			?>
 							</span>
 							<?php
-							print_hidden_field('title[]', $title);
-							foreach (Array('componentid', 'length_mins', 'show_in_handout') as $k) {
-								?>
+			print_hidden_field('title[]', $title);
+			foreach (['componentid', 'length_mins', 'show_in_handout'] as $k) {
+				?>
 								<input type="hidden" name="<?php echo $k; ?>[]" class="<?php echo $k; ?>" value="<?php echo ents($item[$k]); ?>" />
 								<?php
-							}
-							?>
+			}
+			?>
 							<textarea name="note[]" class="unfocused"
 								<?php
-								if (!strlen($item['note'])) {
-									echo 'style="display:none" ';
-									echo 'rows="1" ';
-								} else {
-									echo 'rows="'.(substr_count($item['note'], "\n")+1).'" ';
-								}
-								?>><?php echo ents($item['note']); ?></textarea>
+				if (!strlen($item['note'])) {
+					echo 'style="display:none" ';
+					echo 'rows="1" ';
+				} else {
+					echo 'rows="'.(substr_count($item['note'], "\n") + 1).'" ';
+				}
+			?>><?php echo ents($item['note']); ?></textarea>
 						</td>
 						<td class="personnel"><input class="unfocused" name="personnel[]" type="text" value="<?php echo ents($item['personnel']); ?>" /></td>
 						<td class="tools">
@@ -292,8 +298,8 @@ class View_services extends View
 					</tr>
 					<?php
 
-				}
-				?>
+		}
+		?>
 					<tr id="service-item-template">
 						<td class="start"></td>
 						<td class="number"></td>
@@ -313,8 +319,8 @@ class View_services extends View
 					<tr id="service-plan-spacer">
 						<td colspan="5">
 							<?php
-							if (empty($items) && $this->editing) {
-								?>
+					if (empty($items) && $this->editing) {
+						?>
 								<div class="alert alert-info" id="service-plan-placeholder">
 								To start building this run sheet,
 								<ul>
@@ -324,8 +330,8 @@ class View_services extends View
 								</ul>
 								</div>
 								<?php
-							}
-							?>
+					}
+		?>
 						</td>
 					</tr>
 
@@ -335,8 +341,8 @@ class View_services extends View
 					<tr>
 						<td colspan="5">
 							<?php
-							$this->printNotesFields();
-							?>
+		$this->printNotesFields();
+		?>
 						</td>
 					</tr>
 					<tr>
@@ -372,7 +378,7 @@ class View_services extends View
 					<div class="controls">
 						<?php
 						$dummyItem->setValue('show_in_handout', 'title');
-						$dummyItem->printFieldInterface('show_in_handout'); ?>
+		$dummyItem->printFieldInterface('show_in_handout'); ?>
 					</div>
 				</div>
 				<div class="control-group">
@@ -381,9 +387,9 @@ class View_services extends View
 					</label>
 					<div class="controls">
 						<?php
-						$dummyItem->setValue('length_mins', 2);
-						$dummyItem->printFieldInterface('length_mins');
-						?>
+		$dummyItem->setValue('length_mins', 2);
+		$dummyItem->printFieldInterface('length_mins');
+		?>
 						mins
 					</div>
 				</div>
@@ -407,23 +413,27 @@ class View_services extends View
 					</label>
 					<div class="controls">
 						<?php
-						$options = Array();
-						$selectedID = NULL;
-						$services = $GLOBALS['system']->getDBObjectData('service', Array('>date' => date('Y-m-d', strtotime('-1 year'))), 'AND', 'date DESC');
-						$dummyService = new Service();
-						foreach ($services as $id => $s) {
-							if (!$s['has_items']) continue;
-							if ($id == $this->service->id) continue;
-							$dummyService->populate($id, $s);
-							$options[$id] = $dummyService->toString();
-							if (empty($selectedID)
-								&& $s['congregationid'] == $this->service->getValue('congregationid')
-								&& $s['date'] < $this->service->getValue('date')) {
-								$selectedID = $id;
-							}
-						}
-						print_widget('copy_service_id', Array('type' => 'select', 'options' => $options), $selectedID);
-						?>
+		$options = [];
+		$selectedID = null;
+		$services = $GLOBALS['system']->getDBObjectData('service', ['>date' => date('Y-m-d', strtotime('-1 year'))], 'AND', 'date DESC');
+		$dummyService = new Service();
+		foreach ($services as $id => $s) {
+			if (!$s['has_items']) {
+				continue;
+			}
+			if ($id == $this->service->id) {
+				continue;
+			}
+			$dummyService->populate($id, $s);
+			$options[$id] = $dummyService->toString();
+			if (empty($selectedID)
+				&& $s['congregationid'] == $this->service->getValue('congregationid')
+				&& $s['date'] < $this->service->getValue('date')) {
+				$selectedID = $id;
+			}
+		}
+		print_widget('copy_service_id', ['type' => 'select', 'options' => $options], $selectedID);
+		?>
 					</div>
 				</div>
 				<div class="control-group">
@@ -432,13 +442,13 @@ class View_services extends View
 					</label>
 					<div class="controls">
 						<?php
-						$params = Array(
-							'type' => 'reference',
-							'references' => 'service_component_category',
-							'allow_multiple' => TRUE
-						);
-						print_widget('copy_category_ids[]', $params, '*');
-						?>
+		$params = [
+			'type' => 'reference',
+			'references' => 'service_component_category',
+			'allow_multiple' => true,
+		];
+		print_widget('copy_category_ids[]', $params, '*');
+		?>
 					</div>
 				</div>
 			</div>
@@ -476,8 +486,8 @@ class View_services extends View
 				<span class="add-on"><i class="icon-search"></i></span>
 				<input type="text" placeholder="Search components">
 				<?php
-				print_widget('tag', Array('type' => 'reference', 'references' => 'service_component_tag', 'allow_empty' => TRUE, 'empty_text' => '-- Choose Tag --'), NULL);
-				?>
+				print_widget('tag', ['type' => 'reference', 'references' => 'service_component_tag', 'allow_empty' => true, 'empty_text' => '-- Choose Tag --'], null);
+		?>
 				<button data-action="search" class="btn" type="button">Filter</button>
 				<button data-action="clear" class="btn" type="button">Clear</button>
 			</div>
@@ -503,27 +513,27 @@ class View_services extends View
 			<?php $this->printComponentSearch(); ?>
 			<ul class="nav nav-tabs">
 				<?php
-				$cats = $GLOBALS['system']->getDBObjectData('service_component_category', Array(), 'AND', 'category_name');
-				$active = 'class="active"';
-				foreach ($cats as $catid => $cat) {
-					?>
-					<li <?php echo $active; ?>><a data-toggle="tab" href="#cat<?php echo (int)$catid; ?>"><?php echo ents($cat['category_name']); ?></a></li>
+				$cats = $GLOBALS['system']->getDBObjectData('service_component_category', [], 'AND', 'category_name');
+		$active = 'class="active"';
+		foreach ($cats as $catid => $cat) {
+			?>
+					<li <?php echo $active; ?>><a data-toggle="tab" href="#cat<?php echo (int) $catid; ?>"><?php echo ents($cat['category_name']); ?></a></li>
 					<?php
-					$active = '';
-				}
-				?>
+			$active = '';
+		}
+		?>
 			</ul>
 			<div class="tab-content" id="service-comps">
 				<?php
-				$active = 'active';
-				foreach ($cats as $catid => $cat) {
-					$comps = $GLOBALS['system']->getDBObjectData('service_component', Array(
-						'cong.id' => $this->congregationid,
-						'categoryid' => $catid
-					), 'AND', 'usage_12m');
-					?>
+		$active = 'active';
+		foreach ($cats as $catid => $cat) {
+			$comps = $GLOBALS['system']->getDBObjectData('service_component', [
+				'cong.id' => $this->congregationid,
+				'categoryid' => $catid,
+			], 'AND', 'usage_12m');
+			?>
 					<div class="tab-pane <?php echo $active; ?>"
-						 id="cat<?php echo (int)$catid; ?>">
+						 id="cat<?php echo (int) $catid; ?>">
 						<div class="comps-table-container">
 
 						<table style="display: none" class="table table-bordered table-condensed table-sortable"
@@ -538,41 +548,41 @@ class View_services extends View
 							</thead>
 							<tbody>
 							<?php
-							foreach ($comps as $compid => $comp) {
-								$runsheetTitle = $comp['runsheet_title_format'];
-								if (strlen($runsheetTitle)) {
-									$runsheetTitle = str_replace('%title%', $comp['title'], $runsheetTitle);
-									$runsheetTitle = $this->service->replaceKeywords($runsheetTitle);
-								}
-								$comp['personnel'] = $this->service->replaceKeywords($comp['personnel']);
-								$lastUse = '';
-								$lastUseSort = 0;
-								if ($comp['lastused']) {
-									$lastTS = strtotime($comp['lastused']);
-									$lastUseSort = (int)$lastTS;
-									if ($lastTS == $serviceTS) {
-										$lastUse = 'now';
-									} else if ($lastTS > $serviceTS) {
-										$lastUse = '+'.ceil(($lastTS - $serviceTS) / 60 / 60 / 24 / 7).'w';
-									} else {
-										$lastUse = ceil(($serviceTS - $lastTS) / 60 / 60 / 24 / 7).'w';
-									}
-								}
+					foreach ($comps as $compid => $comp) {
+						$runsheetTitle = $comp['runsheet_title_format'];
+						if (strlen($runsheetTitle)) {
+							$runsheetTitle = str_replace('%title%', $comp['title'], $runsheetTitle);
+							$runsheetTitle = $this->service->replaceKeywords($runsheetTitle);
+						}
+						$comp['personnel'] = $this->service->replaceKeywords($comp['personnel']);
+						$lastUse = '';
+						$lastUseSort = 0;
+						if ($comp['lastused']) {
+							$lastTS = strtotime($comp['lastused']);
+							$lastUseSort = (int) $lastTS;
+							if ($lastTS == $serviceTS) {
+								$lastUse = 'now';
+							} elseif ($lastTS > $serviceTS) {
+								$lastUse = '+'.ceil(($lastTS - $serviceTS) / 60 / 60 / 24 / 7).'w';
+							} else {
+								$lastUse = ceil(($serviceTS - $lastTS) / 60 / 60 / 24 / 7).'w';
+							}
+						}
 
-								?>
-								<tr data-componentid="<?php echo (int)$compid; ?>"
+						?>
+								<tr data-componentid="<?php echo (int) $compid; ?>"
 									data-show_in_handout="<?php echo $comp['show_in_handout']; ?>"
-									data-length_mins="<?php echo (int)$comp['length_mins']; ?>"
+									data-length_mins="<?php echo (int) $comp['length_mins']; ?>"
 									data-runsheet_title="<?php echo ents($runsheetTitle); ?>"
 									data-personnel="<?php echo ents($comp['personnel']); ?>"
 								>
 									<td>
 										<span class="title"><?php echo ents($comp['title']); ?></span>
 										<?php
-										if ($comp['alt_title']) {
-											echo ' <span class="alt-title">'.ents($comp['alt_title']).'</span>';
-										}
-										?>
+								if ($comp['alt_title']) {
+									echo ' <span class="alt-title">'.ents($comp['alt_title']).'</span>';
+								}
+						?>
 									</td>
 									<td data-sort-value="<?php echo $lastUseSort; ?>" class="hide-in-transit">
 										<?php echo $lastUse; ?>
@@ -585,16 +595,16 @@ class View_services extends View
 									</td>
 								</tr>
 								<?php
-							}
-							?>
+					}
+			?>
 							</tbody>
 						</table>
 						</div>
 					</div>
 					<?php
 					$active = '';
-				}
-				?>
+		}
+		?>
 			</div>
 		</div>
 		<?php
@@ -606,4 +616,3 @@ class View_services extends View
 		print_widget('service_comments', $this->service->fields['comments'], $this->service->getValue('comments'));
 	}
 }
-

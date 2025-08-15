@@ -1,22 +1,25 @@
 <?php
-class Config_Manager {
 
+class Config_Manager
+{
 	public static function init()
 	{
 		foreach (self::getSettings() as $symbol => $details) {
-			if (empty($details['type'])) continue; // placeholder settings for age bracket etc
+			if (empty($details['type'])) {
+				continue;
+			} // placeholder settings for age bracket etc
 			if (defined($symbol)) {
 				define($symbol.'_IN_CONFIG_FILE', 1);
-				if (!ifdef('ALLOW_SETTINGS_IN_FILE')  && !self::allowSettingInFile($symbol)) {
+				if (!ifdef('ALLOW_SETTINGS_IN_FILE') && !self::allowSettingInFile($symbol)) {
 					// NB *ALL* migration methods must be safe to run more than once
 					$migrateMethod = 'migrate'.str_replace('_', '', $symbol);
 					if (method_exists(__CLASS__, $migrateMethod)) {
-						call_user_func(Array(__CLASS__, $migrateMethod));
+						call_user_func([__CLASS__, $migrateMethod]);
 					} else {
 						self::saveSetting($symbol, constant($symbol));
-						$savedFromFile = TRUE;
+						$savedFromFile = true;
 					}
-					add_message("The setting ".$symbol." has now been migrated to the database and should be removed from conf.php");
+					add_message('The setting '.$symbol.' has now been migrated to the database and should be removed from conf.php');
 				}
 			} else {
 				define($symbol, $details['value']);
@@ -24,52 +27,59 @@ class Config_Manager {
 		}
 		if (defined('AGE_BRACKET_OPTIONS')) {
 			self::migrateAgeBracketOptions();
-			add_message("The setting AGE_BRACKET_OPTIONS has now been migrated to the database and must now be removed from conf.php",'error');
+			add_message('The setting AGE_BRACKET_OPTIONS has now been migrated to the database and must now be removed from conf.php', 'error');
 		}
 	}
 
 	public static function allowSettingInFile($symbol)
 	{
-		if (0 === strpos($symbol, 'SMS_')) return TRUE;
-		if (0 === strpos($symbol, '2FA_')) return TRUE;
-		if (0 === strpos($symbol, 'SMTP')) return TRUE;
-		return FALSE;
+		if (str_starts_with($symbol, 'SMS_')) {
+			return true;
+		}
+		if (str_starts_with($symbol, '2FA_')) {
+			return true;
+		}
+		if (str_starts_with($symbol, 'SMTP')) {
+			return true;
+		}
+
+		return false;
 	}
 
 	public static function getSettings()
 	{
 		$SQL = 'SELECT symbol, s.* from setting s ORDER BY `rank`';
-		$res = Array();
+		$res = [];
 		try {
-			$res = $GLOBALS['db']->queryAll($SQL, NULL, NULL, TRUE);
+			$res = $GLOBALS['db']->queryAll($SQL, null, null, true);
 		} catch (PDOException $e) {
-			if (FALSE === strpos($e->getMessage(), "Base table or view not found")) {
+			if (!str_contains($e->getMessage(), 'Base table or view not found')) {
 				// We ignore "table not found" because that's expected during install
 				throw $e;
 			}
 		}
+
 		return $res;
 	}
 
 	public static function migrateEnabledFeatures()
 	{
 		$value = explode(',', ENABLED_FEATURES);
-		$value = array_diff($value, Array('DATES'));
+		$value = array_diff($value, ['DATES']);
 		self::saveSetting('ENABLED_FEATURES', implode(',', $value));
-
 	}
 
 	public static function migrateLockLength()
 	{
 		// used to be in strtotime format; now in minutes
 		$secs = strtotime('+'.LOCK_LENGTH);
-		self::saveSetting('LOCK_LENGTH', $secs/60);
+		self::saveSetting('LOCK_LENGTH', $secs / 60);
 	}
 
 	public static function migrateAgeBracketOptions()
 	{
 		$db = $GLOBALS['db'];
-		$res = NULL;
+		$res = null;
 		try {
 			$SQL = 'SELECT count(*) FROM _disused_person_age_brackets';
 			$res = $db->queryAll($SQL);
@@ -89,9 +99,9 @@ class Config_Manager {
 
 		$SQL = 'REPLACE INTO age_bracket (id, label, `rank`, is_adult, is_default)
 				VALUES ';
-		foreach(explode(',', AGE_BRACKET_OPTIONS) as $id => $label) {
+		foreach (explode(',', AGE_BRACKET_OPTIONS) as $id => $label) {
 			$is_adult = strtolower($label) == 'adult' ? 1 : 0;
-			$sets[] = '('.(int)($id+1).', '.$db->quote($label).', '.(int)$id.', '.$is_adult.', '.$is_adult.')';
+			$sets[] = '('.(int) ($id + 1).', '.$db->quote($label).', '.(int) $id.', '.$is_adult.', '.$is_adult.')';
 		}
 		$SQL .= implode(",\n", $sets);
 		$res = $db->exec($SQL);
@@ -109,9 +119,9 @@ class Config_Manager {
 		foreach ($plans as $row) {
 			$actions = unserialize($row['actions']);
 			if (!empty($actions['fields']['age_bracket'])) {
-				$actions['fields']['age_bracketid'] = (int)$actions['fields']['age_bracket']+1;
+				$actions['fields']['age_bracketid'] = (int) $actions['fields']['age_bracket'] + 1;
 				unset($actions['fields']['age_bracket']);
-				$SQL = 'UPDATE action_plan SET actions = '.$db->quote(serialize($actions)).' WHERE id = '.(int)$row['id'];
+				$SQL = 'UPDATE action_plan SET actions = '.$db->quote(serialize($actions)).' WHERE id = '.(int) $row['id'];
 				$res = $db->exec($SQL);
 			}
 		}
@@ -122,16 +132,15 @@ class Config_Manager {
 		foreach ($queries as $row) {
 			$params = unserialize($row['params']);
 			if (!empty($params['rules']['p.age_bracket'])) {
-				$params['rules']['p.age_bracketid'] = Array();
+				$params['rules']['p.age_bracketid'] = [];
 				foreach ($params['rules']['p.age_bracket'] as $k => $v) {
-					$params['rules']['p.age_bracketid'][$k] = (int)$v+1;
+					$params['rules']['p.age_bracketid'][$k] = (int) $v + 1;
 				}
 				unset($params['rules']['p.age_bracket']);
-				$SQL = 'UPDATE person_query SET params = '.$db->quote(serialize($params)).' WHERE id = '.(int)$row['id'];
+				$SQL = 'UPDATE person_query SET params = '.$db->quote(serialize($params)).' WHERE id = '.(int) $row['id'];
 				$res = $db->exec($SQL);
 			}
 		}
-
 	}
 
 	public static function saveSetting($symbol, $value)
@@ -141,14 +150,15 @@ class Config_Manager {
 				SET value = '.$db->quote($value).'
 				WHERE symbol = '.$db->quote($symbol);
 		$res = $db->exec($SQL);
-		return TRUE;
 
+		return true;
 	}
 
 	public static function deleteSetting($symbol)
 	{
 		$db = JethroDB::get();
 		$SQL = 'DELETE FROM setting WHERE symbol = '.$db->quote($symbol);
+
 		return $db->exec($SQL);
 	}
 }

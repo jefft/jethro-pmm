@@ -11,7 +11,7 @@ class View_Persons__Statistics extends View
 	{
 		return _('Person Statistics');
 	}
-	
+
 	function printView()
 	{
 		$GLOBALS['system']->includeDBClass('person');
@@ -26,44 +26,43 @@ class View_Persons__Statistics extends View
 					foreach ($columns as $status_name) {
 						?><th><?php echo ents($status_name); ?></th><?php
 					}
-					?>
+		?>
 				</tr>
 			</thead>
 			<tbody>
 			<?php
 			$congs = $GLOBALS['system']->getDBObjectData('congregation');
-			$congObject = new Congregation();
-			foreach ($congs as $id => $cong) {
-				$congObject->populate($id, $cong);
-				$rows[$cong['name']] = Array(
-					'active'=>$congObject->isActive(),
-					'stats'=>Person::getStatusStats($id),
-					'congid'=>$id
-				);
-			}
-			$rows['Whole System'] = Array(
-				'active'=>true,
-				'stats'=>$stats,
-				'congid'=>NULL
-			);
-			foreach ($rows as $name=>$row) {
-				?><tr class="<?php echo $row['active'] ? '' : 'archived'; echo $row['congid'] ? '' : 'info';  ?>">
+		$congObject = new Congregation();
+		foreach ($congs as $id => $cong) {
+			$congObject->populate($id, $cong);
+			$rows[$cong['name']] = [
+				'active' => $congObject->isActive(),
+				'stats' => Person::getStatusStats($id),
+				'congid' => $id,
+			];
+		}
+		$rows['Whole System'] = [
+			'active' => true,
+			'stats' => $stats,
+			'congid' => null,
+		];
+		foreach ($rows as $name => $row) {
+			?><tr class="<?php echo $row['active'] ? '' : 'archived';
+			echo $row['congid'] ? '' : 'info'; ?>">
 					<td><?php echo ents($name); ?></td>
 					<?php
-					foreach ($columns as $status_name) {
-						?>
+				foreach ($columns as $status_name) {
+					?>
 						<td><?php echo array_get($row['stats'], $status_name, 0); ?></td>
 						<?php
-					}
-					?>
+				}
+			?>
 				</tr>
 				<?php
-			}
-			?>
+		}
+		?>
 			</tbody>
 		</table>
 		<?php
 	}
-
-
 }

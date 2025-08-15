@@ -1,26 +1,27 @@
 <?php
-if (file_exists(dirname(__FILE__).'/version.txt')) {
-	define('JETHRO_VERSION', trim(file_get_contents(dirname(__FILE__).'/version.txt')));
+
+if (file_exists(__DIR__.'/version.txt')) {
+	define('JETHRO_VERSION', trim(file_get_contents(__DIR__.'/version.txt')));
 } else {
 	define('JETHRO_VERSION', 'DEV');
 }
 
-$path_sep = defined('PATH_SEPARATOR') ? PATH_SEPARATOR : ((FALSE === strpos($_ENV['OS'], 'Win')) ? ';' : ':');
+$path_sep = defined('PATH_SEPARATOR') ? \PATH_SEPARATOR : ((!str_contains($_ENV['OS'], 'Win')) ? ';' : ':');
 set_include_path(ini_get('include_path').$path_sep.JETHRO_ROOT.$path_sep.JETHRO_ROOT.'/include/'.$path_sep.JETHRO_ROOT.'/db_objects/');
 
 spl_autoload_register(function ($class_name) {
 	// If this autoloader fails, we want it to quietly continue on to other autoloaders
-	// (eg the Composer one). But the @(shutup) operator does not supress include-once 
+	// (eg the Composer one). But the @(shutup) operator does not supress include-once
 	// errors in PHP8+.  And file_exists does not take include_path into account.
 	// So this ugly approach to supressing 'file not found' errors is necessary.
 	$old_er = error_reporting();
 	error_reporting(0);
-	@include_once strtolower($class_name) . '.class.php';
+	@include_once strtolower($class_name).'.class.php';
 	error_reporting($old_er);
 });
 
 // set error level such that we cope with PHP versions before and after 5.3 when E_DEPRECATED was introduced.
-$error_level = defined('E_DEPRECATED') ? (E_ALL & ~constant('E_DEPRECATED') /*& ~constant('E_STRICT')*/) : E_ALL;
+$error_level = defined('E_DEPRECATED') ? (\E_ALL & ~constant('E_DEPRECATED') /* & ~constant('E_STRICT') */) : \E_ALL;
 error_reporting($error_level);
 @ini_set('display_errors', 1);
 
@@ -28,7 +29,7 @@ require_once JETHRO_ROOT.'/include/general.php';
 strip_all_slashes();
 
 // Set up the DB
-require_once JETHRO_ROOT .'/include/jethrodb.php';
+require_once JETHRO_ROOT.'/include/jethrodb.php';
 JethroDB::init(ifdef('DB_MODE', 'PRIVATE'));
 
 // Apply Mysql mode if applicable
@@ -43,24 +44,23 @@ Config_Manager::init();
 // The session we're about to create should not be GC'ed by PHP until at least SESSION_TIMEOUT_MINS have elapsed.
 // The default 'session.gc_maxlifetime' is 24 minutes, so we need to override it.
 if (defined('SESSION_TIMEOUT_MINS')) {
-	@ini_set('session.gc_maxlifetime', SESSION_TIMEOUT_MINS*60);
+	@ini_set('session.gc_maxlifetime', SESSION_TIMEOUT_MINS * 60);
 }
 
 // Base path, typically / (if Jethro is at https://jethro.example.com), but possibly /jethro (https://example.com/jethro).
 define('BASE_PATH', get_base_path());
 
 if (session_id() == '') {
- 	// If max length is set, set the cookie timeout - this will allow sessions to outlast browser invocations
- 	$expiryTime = defined('SESSION_MAXLENGTH_MINS') ? SESSION_MAXLENGTH_MINS * 60 : NULL;
- 	session_set_cookie_params([
- 		'lifetime'=> $expiryTime,
-		'path'     => BASE_PATH,
- 		'httponly' => true,
- 		'samesite' => 'Lax'
- 		]);
+	// If max length is set, set the cookie timeout - this will allow sessions to outlast browser invocations
+	$expiryTime = defined('SESSION_MAXLENGTH_MINS') ? SESSION_MAXLENGTH_MINS * 60 : null;
+	session_set_cookie_params([
+		'lifetime' => $expiryTime,
+		'path' => BASE_PATH,
+		'httponly' => true,
+		'samesite' => 'Lax',
+	]);
 	session_name('JethroSess');
-    session_start();
-
+	session_start();
 }
 
 if (defined('TIMEZONE') && constant('TIMEZONE')) {

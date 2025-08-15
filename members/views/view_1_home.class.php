@@ -3,7 +3,7 @@ class View_Home extends View
 {
 	function getTitle()
 	{
-		return NULL;
+		return null;
 	}
 
 	function processView()
@@ -37,26 +37,26 @@ class View_Home extends View
 					<a href="?view=_edit_ical" class="pull-right"><small><i class="icon-rss"></i><span class="hidden-phone">Subscribe</span></small></a>
 					<?php
 				}
-				?>
+			?>
 				My Roster &nbsp;
 			</h3>
 			<?php
 			$GLOBALS['system']->includeDBClass('roster_role_assignment');
-			$rallocs = Roster_Role_Assignment::getUpcomingAssignments($GLOBALS['user_system']->getCurrentMember('id'), NULL);
+			$rallocs = Roster_Role_Assignment::getUpcomingAssignments($GLOBALS['user_system']->getCurrentMember('id'), null);
 			if ($rallocs) {
 				?>
 				<table class="table table-condensed">
 				<?php
 				foreach ($rallocs as $date => $allocs) {
-					 ?>
+					?>
 					 <tr>
 						 <th class="narrow"><?php echo date('j M', strtotime($date)); ?></th>
 						 <td>
 							<?php
 							foreach ($allocs as $alloc) {
-								 echo $alloc['cong'].' '.$alloc['title'].'<br />';
+								echo $alloc['cong'].' '.$alloc['title'].'<br />';
 							}
-							?>
+					?>
 						 </td>
 					 </tr>
 					 <?php
@@ -75,12 +75,12 @@ class View_Home extends View
 		}
 
 		$GLOBALS['system']->includeDBClass('person_group');
-		$groups = Person_Group::getGroups($GLOBALS['user_system']->getCurrentMember('id'), FALSE, TRUE);
+		$groups = Person_Group::getGroups($GLOBALS['user_system']->getCurrentMember('id'), false, true);
 		echo '<div  class="member-homepage-box" >';
 		echo '<h3>My Groups</h3>';
 		echo '<ul>';
 		foreach ($groups as $id => $details) {
-			echo '<li><a href="?view=_groups&groupid='.(int)$id.'">'.ents($details['name']).'</a></li>';
+			echo '<li><a href="?view=_groups&groupid='.(int) $id.'">'.ents($details['name']).'</a></li>';
 		}
 		echo '</ul>';
 		echo '</div>';
@@ -95,28 +95,28 @@ class View_Home extends View
 			</h3>
 			<?php
 			$family = $GLOBALS['system']->getDBObject('family', $GLOBALS['user_system']->getCurrentMember('familyid'));
-			$persons = $family->getMemberData();
-			unset($family->fields['status']);
+		$persons = $family->getMemberData();
+		unset($family->fields['status']);
 
-			if ((count($persons) > 1) && $GLOBALS['system']->featureEnabled('PHOTOS')) {
-				?>
-				<img class="family-photo" src="?call=photo&familyid=<?php echo (int)$family->id; ?>" />
-				<?php
-			}
-
-			$family->printSummary();
-			echo '<div class="member-family-members" style="clear: both">';
-			include 'templates/member_list.template.php';
-			echo '</div>';
+		if ((count($persons) > 1) && $GLOBALS['system']->featureEnabled('PHOTOS')) {
 			?>
+				<img class="family-photo" src="?call=photo&familyid=<?php echo (int) $family->id; ?>" />
+				<?php
+		}
+
+		$family->printSummary();
+		echo '<div class="member-family-members" style="clear: both">';
+		include 'templates/member_list.template.php';
+		echo '</div>';
+		?>
 		</div>
 		</div>
 		<?php
 
 	}
 
-	function printFamilyMembers($persons) {
+	function printFamilyMembers($persons)
+	{
 		include 'templates/member_list.template.php';
 	}
-
 }

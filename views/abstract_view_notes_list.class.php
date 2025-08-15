@@ -1,8 +1,8 @@
 <?php
 abstract class Abstract_View_Notes_List extends View
 {
-	var $_reassigning = FALSE;
-	var $_notes = Array();
+	var $_reassigning = false;
+	var $_notes = [];
 
 	static function getMenuPermissionLevel()
 	{
@@ -13,7 +13,7 @@ abstract class Abstract_View_Notes_List extends View
 	{
 		return $a['action_date'] > $b['action_date'] ? 1 : -1;
 	}
-	
+
 	protected function _getNotes($conds)
 	{
 		$conds['status'] = 'pending';
@@ -28,8 +28,9 @@ abstract class Abstract_View_Notes_List extends View
 			$conds['subject'] = '%'.$search.'%';
 		}
 
-		$res = $GLOBALS['system']->getDBObjectData('person_note', $conds, 'AND', '', TRUE) + $GLOBALS['system']->getDBObjectData('family_note', $conds, 'AND', '', TRUE);
-		uasort($res, Array($this, '_compareNoteDates'));
+		$res = $GLOBALS['system']->getDBObjectData('person_note', $conds, 'AND', '', true) + $GLOBALS['system']->getDBObjectData('family_note', $conds, 'AND', '', true);
+		uasort($res, [$this, '_compareNoteDates']);
+
 		return $res;
 	}
 
@@ -46,14 +47,12 @@ abstract class Abstract_View_Notes_List extends View
 				$dummy_note->save();
 				$dummy_note->releaseLock();
 			}
-			add_message(_("Assignments Saved"));
-			$this->_reassigning = FALSE;
-
+			add_message(_('Assignments Saved'));
+			$this->_reassigning = false;
 		}
 		// these will have changed
 		$this->_notes = $this->_getNotesToShow(array_get($_REQUEST, 'assignee'), array_get($_REQUEST, 'search'));
 	}
-
 
 	function printView()
 	{
@@ -64,26 +63,26 @@ abstract class Abstract_View_Notes_List extends View
 		<form class="well well-small form-inline">
 		<input type="hidden" name="view" value="<?php echo $_REQUEST['view']; ?>" />
 		<?php
-		$string = "Show %s of notes assigned to %s with subject containing %s";
+		$string = 'Show %s of notes assigned to %s with subject containing %s';
 
 		if ($GLOBALS['user_system']->havePerm(PERM_VIEWNOTE)) {
-			$filterfunc = function($x) {return $x->getValue("active") && (($x->getValue("permissions") & PERM_VIEWMYNOTES) == PERM_VIEWMYNOTES);};
-			$allowempty = TRUE;
+			$filterfunc = function ($x) {return $x->getValue('active') && (($x->getValue('permissions') & PERM_VIEWMYNOTES) == PERM_VIEWMYNOTES); };
+			$allowempty = true;
 		} else {
-			$filterfunc = function($x) {return $x->id == $GLOBALS['user_system']->getCurrentUser('id');};
-			$allowempty = FALSE;
+			$filterfunc = function ($x) {return $x->id == $GLOBALS['user_system']->getCurrentUser('id'); };
+			$allowempty = false;
 		}
 		ob_start();
 		print_widget(
 			'assignee',
-			Array(
+			[
 				'type' => 'reference',
 				'references' => 'staff_member',
 				'allow_empty' => $allowempty,
 				'empty_text' => 'Anyone',
-				'filter'		=> $filterfunc,
-			),
-			array_get($_REQUEST, 'assignee')
+				'filter' => $filterfunc,
+			],
+			array_get($_REQUEST, 'assignee'),
 		);
 		echo '<br class="visible-phone" />';
 		$assignee_widget = ob_get_clean();
@@ -91,11 +90,11 @@ abstract class Abstract_View_Notes_List extends View
 		ob_start();
 		print_widget(
 			'display_full',
-			Array(
+			[
 				'type' => 'select',
-				'options' => Array('summary', 'full content'),
-			),
-			array_get($_REQUEST, 'display_full', 0)
+				'options' => ['summary', 'full content'],
+			],
+			array_get($_REQUEST, 'display_full', 0),
 		);
 		echo '<br class="visible-phone" />';
 		$display_widget = ob_get_clean();
@@ -103,8 +102,8 @@ abstract class Abstract_View_Notes_List extends View
 		ob_start();
 		print_widget(
 			'search',
-			Array('type' => 'text', 'width' => 10),
-			array_get($_REQUEST, 'search', '')
+			['type' => 'text', 'width' => 10],
+			array_get($_REQUEST, 'search', ''),
 		);
 		$search_widget = ob_get_clean();
 
@@ -123,7 +122,7 @@ abstract class Abstract_View_Notes_List extends View
 			if (!$reassigning && empty($_REQUEST['display_full']) && $GLOBALS['user_system']->havePerm(PERM_BULKNOTE)) {
 				?>
 				<p class="pull-right">
-					<a href="<?php echo build_url(Array('reassigning' => 1)); ?>">
+					<a href="<?php echo build_url(['reassigning' => 1]); ?>">
 						<i class="icon-wrench""></i><?php echo _('Edit the assignees for all these notes'); ?>
 					</a>
 				</p>
@@ -132,12 +131,12 @@ abstract class Abstract_View_Notes_List extends View
 			?>
 			<p><b><?php echo sprintf(_('%s notes in total'), count($this->_notes)); ?></b></p>
 			<?php
-			$notes =& $this->_notes;
+			$notes = &$this->_notes;
 			if (empty($_REQUEST['display_full'])) {
 				include 'templates/list_notes_assorted.template.php';
 			} else {
-				$show_names = TRUE;
-				$show_edit_link = TRUE;
+				$show_names = true;
+				$show_edit_link = true;
 				include 'templates/list_notes.template.php';
 			}
 		}

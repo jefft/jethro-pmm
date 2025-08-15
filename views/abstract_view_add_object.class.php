@@ -31,24 +31,21 @@ class Abstract_View_Add_Object extends View
 
 	protected function _doSuccessRedirect()
 	{
-		redirect($this->_on_success_view, Array($this->_create_type.'id' => $this->_new_object->id));
+		redirect($this->_on_success_view, [$this->_create_type.'id' => $this->_new_object->id]);
 	}
 
-	
 	function _beforeCreate()
 	{
-		
 	}
 
 	function _afterCreate()
 	{
 	}
-	
+
 	function getTitle()
 	{
 		return _($this->_title);
 	}
-
 
 	function printView()
 	{
@@ -57,10 +54,10 @@ class Abstract_View_Add_Object extends View
 			<input type="hidden" name="new_<?php echo $this->_create_type; ?>_submitted" value="1" />
 			<?php
 			$this->_new_object->printForm();
-			?>
+		?>
 			<div class="form-horizontal"><div class="controls">
 				<button type="submit" class="btn"><?php echo _($this->_submit_label); ?></button>
-				<button type="button" class="btn back"><?php echo _('Cancel');?></button>
+				<button type="button" class="btn back"><?php echo _('Cancel'); ?></button>
 			</div></div>
 		</form>
 		<?php

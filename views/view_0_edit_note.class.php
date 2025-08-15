@@ -12,13 +12,13 @@ class View__Edit_Note extends View
 
 	function processView()
 	{
-		$this->_note = $GLOBALS['system']->getDBObject($_REQUEST['note_type'].'_note', (int)$_REQUEST['noteid']);
+		$this->_note = $GLOBALS['system']->getDBObject($_REQUEST['note_type'].'_note', (int) $_REQUEST['noteid']);
 		if ((!$GLOBALS['user_system']->havePerm(PERM_EDITNOTE))
 				&& ($this->_note->getValue('assignee') != $GLOBALS['user_system']->getCurrentUser('id'))) {
-			trigger_error("Current user does not have permission to edit note #".$this->_note->id);
+			trigger_error('Current user does not have permission to edit note #'.$this->_note->id);
+
 			return;
 		}
-
 
 		if (!empty($_POST['delete_note']) && $this->_note->canBeDeleted() && $GLOBALS['user_system']->havePerm(PERM_EDITNOTE)) {
 			if ($this->_note->delete()) {
@@ -27,6 +27,7 @@ class View__Edit_Note extends View
 			} else {
 				add_message(_('Failed to delete note'), 'failure');
 			}
+
 			return;
 		}
 		$note_type = ($_REQUEST['note_type'] == 'family') ? 'family_note' : 'person_note';
@@ -39,15 +40,15 @@ class View__Edit_Note extends View
 
 		if (!empty($_POST['update_note_submitted'])) {
 			$GLOBALS['system']->doTransaction('begin');
-			$success = TRUE;
+			$success = true;
 			if ($this->_note->haveLock()) {
 				$fieldsToSave = array_keys($this->_note->fields);
 				if (!$this->_note->canEditOriginal()) {
-					$fieldsToSave = array_diff($fieldsToSave, Array('subject', 'details'));
+					$fieldsToSave = array_diff($fieldsToSave, ['subject', 'details']);
 				}
 				$this->_note->processForm('', $fieldsToSave);
 				if (!$this->_note->save()) {
-					$success = FALSE;
+					$success = false;
 				}
 
 				if ($success) {
@@ -57,13 +58,13 @@ class View__Edit_Note extends View
 					if (trim($comment->getValue('contents')) != '') {
 						$comment->setValue('noteid', $this->_note->id);
 						if (!$comment->create()) {
-							$success = FALSE;
+							$success = false;
 						}
 					}
 				}
 			} else {
 				add_message('Lock on note object not held', 'failure');
-				$success = FALSE;
+				$success = false;
 			}
 
 			if ($success) {
@@ -71,7 +72,6 @@ class View__Edit_Note extends View
 				$GLOBALS['system']->doTransaction('commit');
 				add_message('Note Updated');
 				$this->redirectAfterEdit();
-
 			} else {
 				add_message('Errors while processing, could not save changes', 'failure');
 				$GLOBALS['system']->doTransaction('rollback');
@@ -79,26 +79,26 @@ class View__Edit_Note extends View
 		}
 	}
 
-	private function redirectAfterEdit() {
+	private function redirectAfterEdit()
+	{
 		$next_view = array_get($_REQUEST, 'back_to', '');
 		if (empty($next_view)) {
 			$next_view = ($_REQUEST['note_type'] == 'family') ? 'families' : 'persons';
 		}
 		switch ($next_view) {
 			case 'persons':
-				$params = Array('personid' => $this->_note->getValue('personid'));
+				$params = ['personid' => $this->_note->getValue('personid')];
 				$hash = 'note_'.$this->_note->id;
 				break;
 			case 'families':
-				$params = Array('familyid' => $this->_note->getValue('familyid'));
+				$params = ['familyid' => $this->_note->getValue('familyid')];
 				$hash = 'note_'.$this->_note->id;
 				break;
 			default:
-				$params = Array();
+				$params = [];
 				$hash = '';
 		}
-		redirect($next_view, $params + Array('*' => NULL), $hash); // exits
-
+		redirect($next_view, $params + ['*' => null], $hash); // exits
 	}
 
 	function getTitle()
@@ -109,7 +109,6 @@ class View__Edit_Note extends View
 			return _('Editing Note for ').$this->_family->toString();
 		}
 	}
-
 
 	function printView()
 	{
@@ -141,11 +140,11 @@ class View__Edit_Note extends View
 		if ($show_form && !empty($_REQUEST['edit_original'])) {
 			print_message('NB: Notes are designed to accumulate as a historical record, so they should usually only be edited to correct a mistake', '');
 			?>
-			<form method="post" class="well" action="<?php echo build_url(Array('edit_original' => NULL)); ?>">
+			<form method="post" class="well" action="<?php echo build_url(['edit_original' => null]); ?>">
 				<input type="hidden" name="update_note_submitted" value="1" />
 				<?php
 				$this->_note->printForm();
-				?>
+			?>
 				<div class="control-group form-horizontal">
 					<div class="controls">
 						<input type="submit" class="btn" value="Save" />
@@ -156,10 +155,10 @@ class View__Edit_Note extends View
 			<?php
 
 		} else {
-			$show_edit_link = FALSE;
-			$d  = $GLOBALS['system']->getDBObjectData(get_class($this->_note), Array('id' => $this->_note->id));
+			$show_edit_link = false;
+			$d = $GLOBALS['system']->getDBObjectData(get_class($this->_note), ['id' => $this->_note->id]);
 			foreach ($d as $id => $entry) {
-				$dummy =& $this->_note;
+				$dummy = &$this->_note;
 				include 'templates/single_note.template.php';
 			}
 		}

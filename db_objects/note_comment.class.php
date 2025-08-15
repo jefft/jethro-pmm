@@ -1,4 +1,5 @@
 <?php
+
 include_once 'include/db_object.class.php';
 class Note_Comment extends DB_Object
 {
@@ -7,34 +8,34 @@ class Note_Comment extends DB_Object
 
 	protected static function _getFields()
 	{
-		return Array(
-				'noteid'	=> Array(
-								'type'			=> 'int',
-								'references'	=> 'abstract_note',
-								'editable'		=> false,
-								'label'			=> 'Response to',
-							   ),
-				'creator'		=> Array(
-									'type'			=> 'int',
-									'editable'		=> false,
-									'references'	=> 'person',
-								   ),
-				'created'		=> Array(
-									'type'			=> 'datetime',
-									'readonly'		=> true,
-								   ),
-				'contents'		=> Array(
-									'type'		=> 'text',
-									'width'		=> 50,
-									'height'	=> 5,
-									'initial_cap'	=> true,
-									'label'		=> '',
-									'class' => 'initial-focus'
-								   ),
-			   );
+		return [
+			'noteid' => [
+				'type' => 'int',
+				'references' => 'abstract_note',
+				'editable' => false,
+				'label' => 'Response to',
+			],
+			'creator' => [
+				'type' => 'int',
+				'editable' => false,
+				'references' => 'person',
+			],
+			'created' => [
+				'type' => 'datetime',
+				'readonly' => true,
+			],
+			'contents' => [
+				'type' => 'text',
+				'width' => 50,
+				'height' => 5,
+				'initial_cap' => true,
+				'label' => '',
+				'class' => 'initial-focus',
+			],
+		];
 	}
 
-	function getInitSQL($table_name=NULL)
+	function getInitSQL($table_name = null)
 	{
 		return "
 			CREATE TABLE `note_comment` (
@@ -54,8 +55,7 @@ class Note_Comment extends DB_Object
 		$res['from'] = '('.$res['from'].') LEFT OUTER JOIN person creator ON note_comment.creator = creator.id';
 		$res['select'][] = 'creator.first_name as creator_fn';
 		$res['select'][] = 'creator.last_name as creator_ln';
+
 		return $res;
-
 	}
-
 }

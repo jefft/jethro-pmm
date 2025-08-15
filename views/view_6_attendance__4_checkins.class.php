@@ -1,7 +1,6 @@
 <?php
 class View_Attendance__Checkins extends View
 {
-
 	static function getMenuPermissionLevel()
 	{
 		return PERM_VIEWATTENDANCE;
@@ -14,8 +13,6 @@ class View_Attendance__Checkins extends View
 
 	function processView()
 	{
-
-
 	}
 
 	function printView()
@@ -27,7 +24,7 @@ class View_Attendance__Checkins extends View
 
 		<?php
 		if (!PUBLIC_AREA_ENABLED) {
-			print_message("You must enable the public area (via Admin > System Configuration) for checkins to work", 'error');
+			print_message('You must enable the public area (via Admin > System Configuration) for checkins to work', 'error');
 		}
 		?>
 
@@ -45,8 +42,10 @@ class View_Attendance__Checkins extends View
 				<td>
 					<?php
 					$venue->printFieldValue('name');
-					if ($venue->getValue('is_archived')) echo ' [Archived]';
-					?>
+			if ($venue->getValue('is_archived')) {
+				echo ' [Archived]';
+			}
+			?>
 				</td>
 				<td class="narrow"><a href="<?php echo $publicURL; ?>" target="checkin">Go to check-in page</a></td>
 				<td class="narrow"><a href="<?php echo $QRURL; ?>" class="med-popup">Get QR code</a></td>

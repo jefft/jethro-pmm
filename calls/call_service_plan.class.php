@@ -2,14 +2,13 @@
 class Call_Service_Plan extends Call
 {
 	/**
-	 * Execute this call
+	 * Execute this call.
 	 *
 	 * @return void
-	 * @access public
 	 */
 	function run()
 	{
-		$service = $GLOBALS['system']->getDBObject('service', (int)$_REQUEST['serviceid']);
+		$service = $GLOBALS['system']->getDBObject('service', (int) $_REQUEST['serviceid']);
 
 		?>
 		<html>
@@ -82,12 +81,12 @@ class Call_Service_Plan extends Call
 
 			</head>
 			<body>
-				<h1><?php echo ents($service->toString(TRUE)); ?></h1>
+				<h1><?php echo ents($service->toString(true)); ?></h1>
 				<p><?php $service->PrintFieldValue('summary_inline'); ?></p>
 				<?php
 				$service->printRunSheetPersonnelTable();
-				$service->printRunSheet();
-				?>
+		$service->printRunSheet();
+		?>
 			</body>
 		</html>
 		<?php

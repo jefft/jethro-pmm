@@ -1,9 +1,10 @@
 <?php
+
 class init_htpasswd extends jethro_hook
 {
 	function run($params)
 	{
-		$passwordfile = dirname(dirname(JETHRO_ROOT)).'/staff.htaccess';
+		$passwordfile = dirname(JETHRO_ROOT, 2).'/staff.htaccess';
 		$username = $params->getValue('username');
 		$password = $params->getValue('raw_password');
 		if ($params->getValue('active')) {
@@ -15,7 +16,7 @@ class init_htpasswd extends jethro_hook
 			// remove them from the htpasswd file
 			$lines = file($passwordfile);
 			foreach ($lines as $i => $v) {
-				if (0 === strpos($v, $username.':')) {
+				if (str_starts_with($v, $username.':')) {
 					unset($lines[$i]);
 				}
 			}

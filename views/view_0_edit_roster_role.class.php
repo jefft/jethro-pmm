@@ -1,4 +1,5 @@
 <?php
+
 require_once 'views/abstract_view_edit_object.class.php';
 class View__Edit_Roster_Role extends Abstract_View_Edit_Object
 {

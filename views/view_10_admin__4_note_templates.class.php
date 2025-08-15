@@ -1,7 +1,7 @@
 <?php
 class View_Admin__Note_Templates extends View
 {
-	private $_template = NULL;
+	private $_template;
 
 	static function getMenuPermissionLevel()
 	{
@@ -14,25 +14,27 @@ class View_Admin__Note_Templates extends View
 	function processView()
 	{
 		if (isset($_REQUEST['templateid'])) {
-			$this->_template =  new Note_Template((int)$_REQUEST['templateid']);
-			if ($this->_template->id) $this->_template->acquireLock();
+			$this->_template = new Note_Template((int) $_REQUEST['templateid']);
+			if ($this->_template->id) {
+				$this->_template->acquireLock();
+			}
 		}
 		if (!empty($_POST['delete'])) {
 			$this->_template->delete();
-			add_message("Template deleted");
-			redirect($_REQUEST['view'], Array('*' => NULL)); // exits
+			add_message('Template deleted');
+			redirect($_REQUEST['view'], ['*' => null]); // exits
 		}
 		if (!empty($_REQUEST['template_submitted'])) {
 			$this->_template->processForm();
 			if ($this->_template->id) {
 				if ($this->_template->save()) {
-					add_message("Template saved");
-					redirect($_REQUEST['view'], Array('*' => NULL));
+					add_message('Template saved');
+					redirect($_REQUEST['view'], ['*' => null]);
 				}
 			} else {
 				if ($this->_template->create()) {
-					add_message("Template added");
-					redirect($_REQUEST['view'], Array('*' => NULL));
+					add_message('Template added');
+					redirect($_REQUEST['view'], ['*' => null]);
 				}
 			}
 		}
@@ -42,7 +44,7 @@ class View_Admin__Note_Templates extends View
 	{
 		if (!$this->_template) {
 			return 'Configure Note Templates';
-		} else if (!$this->_template->id) {
+		} elseif (!$this->_template->id) {
 			return 'Add Note Template';
 		} else {
 			return 'Edit Note Template';
@@ -59,22 +61,22 @@ class View_Admin__Note_Templates extends View
 	}
 
 	/**
-	 * Print the list of templates to choose from
+	 * Print the list of templates to choose from.
 	 */
 	private function printTemplateList()
 	{
 		?>
 		<p class="text alert alert-info">
 			<?php
-			echo _("When you create a note template here, it then becomes available for use when adding a note to a person. Templates are useful if you often need to add notes containing a fixed set of details, for example an incident report or training record. ");
-			?>
+			echo _('When you create a note template here, it then becomes available for use when adding a note to a person. Templates are useful if you often need to add notes containing a fixed set of details, for example an incident report or training record. ');
+		?>
 		</p>
 		<p>
-			<a href="<?php echo build_url(Array('*' => NULL, 'view' => $_REQUEST['view'], 'templateid' => 0)); ?>"><i class="icon-plus-sign"></i>Create a new note template</a>
+			<a href="<?php echo build_url(['*' => null, 'view' => $_REQUEST['view'], 'templateid' => 0]); ?>"><i class="icon-plus-sign"></i>Create a new note template</a>
 		</p>
 		<?php
 
-		$templates = $GLOBALS['system']->getDBObjectData('note_template', Array(), 'OR', 'name');
+		$templates = $GLOBALS['system']->getDBObjectData('note_template', [], 'OR', 'name');
 		if ($templates) {
 			?>
 			<table class="table table-auto-width">
@@ -93,24 +95,23 @@ class View_Admin__Note_Templates extends View
 						<td><?php echo $id; ?></td>
 						<td><?php echo ents($template['name']); ?></td>
 						<td class="action-cell">
-							<a href="<?php echo build_url(Array('templateid' => $id)); ?>"><i class="icon-wrench"></i>Edit</a>
+							<a href="<?php echo build_url(['templateid' => $id]); ?>"><i class="icon-wrench"></i>Edit</a>
 							&nbsp;
-							<a href="<?php echo build_url(Array('templateid' => $id, 'delete' => 1)); ?>" data-method="post" data-confirm="Are you sure you want to delete this note template?  This cannot be undone."><i class="icon-trash"></i>Delete</a>
+							<a href="<?php echo build_url(['templateid' => $id, 'delete' => 1]); ?>" data-method="post" data-confirm="Are you sure you want to delete this note template?  This cannot be undone."><i class="icon-trash"></i>Delete</a>
 						</td>
 					</tr>
 					<?php
 				}
-				?>
+			?>
 				</tbody>
 
 			</table>
 			<?php
 		}
-
 	}
 
 	/**
-	 * Print the details of a template for editing
+	 * Print the details of a template for editing.
 	 */
 	private function printTemplateDetails()
 	{
@@ -120,7 +121,7 @@ class View_Admin__Note_Templates extends View
 			<input type="hidden" name="template_submitted" value="1">
 			<?php
 			$this->_template->printForm();
-			?>
+		?>
 			<div class="controls">
 				<input class="btn" type="submit" value="Save">
 				<a href="?view=admin__note_templates" class="btn">Cancel</a>

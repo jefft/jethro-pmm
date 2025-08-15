@@ -18,16 +18,17 @@ class Member_User_System extends Abstract_User_System
 		}
 	}
 
-	public function run() {
+	public function run()
+	{
 		if (!empty($_REQUEST['logout'])) {
 			$this->_clearAuthMember();
-		} else if (empty($_SESSION['member']) && !empty($_REQUEST['login-request'])) {
+		} elseif (empty($_SESSION['member']) && !empty($_REQUEST['login-request'])) {
 			$this->handleLoginRequest();
-		} else if (!empty($_REQUEST['password-request']) && !empty($_REQUEST['email'])) {
+		} elseif (!empty($_REQUEST['password-request']) && !empty($_REQUEST['email'])) {
 			$this->handleAccountRequest();
-		} else if (!empty($_REQUEST['verify'])) {
+		} elseif (!empty($_REQUEST['verify'])) {
 			$this->processEmailVerification();
-		} else if (!empty($_REQUEST['set-password'])) {
+		} elseif (!empty($_REQUEST['set-password'])) {
 			$this->processSetPassword();
 		}
 
@@ -45,35 +46,35 @@ class Member_User_System extends Abstract_User_System
 					$this->_clearAuthMember();
 					$this->printLogin();
 				}
-
 			}
 			$_SESSION['last_activity_time'] = time();
-            $GLOBALS['db']->setCurrentUserID((int)$_SESSION['member']['id']);
+			$GLOBALS['db']->setCurrentUserID((int) $_SESSION['member']['id']);
 
 			$this->_loadPermissionLevels();
-			return;
 
+			return;
 		} else {
 			$this->printLogin();
 		}
-
 	}
 
 	private function handleLoginRequest()
 	{
-			// process the login form
-			if (array_get($_SESSION, 'login_key', NULL) != $_POST['login_key']) {
-				$this->_error = 'Login form expired.  Please try again.';
-				return;
-			}
-			$user_details = $this->_findAuthMember($_POST['email'], $_POST['password']);
-			if (is_null($user_details)) {
-				$this->_error = 'Incorrect email address or password';
-				return;
-			} else {
-				// Log the member in
-				$this->_setAuthMember($user_details);
-			}
+		// process the login form
+		if (array_get($_SESSION, 'login_key', null) != $_POST['login_key']) {
+			$this->_error = 'Login form expired.  Please try again.';
+
+			return;
+		}
+		$user_details = $this->_findAuthMember($_POST['email'], $_POST['password']);
+		if (null === $user_details) {
+			$this->_error = 'Incorrect email address or password';
+
+			return;
+		} else {
+			// Log the member in
+			$this->_setAuthMember($user_details);
+		}
 	}
 
 	public function sendActivationEmail($person)
@@ -82,7 +83,7 @@ class Member_User_System extends Abstract_User_System
 		$SQL = 'UPDATE _person
 				SET resethash='.$GLOBALS['db']->quote($hash).',
 				resetexpires = NOW() + INTERVAL 24 HOUR
-				WHERE id = '.(int)$person['id'];
+				WHERE id = '.(int) $person['id'];
 		$res = $GLOBALS['db']->exec($SQL);
 
 		$url = base_url().'/members/?email='.rawurlencode($person['email']).'&verify='.rawurlencode($hash);
@@ -98,8 +99,8 @@ If you didn't request an account, you can just ignore this email";
 
 		$message = Emailer::newMessage()
 		  ->setSubject(MEMBER_REGO_EMAIL_SUBJECT)
-		  ->setFrom(array(MEMBER_REGO_EMAIL_FROM_ADDRESS => MEMBER_REGO_EMAIL_FROM_NAME))
-		  ->setTo(array($person['email'] => $person['first_name'].' '.$person['last_name']))
+		  ->setFrom([MEMBER_REGO_EMAIL_FROM_ADDRESS => MEMBER_REGO_EMAIL_FROM_NAME])
+		  ->setTo([$person['email'] => $person['first_name'].' '.$person['last_name']])
 		  ->setBody($text)
 		  ->addPart($html, 'text/html');
 
@@ -110,104 +111,104 @@ If you didn't request an account, you can just ignore this email";
 
 	private function handleAccountRequest()
 	{
-			$person = $this->findCandidateMember($_REQUEST['email']);
-			require_once 'include/emailer.class.php';
-			$failureEmail = MEMBER_REGO_FAILURE_EMAIL;
+		$person = $this->findCandidateMember($_REQUEST['email']);
+		require_once 'include/emailer.class.php';
+		$failureEmail = MEMBER_REGO_FAILURE_EMAIL;
 
-			if (is_array($person)) {
-				// Send them an email
-				$res = $this->sendActivationEmail($person);
+		if (is_array($person)) {
+			// Send them an email
+			$res = $this->sendActivationEmail($person);
 
-				if (TRUE == $res) {
-					require_once 'templates/account_request_received.template.php';
-					exit;
-				} else {
-					$this->_error = 'Could not send to the specified address.  Your email server may be experiencing problems.';
-					return;
-				}
-
-			} else if (!Emailer::validateAddress($_REQUEST['email'])) {
-				$this->_error = 'You have entered an invalid email address.  Please check the address and try again.';
-
-			} else if (($person == -1) && !empty($failureEmail)) {
-				// This email address is in use by two or more persons from *different families*.
-				// Therefore this address cannot be used for member access.
-
-				$message = Emailer::newMessage()
-				  ->setSubject("Member Account request from multi-family email")
-				  ->setFrom(array(MEMBER_REGO_EMAIL_FROM_ADDRESS => SYSTEM_NAME.' Jethro System'))
-				  ->setTo(MEMBER_REGO_FAILURE_EMAIL)
-				  ->setBody("Hi, \n\nThis is an automated message from the Jethro system at ".base_url().".\n\n"
-						  ."Somebody has used the form at ".base_url()."/members to request member-access to this Jethro system. \n\n"
-						  ."The email address they specified was ".$_REQUEST['email']." but this address belongs to SEVERAL persons from DIFFERENT families.  It therefore can't be used for member access.\n\n"
-						  ."Please look up this email address in Jethro and contact the relevant persons to help them solve this problem.\n\n");
-
-				$res = Emailer::send($message);
-
-				// Show the user the generic "thanks" page - because we do not want
-				// to tell strangers whether an email is or isn't known.
-				require_once 'templates/account_request_received.template.php';
-				exit;
-
-			} else if (!empty($failureEmail)) {
-				// This email address doesn't match any person record.
-				// Send the administrator an email
-
-				$message = Emailer::newMessage()
-				  ->setSubject("Member Account request from unknown email")
-				  ->setFrom(array(MEMBER_REGO_EMAIL_FROM_ADDRESS => SYSTEM_NAME.' Jethro System'))
-				  ->setTo(MEMBER_REGO_FAILURE_EMAIL)
-				  ->setBody("Hi, \n\nThis is an automated message from the Jethro system at ".base_url().".\n\n"
-						  ."Somebody has used the form at ".base_url()."/members to request member-access to this Jethro system. \n\n"
-						  ."The email address they specified was ".$_REQUEST['email']." but there is no current person record in the Jethro system with that address. (There could be an archived record).\n\n"
-						  ."If you believe this person is a church member, please add their email address to their person record and then ask them to try registering again.\n\n");
-
-				$res = Emailer::send($message);
-
-				// Show the user the generic "thanks" page - because we do not want
-				// to tell strangers whether an email is or isn't known.
+			if (true == $res) {
 				require_once 'templates/account_request_received.template.php';
 				exit;
 			} else {
-				// Show the user the generic "thanks" page - because we do not want
-				// to tell strangers whether an email is or isn't known.
-				// (even though there is no failure email to send)
-				require_once 'templates/account_request_received.template.php';
-				exit;
+				$this->_error = 'Could not send to the specified address.  Your email server may be experiencing problems.';
+
+				return;
 			}
+		} elseif (!Emailer::validateAddress($_REQUEST['email'])) {
+			$this->_error = 'You have entered an invalid email address.  Please check the address and try again.';
+		} elseif (($person == -1) && !empty($failureEmail)) {
+			// This email address is in use by two or more persons from *different families*.
+			// Therefore this address cannot be used for member access.
+
+			$message = Emailer::newMessage()
+			  ->setSubject('Member Account request from multi-family email')
+			  ->setFrom([MEMBER_REGO_EMAIL_FROM_ADDRESS => SYSTEM_NAME.' Jethro System'])
+			  ->setTo(MEMBER_REGO_FAILURE_EMAIL)
+			  ->setBody("Hi, \n\nThis is an automated message from the Jethro system at ".base_url().".\n\n"
+					  .'Somebody has used the form at '.base_url()."/members to request member-access to this Jethro system. \n\n"
+					  .'The email address they specified was '.$_REQUEST['email']." but this address belongs to SEVERAL persons from DIFFERENT families.  It therefore can't be used for member access.\n\n"
+					  ."Please look up this email address in Jethro and contact the relevant persons to help them solve this problem.\n\n");
+
+			$res = Emailer::send($message);
+
+			// Show the user the generic "thanks" page - because we do not want
+			// to tell strangers whether an email is or isn't known.
+			require_once 'templates/account_request_received.template.php';
+			exit;
+		} elseif (!empty($failureEmail)) {
+			// This email address doesn't match any person record.
+			// Send the administrator an email
+
+			$message = Emailer::newMessage()
+			  ->setSubject('Member Account request from unknown email')
+			  ->setFrom([MEMBER_REGO_EMAIL_FROM_ADDRESS => SYSTEM_NAME.' Jethro System'])
+			  ->setTo(MEMBER_REGO_FAILURE_EMAIL)
+			  ->setBody("Hi, \n\nThis is an automated message from the Jethro system at ".base_url().".\n\n"
+					  .'Somebody has used the form at '.base_url()."/members to request member-access to this Jethro system. \n\n"
+					  .'The email address they specified was '.$_REQUEST['email']." but there is no current person record in the Jethro system with that address. (There could be an archived record).\n\n"
+					  ."If you believe this person is a church member, please add their email address to their person record and then ask them to try registering again.\n\n");
+
+			$res = Emailer::send($message);
+
+			// Show the user the generic "thanks" page - because we do not want
+			// to tell strangers whether an email is or isn't known.
+			require_once 'templates/account_request_received.template.php';
+			exit;
+		} else {
+			// Show the user the generic "thanks" page - because we do not want
+			// to tell strangers whether an email is or isn't known.
+			// (even though there is no failure email to send)
+			require_once 'templates/account_request_received.template.php';
+			exit;
+		}
 	}
 
-	private function processEmailVerification() {
+	private function processEmailVerification()
+	{
 		if ($person = $this->_findPendingMember($_REQUEST['email'], $_REQUEST['verify'])) {
 			$this->_setAuthMember($person);
-			require_once('templates/set_password.template.php');
+			require_once 'templates/set_password.template.php';
 			exit;
 		} else {
 			$this->_error = 'The account request is not valid.  You may have used an out-of-date link.  Please try registering again.';
 		}
 	}
 
-	private function processSetPassword() {
+	private function processSetPassword()
+	{
 		$db = $GLOBALS['db'];
 		$val = $_REQUEST['password1'];
 		if ($val != $_REQUEST['password2']) {
 			$this->_error = 'Password and password confirmation do not match.  Try again.';
-			require_once('templates/set_password.template.php');
+			require_once 'templates/set_password.template.php';
 			exit;
-		} else if (strlen($val) < MEMBER_PASSWORD_MIN_LENGTH) {
+		} elseif (strlen($val) < MEMBER_PASSWORD_MIN_LENGTH) {
 			$this->_error = 'Password is too short - must be at least '.MEMBER_PASSWORD_MIN_LENGTH.' characters; Password not saved.';
-			require_once('templates/set_password.template.php');
+			require_once 'templates/set_password.template.php';
 			exit;
-		} else if (!preg_match('/[0-9]+/', $val) || !preg_match('/[^0-9]+/', $val)) {
+		} elseif (!preg_match('/[0-9]+/', $val) || !preg_match('/[^0-9]+/', $val)) {
 			$this->_error = 'Password is too simple - it must contain letters and numbers; Password not saved.';
-			require_once('templates/set_password.template.php');
+			require_once 'templates/set_password.template.php';
 			exit;
 		} else {
 			$sql = 'UPDATE _person '
-					. 'SET `member_password` = '.$db->quote(jethro_password_hash($val)).', '
-					. 'resethash = NULL, '
-					. 'resetexpires = NULL '
-					. 'WHERE id = '.(int)$_SESSION['member']['id'];
+					.'SET `member_password` = '.$db->quote(jethro_password_hash($val)).', '
+					.'resethash = NULL, '
+					.'resetexpires = NULL '
+					.'WHERE id = '.(int) $_SESSION['member']['id'];
 			$res = $db->exec($sql);
 
 			if (!empty($_REQUEST['isreset'])) {
@@ -218,24 +219,22 @@ If you didn't request an account, you can just ignore this email";
 		}
 	}
 
-
 	public function printLogin()
 	{
 		$_SESSION['login_key'] = $login_key = generate_random_string(32);
 		require TEMPLATE_DIR.'/login_form.template.php';
 		exit;
-
-	}//end printLogin()
+	}// end printLogin()
 
 	/**
-	 * Get details of the currently-authorised church member
-	 * @param string $field	Particular field to return; null=return all fields
-	 * @return mixed
+	 * Get details of the currently-authorised church member.
+	 *
+	 * @param string $field Particular field to return; null=return all fields
 	 */
-	public function getCurrentMember($field='')
+	public function getCurrentMember($field = '')
 	{
 		if (empty($_SESSION['member'])) {
-			return NULL;
+			return null;
 		} else {
 			if (empty($field)) {
 				return $_SESSION['member'];
@@ -243,41 +242,43 @@ If you didn't request an account, you can just ignore this email";
 				return array_get($_SESSION['member'], $field, '');
 			}
 		}
-
 	}
 
 	/**
-	 * Get details of the currently-authorised church member
+	 * Get details of the currently-authorised church member.
+	 *
 	 * @see Abstract_User_System::getCurrentPerson()
-	 * @param string $field	Particular field to return; null=return all fields
-	 * @return mixed
+	 *
+	 * @param string $field Particular field to return; null=return all fields
 	 */
-	public function getCurrentPerson($field='')
+	public function getCurrentPerson($field = '')
 	{
 		return $this->getCurrentMember($field);
 	}
 
 	/**
-	 * Set the session as having the specified person logged in
+	 * Set the session as having the specified person logged in.
+	 *
 	 * @param array $member_details
 	 */
 	private function _setAuthMember($member_details)
 	{
 		// Recreate session ID when logging in
 		session_regenerate_id();
-		$_SESSION = Array();
+		$_SESSION = [];
 		$_SESSION['member'] = $member_details;
 		$_SESSION['login_time'] = time();
 		$_SESSION['last_activity_time'] = time();
 	}
 
 	/**
-	 * Set the session as not having any member logged in
+	 * Set the session as not having any member logged in.
 	 */
-	private function _clearAuthMember() {
-		$_SESSION['member'] = NULL;
-		$_SESSION['login_time'] = NULL;
-		$_SESSION['last_activity_time'] = NULL;
+	private function _clearAuthMember()
+	{
+		$_SESSION['member'] = null;
+		$_SESSION['login_time'] = null;
+		$_SESSION['last_activity_time'] = null;
 	}
 
 	/**
@@ -287,21 +288,22 @@ If you didn't request an account, you can just ignore this email";
 	 * If the email address belongs to several persons in different families, returns -1
 	 *   because such addresses cannot be used for member-login.
 	 * If the email address does not belong to any person record, returns null.
-	 * @param string $email	Email address for the account
-	 * @return mixed.
+	 *
+	 * @param string $email Email address for the account
 	 */
 	public function findCandidateMember($email)
 	{
-		$db =& $GLOBALS['db'];
+		$db = &$GLOBALS['db'];
 		$sql = 'SELECT COUNT(DISTINCT familyid) '
-				. 'FROM _person p '
-				. 'JOIN person_status ps ON ps.id = p.status '
-				. 'WHERE email = '.$db->quote($email).''
-				. 'AND (NOT ps.is_archived)';
+				.'FROM _person p '
+				.'JOIN person_status ps ON ps.id = p.status '
+				.'WHERE email = '.$db->quote($email).''
+				.'AND (NOT ps.is_archived)';
 		$familyCount = $db->queryOne($sql);
 
-		if ($familyCount > 1) return -1;
-
+		if ($familyCount > 1) {
+			return -1;
+		}
 
 		$sql = 'SELECT p.*
 				FROM _person p
@@ -316,33 +318,38 @@ If you didn't request an account, you can just ignore this email";
 	}
 
 	/**
-	 * Find a person record that has the specified email and account-creation hash
+	 * Find a person record that has the specified email and account-creation hash.
+	 *
 	 * @param string $email
 	 * @param string $hash
+	 *
 	 * @return array
 	 */
-	private function _findPendingMember($email, $hash) {
-		$db =& $GLOBALS['db'];
+	private function _findPendingMember($email, $hash)
+	{
+		$db = &$GLOBALS['db'];
 		$sql = 'SELECT p.*
 				FROM _person p
 				WHERE p.email  = '.$db->quote($email).'
 				AND resethash = '.$db->quote($hash).'
 				AND resetexpires > NOW()';
 		$res = $db->queryRow($sql);
+
 		return $res;
 	}
-
 
 	/**
 	 * Find a person record that matches the given email and password
 	 * (Matches member-area AND control-centre passwords).
-	 * @param string $email		Find a person with this record
-	 * @param string $password	Find a person with this member_password
-	 * @return array	Person details
+	 *
+	 * @param string $email    Find a person with this record
+	 * @param string $password Find a person with this member_password
+	 *
+	 * @return array Person details
 	 */
 	private function _findAuthMember($email, $password)
 	{
-		$db =& $GLOBALS['db'];
+		$db = &$GLOBALS['db'];
 		$sql = 'SELECT p.*, sm.password
 				FROM _person p
 				LEFT JOIN staff_member sm ON sm.id = p.id
@@ -351,27 +358,29 @@ If you didn't request an account, you can just ignore this email";
 		$res = $db->queryAll($sql);
 		foreach ($res as $row) {
 			if (jethro_password_verify($password, $row['member_password'])) {
-				unset($row['member_password']);
-				unset($row['history']);
+				unset($row['member_password'], $row['history']);
+
 				return $row;
 			}
 			// Auth using the control centre password if available
 			if (strlen($row['password']) && jethro_password_verify($password, $row['password'])) {
-				unset($row['member_password']);
-				unset($row['history']);
+				unset($row['member_password'], $row['history']);
+
 				return $row;
 			}
 		}
-		return NULL;
+
+		return null;
 	}
 
 	public function handle2FAMobileTelChange($person, $old_mobile)
 	{
 		$staff_member = new Staff_Member($person->id);
-		if (!$staff_member) return;
+		if (!$staff_member) {
+			return;
+		}
 		if ($staff_member->requires2FA()) {
-			throw new \RuntimeException("Attempt to change 2FA user's mobile number via the members interface");
+			throw new RuntimeException("Attempt to change 2FA user's mobile number via the members interface");
 		}
 	}
-
 }

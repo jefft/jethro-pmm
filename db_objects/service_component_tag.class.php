@@ -1,4 +1,5 @@
 <?php
+
 class Service_Component_Tag extends db_object
 {
 	protected $_load_permission_level = 0; // want PERM_VIEWSERVICE | PERM_VIEWROSTER
@@ -6,21 +7,19 @@ class Service_Component_Tag extends db_object
 
 	protected static function _getFields()
 	{
+		$fields = [
+			'tag' => [
+				'type' => 'text',
+				'width' => 80,
+				'initial_cap' => true,
+			],
+		];
 
-		$fields = Array(
-			'tag'		=> Array(
-									'type'		=> 'text',
-									'width'		=> 80,
-									'initial_cap'	=> TRUE,
-								   ),
-		);
 		return $fields;
 	}
-
 
 	function toString()
 	{
 		return $this->values['tag'];
 	}
-
 }

@@ -1,8 +1,9 @@
 <?php
+
 class View__Persons_Bulk_Update extends View
 {
 	var $_person;
-	var $_allowedFields = Array('status', 'age_bracketid', 'congregationid');
+	var $_allowedFields = ['status', 'age_bracketid', 'congregationid'];
 
 	static function getMenuPermissionLevel()
 	{
@@ -12,12 +13,13 @@ class View__Persons_Bulk_Update extends View
 	function processView()
 	{
 		if (empty($_POST['personid'])) {
-			trigger_error("Cannot update persons, no person ID specified", E_USER_WARNING);
+			trigger_error('Cannot update persons, no person ID specified', \E_USER_WARNING);
+
 			return;
 		}
 
-		$customValues = Array();
-		$customFields = $GLOBALS['system']->getDBObjectData('custom_field', Array(), 'OR', 'rank');
+		$customValues = [];
+		$customFields = $GLOBALS['system']->getDBObjectData('custom_field', [], 'OR', 'rank');
 		$dummyField = new Custom_Field();
 		foreach ($customFields as $fieldid => $fieldDetails) {
 			$dummyField->populate($fieldid, $fieldDetails);
@@ -27,29 +29,31 @@ class View__Persons_Bulk_Update extends View
 		}
 
 		foreach ($this->_allowedFields as $field) {
-			if (array_get($_POST, $field, '') == '') unset($_POST[$field]);
+			if (array_get($_POST, $field, '') == '') {
+				unset($_POST[$field]);
+			}
 		}
-		
+
 		if (empty($customValues) && count(array_intersect(array_keys($_POST), $this->_allowedFields)) == 0) {
-			add_message("Cannot update; no new values were specified", 'error');
+			add_message('Cannot update; no new values were specified', 'error');
 			if (!empty($_REQUEST['backto'])) {
 				parse_str($_REQUEST['backto'], $back);
 				unset($back['backto']);
-				$back['*'] = NULL;
+				$back['*'] = null;
 				redirect($back['view'], $back);
 			}
+
 			return;
 		}
-		
-		$success = 0;
-		$GLOBALS['system']->setFriendlyErrors(TRUE);
-		foreach ((array)$_REQUEST['personid'] as $personid) {
 
-			$this->_person = new Person((int)$personid);
+		$success = 0;
+		$GLOBALS['system']->setFriendlyErrors(true);
+		foreach ((array) $_REQUEST['personid'] as $personid) {
+			$this->_person = new Person((int) $personid);
 			if (!$this->_person->acquireLock()) {
 				add_message($this->_person->toString().' is locked by another user and cannot be updated. Please try again later', 'error');
 			}
-			
+
 			foreach ($this->_allowedFields as $field) {
 				if (strlen(array_get($_POST, $field, ''))) {
 					// we need our own isset
@@ -58,16 +62,16 @@ class View__Persons_Bulk_Update extends View
 			}
 
 			foreach ($customValues as $fieldid => $val) {
-				$this->_person->setCustomValue($fieldid, $val, array_get($_POST, 'custom_'.$fieldid.'_add', FALSE));
+				$this->_person->setCustomValue($fieldid, $val, array_get($_POST, 'custom_'.$fieldid.'_add', false));
 			}
 
 			if ($this->_person->validateFields() && $this->_person->save()) {
-				$success++;
+				++$success;
 			}
 		}
 		if ($success == count($_REQUEST['personid'])) {
-			add_message('Fields updated for ' .count($_REQUEST['personid']).' persons');
-		} else if ($success > 0) {
+			add_message('Fields updated for '.count($_REQUEST['personid']).' persons');
+		} elseif ($success > 0) {
 			add_message("Fields updated for $success persons; some persons could not be updated");
 		} else {
 			add_message('There was a problem updating the fields. Check your selected persons.');
@@ -75,23 +79,21 @@ class View__Persons_Bulk_Update extends View
 		if (!empty($_REQUEST['backto'])) {
 			parse_str($_REQUEST['backto'], $back);
 			unset($back['backto']);
-			$back['*'] = NULL;
+			$back['*'] = null;
 			redirect($back['view'], $back);
 		}
-		
 	}
-	
+
 	function getTitle()
 	{
 		if (empty($this->_person)) {
 			return;
 		}
+
 		return 'Update status for person';
 	}
 
-
 	function printView()
 	{
-		
 	}
 }

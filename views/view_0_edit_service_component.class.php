@@ -20,6 +20,6 @@ class View__Edit_Service_Component extends Abstract_View_Edit_Object
 			<?php
 			exit;
 		}
-		redirect($this->_on_success_view, Array(), 'cat'.array_get($_REQUEST, 'categoryid'));
+		redirect($this->_on_success_view, [], 'cat'.array_get($_REQUEST, 'categoryid'));
 	}
 }

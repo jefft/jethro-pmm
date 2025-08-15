@@ -2,12 +2,12 @@
 class View_Admin__Import extends View
 {
 	private $_stage = 'begin';
-	private $_sess = NULL;
-	private $_dummy_family = NULL;
-	private $_dummy_person = NULL;
-	private $_captured_errors = Array();
+	private $_sess;
+	private $_dummy_family;
+	private $_dummy_person;
+	private $_captured_errors = [];
 	private $_error_index = 0;
-	private $_groups = Array();
+	private $_groups = [];
 
 	static function getMenuPermissionLevel()
 	{
@@ -37,7 +37,7 @@ class View_Admin__Import extends View
 
 	function processView()
 	{
-		$this->_sess =& $_SESSION['import'];
+		$this->_sess = &$_SESSION['import'];
 
 		$GLOBALS['system']->includeDBClass('family');
 		$GLOBALS['system']->includeDBClass('person');
@@ -47,13 +47,12 @@ class View_Admin__Import extends View
 
 		if (!empty($_REQUEST['done'])) {
 			$this->_stage = 'done';
-		} else if (!empty($_POST['confirm_import'])) {
+		} elseif (!empty($_POST['confirm_import'])) {
 			$this->_processImport();
-		} else if (!empty($_FILES['import'])) {
+		} elseif (!empty($_FILES['import'])) {
 			$this->_preparePreview();
 		}
 	}
-
 
 	private function _printBeginView()
 	{
@@ -74,17 +73,25 @@ class View_Admin__Import extends View
 				<td>
 					<label>
 						<input type="radio" name="data_source" value="upload" data-toggle="visible" data-target=".importsource" data-match-attr="data-source" 
-							<?php if (array_get($_REQUEST, 'data_source', 'upload') == 'upload') echo 'checked="checked"'; ?> />
+							<?php if (array_get($_REQUEST, 'data_source', 'upload') == 'upload') {
+								echo 'checked="checked"';
+							} ?> />
 						Upload file&nbsp;
 						<input class="importsource" data-source="upload" type="file" name="import"
-							<?php if (array_get($_REQUEST, 'data_source', 'upload') != 'upload') echo 'style="display:none"'; ?> />
+							<?php if (array_get($_REQUEST, 'data_source', 'upload') != 'upload') {
+								echo 'style="display:none"';
+							} ?> />
 					</label>
 					<label>
 						<input type="radio" name="data_source" value="input" data-toggle="visible" data-target=".importsource" data-match-attr="data-source" 
-							<?php if (array_get($_REQUEST, 'data_source', 'upload') == 'input') echo 'checked="checked"'; ?> />
+							<?php if (array_get($_REQUEST, 'data_source', 'upload') == 'input') {
+								echo 'checked="checked"';
+							} ?> />
 						Paste text...<br />
 						<textarea style="width: 50ex; height: 6ex;
-										<?php if (array_get($_REQUEST, 'data_source', 'upload') != 'input') echo 'display:none'; ?>
+										<?php if (array_get($_REQUEST, 'data_source', 'upload') != 'input') {
+											echo 'display:none';
+										} ?>
 							" name="importdata" class="importsource" data-source="input" placeholder="Paste Tab-separated text here"></textarea>
 					</label>
 				</td>
@@ -94,26 +101,34 @@ class View_Admin__Import extends View
 				<td>
 					<label>
 						<input type="radio" name="group_type" value="new" 
-							<?php if (array_get($_REQUEST, 'group_type', 'new') == 'new') echo 'checked="checked"'; ?>
+							<?php if (array_get($_REQUEST, 'group_type', 'new') == 'new') {
+								echo 'checked="checked"';
+							} ?>
 							data-toggle="visible" data-target=".grouptype" data-match-attr="data-group-source"  />
 						Create a new group
 						<span class="grouptype" data-group-source="new"
-							<?php if (array_get($_REQUEST, 'group_type', 'new') != 'new') echo 'style="display:none"'; ?>	>
+							<?php if (array_get($_REQUEST, 'group_type', 'new') != 'new') {
+								echo 'style="display:none"';
+							} ?>	>
 							called
 							<input type="text" name="new_group_name" value="<?php echo ents(array_get($_REQUEST, 'new_group_name', '')); ?>"/>
 							in category
 							<?php
 							Person_Group_Category::printChooser('new_group_categoryid', array_get($_REQUEST, 'new_group_categoryid'));
-							?>
+		?>
 						</span>
 					</label>
 					<label>
 						<input type="radio" name="group_type" value="existing"
-						<?php if (array_get($_REQUEST, 'group_type', 'new') == 'existing') echo 'checked="checked"'; ?>
+						<?php if (array_get($_REQUEST, 'group_type', 'new') == 'existing') {
+							echo 'checked="checked"';
+						} ?>
 						data-toggle="visible" data-target=".grouptype" data-match-attr="data-group-source" />
 						Add to an existing group
 						<span class="grouptype" data-group-source="existing"
-							<?php if (array_get($_REQUEST, 'group_type', 'new') != 'existing') echo 'style="display:none"'; ?>	>
+							<?php if (array_get($_REQUEST, 'group_type', 'new') != 'existing') {
+								echo 'style="display:none"';
+							} ?>	>
 							<?php Person_Group::printChooser('groupid', array_get($_REQUEST, 'groupid', 0)); ?>
 						</span>
 					</label>											
@@ -124,25 +139,35 @@ class View_Admin__Import extends View
 				<th>Options</th>
 				<td>
 					<label class="checkbox">
-						<input type="checkbox" name="match_existing" value="1" <?php if (array_get($_REQUEST, 'match_existing', 1)) echo 'checked="checked"';?> data-toggle="enable" data-target="#match-options *"/>
+						<input type="checkbox" name="match_existing" value="1" <?php if (array_get($_REQUEST, 'match_existing', 1)) {
+							echo 'checked="checked"';
+						}?> data-toggle="enable" data-target="#match-options *"/>
 						Update existing persons if their first and last name match
 					</label>
 					<div class="indent-left" id="match-options">
 						<label class="checkbox">
-							<input type="checkbox" name="match_email" value="1" <?php if (array_get($_REQUEST, 'match_email', 0)) echo 'checked="checked"';?>/>
+							<input type="checkbox" name="match_email" value="1" <?php if (array_get($_REQUEST, 'match_email', 0)) {
+								echo 'checked="checked"';
+							}?>/>
 							Don't match if email address is different
 						</label>
 						<label class="checkbox">
-							<input type="checkbox" name="match_mobile_tel" value="1" <?php if (array_get($_REQUEST, 'match_mobile_tel', 0)) echo 'checked="checked"';?>/>
+							<input type="checkbox" name="match_mobile_tel" value="1" <?php if (array_get($_REQUEST, 'match_mobile_tel', 0)) {
+								echo 'checked="checked"';
+							}?>/>
 							Don't match if mobile number is different
 						</label>
 						If a field value differs,
 						<label class="checkbox" checked="checked">
-							<input type="radio" name="overwrite_existing" <?php if (array_get($_REQUEST, 'overwrite_existing', 1)) echo 'checked="checked"';?> value="1" />
+							<input type="radio" name="overwrite_existing" <?php if (array_get($_REQUEST, 'overwrite_existing', 1)) {
+								echo 'checked="checked"';
+							}?> value="1" />
 							use the value from the import file
 						</label>
 						<label class="checkbox">
-							<input type="radio" name="overwrite_existing" <?php if (!array_get($_REQUEST, 'overwrite_existing', 1)) echo 'checked="checked"';?> value="0" />
+							<input type="radio" name="overwrite_existing" <?php if (!array_get($_REQUEST, 'overwrite_existing', 1)) {
+								echo 'checked="checked"';
+							}?> value="0" />
 							preserve the existing value in Jethro
 						</label>
 					</div>
@@ -160,38 +185,41 @@ class View_Admin__Import extends View
 		<?php
 	}
 
-
 	private function _preparePreview()
 	{
 		switch ($_REQUEST['group_type']) {
 			case 'existing':
 				if (empty($_REQUEST['groupid'])) {
-					add_message(_("You must choose a group first"), 'error');
+					add_message(_('You must choose a group first'), 'error');
 					$this->_stage = 'begin';
+
 					return;
 				}
 				break;
 			case 'new':
 				if (!strlen(array_get($_REQUEST, 'new_group_name'))) {
-					add_message(_("You must enter a name for the new group"), 'error');
+					add_message(_('You must enter a name for the new group'), 'error');
 					$this->_stage = 'begin';
+
 					return;
 				}
 				break;
 		}
-		
+
 		switch ($_REQUEST['data_source']) {
 			case 'upload':
 				if (empty($_FILES['import']) || empty($_FILES['import']['tmp_name'])) {
-					add_message(_("You must upload a file"), 'error');
+					add_message(_('You must upload a file'), 'error');
+
 					return;
 				}
 				$datafile = $_FILES['import']['tmp_name'];
-				$separator = ",";
+				$separator = ',';
 				break;
 			case 'input':
 				if (!strlen($_REQUEST['importdata'])) {
-					add_message(_("You must enter some import data"), 'error');
+					add_message(_('You must enter some import data'), 'error');
+
 					return;
 				}
 				$datafile = tempnam(sys_get_temp_dir(), 'jethroimport');
@@ -199,46 +227,46 @@ class View_Admin__Import extends View
 				file_put_contents($datafile, $_REQUEST['importdata']);
 				break;
 			default:
-				trigger_error("Invalid data_source value");
+				trigger_error('Invalid data_source value');
 		}
-		
+
 		$this->_dummy_family = new Family();
 		$this->_dummy_person = new Person();
-		$family_fields = Array('family_name', 'home_tel', 'address_street', 'address_suburb', 'address_state', 'address_postcode');
-		$_SESSION['import'] = Array();
+		$family_fields = ['family_name', 'home_tel', 'address_street', 'address_suburb', 'address_state', 'address_postcode'];
+		$_SESSION['import'] = [];
 
 		$this->_sess['overwrite_existing'] = array_get($_REQUEST, 'overwrite_existing', 1);
-		$this->_sess['groupid'] = (int)array_get($_POST, 'groupid'); // the group for every new/updated person to go in
+		$this->_sess['groupid'] = (int) array_get($_POST, 'groupid'); // the group for every new/updated person to go in
 		$this->_sess['new_group_name'] = array_get($_POST, 'new_group_name'); // the group for every new/updated person to go in
-		$this->_sess['new_group_categoryid'] = (int)array_get($_POST, 'new_group_categoryid'); // the group for every new/updated person to go in
+		$this->_sess['new_group_categoryid'] = (int) array_get($_POST, 'new_group_categoryid'); // the group for every new/updated person to go in
 
 		// @var existing groups mentioned in a 'group' column (name => id)
-		$this->_sess['matched_groups'] = Array();
+		$this->_sess['matched_groups'] = [];
 
 		// @var names new groups to be created, mentioned in a 'group' column
-		$this->_sess['new_groups'] = Array();
+		$this->_sess['new_groups'] = [];
 
 		// @var New families to be created, including an array of family members
-		$this->_sess['new_families'] = Array();
+		$this->_sess['new_families'] = [];
 
 		// @var Count of new persons
 		$this->_sess['total_new_persons'] = 0;
 
 		// @var New persons to be added to existing families, with ['familyid'] set.
-		$this->_sess['new_persons'] = Array();
+		$this->_sess['new_persons'] = [];
 
 		// @var Existing persons to be updated, keyed by personid
 		// Format ready for ->fromCSVRow plus _note and _groups.
-		$this->_sess['person_updates'] = Array();
+		$this->_sess['person_updates'] = [];
 
 		// @var Existing families to be updated, keyed by familyid.
 		// Format ready for ->fromCSVRow plus _note and _groups.
-		$this->_sess['family_updates'] = Array();
+		$this->_sess['family_updates'] = [];
 
 		// @var Ids => names of the custom fields in play in this import (so we know what to display)
-		$this->_sess['used_custom_fields'] = Array();
+		$this->_sess['used_custom_fields'] = [];
 
-		$custom_fields = Array();
+		$custom_fields = [];
 		foreach (Person::getCustomFields() as $id => $detail) {
 			$custom_fields[self::_stringToKey($detail['name'])] = $id;
 		}
@@ -246,43 +274,47 @@ class View_Admin__Import extends View
 		// read the csv and save to session
 		$fp = fopen($datafile, 'r');
 		if (!$fp) {
-			add_message(_("There was a problem reading your CSV file.  Please try again."), 'error');
+			add_message(_('There was a problem reading your CSV file.  Please try again.'), 'error');
 			$this->stage = 'begin';
+
 			return;
 		}
 		$map = fgetcsv($fp, 0, $separator, '"');
 		$sample_header = self::getSampleHeader();
 		foreach ($map as $k => $v) {
-			if ($v == '') continue;
+			if ($v == '') {
+				continue;
+			}
 			$v = self::_stringToKey($v);
-			if (!in_array($v, $sample_header)) {
-				add_message("Unrecognised column \"".$v.'" will be ignored', 'warning');
+			if (!in_array($v, $sample_header, true)) {
+				add_message('Unrecognised column "'.$v.'" will be ignored', 'warning');
 			}
 			$map[$k] = $v;
 			if ($cfid = array_get($custom_fields, $v)) {
 				$this->_sess['used_custom_fields'][$cfid] = $v;
 			}
 		}
-		$has_required_cols = TRUE;
-		foreach (self::getSampleHeader(TRUE) as $hcol) {
-			if (!in_array($hcol, $map)) {
+		$has_required_cols = true;
+		foreach (self::getSampleHeader(true) as $hcol) {
+			if (!in_array($hcol, $map, true)) {
 				add_message("Your file must contain a $hcol column", 'error');
-				$has_required_cols = FALSE;
+				$has_required_cols = false;
 			}
 		}
 		if (!$has_required_cols) {
 			$this->_stage = 'begin';
+
 			return;
 		}
 
-		$row_errors = Array();
-		$current_new_family_data = Array();
-		$current_existing_family_data = NULL;
+		$row_errors = [];
+		$current_new_family_data = [];
+		$current_existing_family_data = null;
 
 		$i = 0;
 		while ($rawrow = fgetcsv($fp, 0, $separator, '"')) {
-			$i++;
-			$row = Array();
+			++$i;
+			$row = [];
 			foreach ($map as $index => $fieldname) {
 				if ($fieldname == 'group') {
 					if (strlen($g = array_get($rawrow, $index, ''))) {
@@ -296,8 +328,10 @@ class View_Admin__Import extends View
 							}
 						}
 					}
-				} else if ($fieldname == 'note') {
-					if (strlen($n = array_get($rawrow, $index, ''))) $row['_note'] = $n;
+				} elseif ($fieldname == 'note') {
+					if (strlen($n = array_get($rawrow, $index, ''))) {
+						$row['_note'] = $n;
+					}
 				} else {
 					$row[$fieldname] = trim(array_get($rawrow, $index, ''));
 				}
@@ -311,8 +345,8 @@ class View_Admin__Import extends View
 				if (!empty($current_new_family_data['members'])) {
 					$this->_sess['new_families'][] = $current_new_family_data;
 				}
-				$current_new_family_data = Array();
-				$current_existing_family_data = Array();
+				$current_new_family_data = [];
+				$current_existing_family_data = [];
 			}
 			if ($this->_isEmptyRow($row)) {
 				continue;
@@ -320,7 +354,9 @@ class View_Admin__Import extends View
 
 			$ei = $i;
 			$name = array_get($row, 'first_name', '').' '.array_get($row, 'last_name', '');
-			if (strlen(trim($name))) $ei .= ' ('.$name.')';
+			if (strlen(trim($name))) {
+				$ei .= ' ('.$name.')';
+			}
 			$this->_captureErrors($ei);
 
 			if (!empty($row['congregation'])) {
@@ -350,7 +386,7 @@ class View_Admin__Import extends View
 
 					// Grab any family data supplied in the previous rows
 					$this->_pushIntoArray($current_new_family_data, $family_row);
-					$current_new_family_data = Array();
+					$current_new_family_data = [];
 				}
 
 				// Try updating the family fields
@@ -359,7 +395,7 @@ class View_Admin__Import extends View
 				$family_row['family_name'] = $familyObj->getValue('family_name'); // avoid case munging
 				$familyObj->fromCsvRow($family_row, $this->_sess['overwrite_existing']);
 				if (empty($current_existing_family_data) || ($existingPerson->getValue('familyid') != $current_existing_family_data['id'])) {
-					$current_existing_family_data = $family_row + Array('id' => $familyObj->id);
+					$current_existing_family_data = $family_row + ['id' => $familyObj->id];
 				} else {
 					$this->_pushIntoArray($family_row, $current_existing_family_data);
 				}
@@ -368,20 +404,18 @@ class View_Admin__Import extends View
 					if (isset($this->_sess['person_updates'][$existingPerson->id])) {
 						// a previous import row also matched this same person.
 						// Later rows take precedence over earlier rows, but data should be combined where possible (eg groups).
-						$already_groups = array_get($this->_sess['person_updates'][$existingPerson->id], '_groups', Array());
+						$already_groups = array_get($this->_sess['person_updates'][$existingPerson->id], '_groups', []);
 						$this->_pushIntoArray($this->_sess['person_updates'][$existingPerson->id], $person_row);
 						$this->_sess['person_updates'][$existingPerson->id] = $person_row;
 						if (!empty($person_row['_groups'])) {
 							$this->_sess['person_updates'][$existingPerson->id]['_groups'] = array_unique(array_merge($already_groups, $person_row['_groups']));
 						}
-
 					} else {
 						$this->_sess['person_updates'][$existingPerson->id] = $person_row;
 					}
 					$this->_sess['family_updates'][$existingPerson->getValue('familyid')] = $current_existing_family_data;
 				}
 			} else {
-
 				// SCENARIO 2 - WE ARE CREATING A NEW PERSON,
 
 				// Try pulling details into person object - will throw errors on bad data
@@ -405,7 +439,7 @@ class View_Admin__Import extends View
 						$this->_sess['new_persons'][] = $person_row;
 						$this->_sess['family_updates'][$current_existing_family_data['id']] = $current_existing_family_data;
 					}
-				} else if (!empty($current_new_family_data)) {
+				} elseif (!empty($current_new_family_data)) {
 					// 2B) THE NEW PERSON IS TO BE ADDED TO A NEW FAMILY ALREADY STARTED IN THIS IMPORT
 
 					// Add to the new family data any extra details supplied in this row
@@ -417,8 +451,6 @@ class View_Admin__Import extends View
 					if (!$this->_haveErrors($i)) {
 						$current_new_family_data['members'][] = $person_row;
 					}
-
-
 				} else {
 					// 2C) THE NEW PERSON IS TO BE ADDED TO A WHOLE NEW FAMILY NOT YET SEEN IN THIS IMPORT
 
@@ -448,7 +480,7 @@ class View_Admin__Import extends View
 		if (!empty($row_errors)) {
 			$msg = _('Your import file is not valid.  Please correct the following errors and try again:').'<ul>';
 			foreach ($row_errors as $line => $errors) {
-				$msg .= '<li>Row '.($line).': '.implode('; ', $errors).'</li>';
+				$msg .= '<li>Row '.$line.': '.implode('; ', $errors).'</li>';
 			}
 			$msg .= '</ul>';
 			add_message($msg, 'failure', true);
@@ -457,13 +489,11 @@ class View_Admin__Import extends View
 			$this->_stage = 'confirm';
 		}
 		unlink($datafile);
-
 	}
-
 
 	private function _printConfirmView()
 	{
-		if (($this->_sess['groupid'])) {
+		if ($this->_sess['groupid']) {
 			$groupname = $GLOBALS['system']->getDBObject('person_group', $_SESSION['import']['groupid'])->toString();
 		} else {
 			$groupname = $this->_sess['new_group_name'];
@@ -484,18 +514,22 @@ class View_Admin__Import extends View
 				<td>New persons to be created</td>
 				<td>
 					<?php
-					$printed = FALSE;
-					if ($this->_sess['total_new_persons']) {
-						echo $this->_sess['total_new_persons'].' within new families';
-						$printed = TRUE;
-					}
-					if ($np = count($this->_sess['new_persons'])) {
-						if ($printed) echo '<br />';
-						echo $np.' within existing families';
-						$printed = TRUE;
-					}
-					if (!$printed) echo '0';
-					?>
+					$printed = false;
+		if ($this->_sess['total_new_persons']) {
+			echo $this->_sess['total_new_persons'].' within new families';
+			$printed = true;
+		}
+		if ($np = count($this->_sess['new_persons'])) {
+			if ($printed) {
+				echo '<br />';
+			}
+			echo $np.' within existing families';
+			$printed = true;
+		}
+		if (!$printed) {
+			echo '0';
+		}
+		?>
 				</td>
 			</tr>
 			<tr>
@@ -547,7 +581,7 @@ class View_Admin__Import extends View
 
 						<?php
 						$this->_printPersonHeaders();
-						?>
+			?>
 
 					</tr>
 				</thead>
@@ -565,12 +599,12 @@ class View_Admin__Import extends View
 								echo nl2br(ents($familydata['address_street']));
 								echo '<br />'.$familydata['address_suburb'].' '.$familydata['address_state'].' '.$familydata['address_postcode'];
 							}
-							?>
+					?>
 						</td>
 					<?php
-					$this->_printPersonRows($familydata['members'], TRUE);
+					$this->_printPersonRows($familydata['members'], true);
 				}
-				?>
+			?>
 				</tbody>
 			</table>
 			<?php
@@ -586,13 +620,13 @@ class View_Admin__Import extends View
 						<th>Family</th>
 						<?php
 						$this->_printPersonHeaders();
-						?>
+			?>
 					</tr>
 				</thead>
 				<tbody>
 				<?php
-				$this->_printPersonRows($this->_sess['new_persons'], FALSE, TRUE)
-				?>
+				$this->_printPersonRows($this->_sess['new_persons'], false, true);
+			?>
 				</tbody>
 			</table>
 			<?php
@@ -616,7 +650,7 @@ class View_Admin__Import extends View
 					?>
 					<tr>
 						<td>
-							<a href="?view=families&familyid=<?php echo (int)$id; ?>" class="med-popup">#<?php echo (int)$id; ?></a>
+							<a href="?view=families&familyid=<?php echo (int) $id; ?>" class="med-popup">#<?php echo (int) $id; ?></a>
 						</td>
 						<td class="nowrap"><?php echo ents(array_get($familydata, 'family_name')); ?></td>
 						<td class="nowrap"><?php echo ents(array_get($familydata, 'home_tel')); ?></td>
@@ -626,12 +660,12 @@ class View_Admin__Import extends View
 								echo nl2br(ents($familydata['address_street']));
 								echo '<br />'.$familydata['address_suburb'].' '.$familydata['address_state'].' '.$familydata['address_postcode'];
 							}
-							?>
+					?>
 						</td>
 					</tr>
 					<?php
 				}
-				?>
+			?>
 				</tbody>
 			</table>
 			<?php
@@ -649,8 +683,8 @@ class View_Admin__Import extends View
 				</thead>
 				<tbody>
 				<?php
-				$this->_printPersonRows($this->_sess['person_updates'], FALSE, FALSE, TRUE);
-				?>
+				$this->_printPersonRows($this->_sess['person_updates'], false, false, true);
+			?>
 				</tbody>
 			</table>
 			<?php
@@ -658,35 +692,34 @@ class View_Admin__Import extends View
 		?>
 
 		<form method="post"><input type="submit" name="confirm_import" value="Proceed with import" class="confirm-title btn btn-danger" title="Proceed with import" />
-		<a href="<?php echo build_url(array()); ?>" class="btn">Cancel and start again</a>
+		<a href="<?php echo build_url([]); ?>" class="btn">Cancel and start again</a>
 		</form>
 		<?php
 	}
 
-
 	private function _processImport()
 	{
 		ini_set('memory_limit', '256M');
-		ini_set('max_execution_time', 60*10);
+		ini_set('max_execution_time', 60 * 10);
 		ini_set('zlib.output_compression', 'Off');
 		include_once 'templates/head.template.php';
-		
+
 		// read from session and create
 		$GLOBALS['system']->doTransaction('BEGIN');
 		$done = 0;
-		$todo = $this->_sess['total_new_persons'] + count($this->_sess['new_persons']) + count($this->_sess['family_updates']) + count($this->_sess['person_updates'])
+		$todo = $this->_sess['total_new_persons'] + count($this->_sess['new_persons']) + count($this->_sess['family_updates']) + count($this->_sess['person_updates']);
 		?>
 		
 		<h1 style="position: absolute; text-align: center; top: 40%; color: #ccc; width: 100%">Importing...</h1>
 		<div style="border: 1px solid; width: 50%; height: 30px; top: 50%; left: 25%; position: absolute"><div id="progress" style="background: blue; height: 30px; width: 2%; overflow: visible; line-height: 30px; text-align: center; color: white" /></div>
-		<p style="text-align: center; color: #888">If this indicator stops making progress, your import may still be running in the background.<br />You should <a href="<?php echo build_url(Array('view' => 'persons__list_all')); ?>">check your system for the imported persons</a> before running the import again.</p>
+		<p style="text-align: center; color: #888">If this indicator stops making progress, your import may still be running in the background.<br />You should <a href="<?php echo build_url(['view' => 'persons__list_all']); ?>">check your system for the imported persons</a> before running the import again.</p>
 		<?php
 
 		// Create new groups and load up existing groups to be ready to receive persons.
 		foreach ($this->_sess['new_groups'] as $key => $name) {
 			$g = new Person_Group();
 			$g->setValue('name', $name);
-			$g->setValue('categoryid', NULL);
+			$g->setValue('categoryid', null);
 			if (!$g->create()) {
 				trigger_error("Could not create group $name");
 				exit;
@@ -705,7 +738,7 @@ class View_Admin__Import extends View
 			$family = new Family();
 			$family->fromCSVRow($familyrow);
 			if (!$family->create()) {
-				trigger_error('Family: '.$familydata['family_name']." not created");
+				trigger_error('Family: '.$familydata['family_name'].' not created');
 				continue;
 			}
 			foreach ($members as $member) {
@@ -713,21 +746,22 @@ class View_Admin__Import extends View
 				$person = new Person();
 				$person->fromCSVRow($member);
 				if (!$person->create()) {
-					$results[] = "Person: ".$member['first_name'].' '.$member['last_name'].' not created';
+					$results[] = 'Person: '.$member['first_name'].' '.$member['last_name'].' not created';
 					continue;
 				}
 				$this->_finalisePerson($person, $member); // adds note and group
 				$this->_printProgress($done++, $todo);
 				unset($person);
 			}
-
 		}
 		foreach ($this->_sess['new_persons'] as $row) {
-			if (!isset($row['gender'])) $row['gender'] = 'Unknown';
+			if (!isset($row['gender'])) {
+				$row['gender'] = 'Unknown';
+			}
 			$person = new Person();
 			$person->fromCSVRow($row);
 			if (!$person->create()) {
-				trigger_error("Person: ".$person['first_name'].' '.$person['last_name'].' not created', E_USER_WARNING);
+				trigger_error('Person: '.$person['first_name'].' '.$person['last_name'].' not created', \E_USER_WARNING);
 				continue;
 			}
 			$this->_finalisePerson($person, $row); // adds note and group
@@ -737,12 +771,12 @@ class View_Admin__Import extends View
 		foreach ($this->_sess['family_updates'] as $familyid => $familyrow) {
 			$family = new Family($familyid);
 			if (!$family->acquireLock()) {
-				trigger_error("Could not update ".$familydata['family_name'].' because another user is editing it. Please try again later.', E_USER_WARNING);
+				trigger_error('Could not update '.$familydata['family_name'].' because another user is editing it. Please try again later.', \E_USER_WARNING);
 				continue;
 			}
 			$family->fromCSVRow($familyrow, $this->_sess['overwrite_existing']);
 			if (!$family->save()) {
-				trigger_error('Family: '.$familydata['family_name']." not updated");
+				trigger_error('Family: '.$familydata['family_name'].' not updated');
 			}
 			$family->releaseLock();
 			$this->_printProgress($done++, $todo);
@@ -751,12 +785,12 @@ class View_Admin__Import extends View
 		foreach ($this->_sess['person_updates'] as $personid => $row) {
 			$person = new Person($personid);
 			if (!$person->acquireLock()) {
-				trigger_error("Could not update ".$person->toString().' because another user is editing them. Please try again later.', E_USER_WARNING);
+				trigger_error('Could not update '.$person->toString().' because another user is editing them. Please try again later.', \E_USER_WARNING);
 				continue;
 			}
 			$person->fromCSVRow($row, $this->_sess['overwrite_existing']);
 			if (!$person->save()) {
-				trigger_error("Person: ".$row['first_name'].' '.$row['last_name'].' not created', E_USER_WARNING);
+				trigger_error('Person: '.$row['first_name'].' '.$row['last_name'].' not created', \E_USER_WARNING);
 				continue;
 			}
 			$this->_finalisePerson($person, $row); // adds note and group
@@ -769,10 +803,10 @@ class View_Admin__Import extends View
 			add_message($msg, 'failure', true);
 			$GLOBALS['system']->doTransaction('ROLLBACK');
 		} else {
-			add_message(_('Import complete'), 'success',TRUE);
+			add_message(_('Import complete'), 'success', true);
 			$GLOBALS['system']->doTransaction('COMMIT');
 			if ($total_group = $this->_getTotalGroup()) {
-				$url = build_url(Array('view' => 'groups', 'groupid' => $total_group->id));
+				$url = build_url(['view' => 'groups', 'groupid' => $total_group->id]);
 			}
 		}
 
@@ -781,9 +815,7 @@ class View_Admin__Import extends View
 		exit;
 	}
 
-
-
-	//////////////////// PRIVATE HELPERS //////////////////////////////
+	// ////////////////// PRIVATE HELPERS //////////////////////////////
 
 	private function _printPersonHeaders()
 	{
@@ -803,32 +835,32 @@ class View_Admin__Import extends View
 					<th><?php echo ents($label); ?></th>
 					<?php
 				}
-				?>
+		?>
 				<th>Note</th>
 				<th>To be added to groups</th>
 		<?php
 	}
 
-	private function _printPersonRows($persons, $omitFirstTR=FALSE, $includeFamilyLink=FALSE, $includePersonLink=FALSE)
+	private function _printPersonRows($persons, $omitFirstTR = false, $includeFamilyLink = false, $includePersonLink = false)
 	{
-		$first = TRUE;
+		$first = true;
 		foreach ($persons as $key => $person) {
 			if (!$first || !$omitFirstTR) {
 				echo '<tr>';
 			}
-			$first = FALSE;
+			$first = false;
 
 			if ($includeFamilyLink) {
 				?>
 				<td>
-					<a href="?view=families&familyid=<?php echo (int)$person['familyid']; ?>" class="med-popup">#<?php echo (int)$person['familyid']; ?></a>
+					<a href="?view=families&familyid=<?php echo (int) $person['familyid']; ?>" class="med-popup">#<?php echo (int) $person['familyid']; ?></a>
 				</td>
 				<?php
 			}
 			if ($includePersonLink) {
 				?>
 				<td>
-					<a href="?view=persons&personid=<?php echo (int)$key; ?>" class="med-popup">#<?php echo (int)$key; ?></a>
+					<a href="?view=persons&personid=<?php echo (int) $key; ?>" class="med-popup">#<?php echo (int) $key; ?></a>
 				</td>
 				<?php
 
@@ -851,7 +883,7 @@ class View_Admin__Import extends View
 			}
 			?>
 			<td><?php echo ents(array_get($person, '_note', '')); ?></td>
-			<td><?php echo implode('; ', array_map('ents', array_get($person, '_groups', Array()))); ?></td>
+			<td><?php echo implode('; ', array_map('ents', array_get($person, '_groups', []))); ?></td>
 			<?php
 			echo '</tr>';
 		}
@@ -878,21 +910,19 @@ class View_Admin__Import extends View
 		if ($total_group = $this->_getTotalGroup()) {
 			$total_group->addMember($person->id);
 		}
-
-
 	}
-	
+
 	/**
 	 * @return Person_Group that all new/updated persons should be added to
 	 */
 	private function _getTotalGroup()
 	{
-		static $total_group = NULL;
-		if ($total_group === NULL) {
-			$total_group = FALSE;
+		static $total_group = null;
+		if ($total_group === null) {
+			$total_group = false;
 			if ($this->_sess['groupid']) {
 				$total_group = new Person_Group($this->_sess['groupid']);
-			} else if ($this->_sess['new_group_name']) {
+			} elseif ($this->_sess['new_group_name']) {
 				$total_group = new Person_Group();
 				$total_group->setValue('name', $this->_sess['new_group_name']);
 				if (!empty($this->_sess['new_group_categoryid'])) {
@@ -901,47 +931,55 @@ class View_Admin__Import extends View
 				$total_group->create();
 			}
 		}
+
 		return $total_group;
 	}
-	
+
 	private function _printProgress($done, $todo)
 	{
 		if ($done % 5 == 0) {
-			$message = ((int)(($done/$todo)*100)).'% complete';
+			$message = ((int) (($done / $todo) * 100)).'% complete';
 			?>
 			<script>
 				var d = document.getElementById('progress');
 				d.innerHTML = "<?php echo ents($message); ?>";
-				d.style.width = '<?php echo (int)(($done/$todo)*100); ?>%';
+				d.style.width = '<?php echo (int) (($done / $todo) * 100); ?>%';
 			</script>
 			<?php
-			echo str_repeat('    ', 1024*4);
+			echo str_repeat('    ', 1024 * 4);
 		}
 	}
 
 	private function _filterArrayKeys($dataArray, $desiredKeys)
 	{
 		foreach ($dataArray as $k => $v) {
-			if (!in_array($k, $desiredKeys)) unset($dataArray[$k]);
+			if (!in_array($k, $desiredKeys, true)) {
+				unset($dataArray[$k]);
+			}
 		}
+
 		return $dataArray;
 	}
 
 	/**
-	 * Returns an array with all the key-value pairs from $x where the key DOESN'T exist in $y
+	 * Returns an array with all the key-value pairs from $x where the key DOESN'T exist in $y.
+	 *
 	 * @param type $x
 	 * @param type $y
 	 */
 	private function _arrayDiffAssoc($x, $y)
 	{
 		foreach ($x as $k => $v) {
-			if (array_key_exists($k, $y)) unset($x[$k]);
+			if (array_key_exists($k, $y)) {
+				unset($x[$k]);
+			}
 		}
+
 		return $x;
 	}
 
-
-	private function _pushIntoArray($from, &$to) {
+	private function _pushIntoArray($from, &$to)
+	{
 		foreach ($from as $k => $v) {
 			if (is_string($v) && strlen($v) && array_key_exists($k, $to) && !strlen($to[$k])) {
 				// $to has this element but it's empty
@@ -955,49 +993,56 @@ class View_Admin__Import extends View
 		return str_replace(' ', '_', strtolower($string));
 	}
 
-
 	private function _isEmptyRow($row)
 	{
 		foreach ($row as $x) {
-			if (!empty($x)) return FALSE;
+			if (!empty($x)) {
+				return false;
+			}
 		}
-		return TRUE;
+
+		return true;
 	}
 
 	private function _isNewFamily($row, $current_family)
 	{
-		foreach (Array('family_name', 'address_street', 'address_suburb', 'address_state', 'home_tel') as $field) {
+		foreach (['family_name', 'address_street', 'address_suburb', 'address_state', 'home_tel'] as $field) {
 			if (!empty($row[$field]) && !empty($current_family[$field])) {
 				if ($field == 'home_tel') {
-					if (preg_replace('/[^0-9]/', '', $row[$field]) != preg_replace('/[^0-9]/', '',$current_family[$field])) {
-						return TRUE;
+					if (preg_replace('/[^0-9]/', '', $row[$field]) != preg_replace('/[^0-9]/', '', $current_family[$field])) {
+						return true;
 					}
 				} else {
 					if (strtolower($row[$field]) != strtolower($current_family[$field])) {
-						return TRUE;
+						return true;
 					}
 				}
 			}
 		}
-		return FALSE;
+
+		return false;
 	}
 
 	/**
 	 * Look for an existing person record matching the supplied import row
 	 * Looks at the match_existing, match_mobile_tel and match_email flags in the request.
+	 *
 	 * @param array $row Data from import CSV
+	 *
 	 * @return Person|null
 	 */
 	private function _findExistingPerson($row)
 	{
-		if (empty($_REQUEST['match_existing'])) return NULL;
-		$params = Array(
-					'first_name' => $row['first_name'],
-					'last_name' => $row['last_name'],
-				);
+		if (empty($_REQUEST['match_existing'])) {
+			return null;
+		}
+		$params = [
+			'first_name' => $row['first_name'],
+			'last_name' => $row['last_name'],
+		];
 		$matches = $GLOBALS['system']->getDBObjectData('person', $params, 'AND');
 		$row['mobile_tel'] = preg_replace('/[^0-9]/', '', array_get($row, 'mobile_tel', ''));
-		foreach (Array('email', 'mobile_tel') as $fieldName) {
+		foreach (['email', 'mobile_tel'] as $fieldName) {
 			if (!empty($_REQUEST['match_'.$fieldName]) && strlen(array_get($row, $fieldName, ''))) {
 				foreach ($matches as $id => $details) {
 					if (strlen($details[$fieldName]) && strtolower($row[$fieldName]) != strtolower($details[$fieldName])) {
@@ -1012,25 +1057,28 @@ class View_Admin__Import extends View
 		}
 		if (count($matches) == 1) {
 			reset($matches);
+
 			return $GLOBALS['system']->getDBObject('person', key($matches));
 		}
 
 		if (count($matches) > 1) {
-
 		}
-		return NULL;
+
+		return null;
 	}
 
-	private function _captureErrors($i=0)
+	private function _captureErrors($i = 0)
 	{
-		if (empty($this->_captured_errors)) $this->_captured_errors = Array();
+		if (empty($this->_captured_errors)) {
+			$this->_captured_errors = [];
+		}
 		$this->_error_index = $i;
-		set_error_handler(Array($this, '_handleError'));
+		set_error_handler([$this, '_handleError']);
 	}
 
 	public function _handleError($errno, $errstr, $errfile, $errline)
 	{
-		if (in_array($errno, array(E_USER_NOTICE, E_USER_WARNING))) {
+		if (in_array($errno, [\E_USER_NOTICE, \E_USER_WARNING], true)) {
 			$this->_captured_errors[$this->_error_index][] = $errstr;
 		} else {
 			$GLOBALS['system']->_handleError($errno, $errstr, $errfile, $errline);
@@ -1040,8 +1088,9 @@ class View_Admin__Import extends View
 	private function _getErrors()
 	{
 		$res = $this->_captured_errors;
-		$this->_captured_errors = Array();
+		$this->_captured_errors = [];
 		restore_error_handler();
+
 		return $res;
 	}
 
@@ -1050,20 +1099,20 @@ class View_Admin__Import extends View
 		return !empty($this->_captured_errors[$i]);
 	}
 
-	public static function getSampleHeader($required_fields_only=FALSE)
+	public static function getSampleHeader($required_fields_only = false)
 	{
-		$header = Array(
+		$header = [
 			'family_name',
 			'last_name',
 			'first_name',
 			'congregation',
 			'status',
 			'age_bracket',
-		);
+		];
 		if ($required_fields_only) {
 			return $header;
 		}
-		$header = array_merge($header, Array(
+		$header = array_merge($header, [
 			'gender',
 			'email',
 			'mobile_tel',
@@ -1073,7 +1122,7 @@ class View_Admin__Import extends View
 			'address_suburb',
 			'address_state',
 			'address_postcode',
-		));
+		]);
 		$custom_fields = Person::getCustomFields();
 		foreach ($custom_fields as $field) {
 			$header[] = self::_stringToKey($field['name']);
@@ -1083,7 +1132,7 @@ class View_Admin__Import extends View
 		$header[] = 'group';
 		$header[] = 'group';
 		$header[] = 'group';
+
 		return $header;
 	}
-
 }

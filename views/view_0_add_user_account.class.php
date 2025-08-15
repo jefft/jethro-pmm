@@ -2,7 +2,7 @@
 class View__Add_User_Account extends View
 {
 	var $_sm;
-	var $_sm_fields = Array('username', 'password', 'active', 'permissions', 'restrictions');
+	var $_sm_fields = ['username', 'password', 'active', 'permissions', 'restrictions'];
 
 	static function getMenuPermissionLevel()
 	{
@@ -17,13 +17,15 @@ class View__Add_User_Account extends View
 		if (!empty($_REQUEST['new_sm_submitted'])) {
 			if (empty($_REQUEST['personid'])) {
 				trigger_error('You must choose a person record to create the user account for');
+
 				return;
 			}
 			$person = $GLOBALS['system']->getDBObject('person', $_REQUEST['personid']);
 			$existing = new Staff_Member($person->id);
 			if ($existing->id) {
-				add_message("A user account already exists for the selected person. Review and adjust the account details below.", 'error');
-				redirect('_edit_user_account', Array('staff_member_id' => 1));
+				add_message('A user account already exists for the selected person. Review and adjust the account details below.', 'error');
+				redirect('_edit_user_account', ['staff_member_id' => 1]);
+
 				return;
 			}
 			$this->_sm->processForm('', $this->_sm_fields);
@@ -43,7 +45,6 @@ class View__Add_User_Account extends View
 		return 'Add User Account';
 	}
 
-
 	function printView()
 	{
 		?>
@@ -54,15 +55,15 @@ class View__Add_User_Account extends View
 				<div class="controls">
 					<?php
 					if (!empty($_REQUEST['personid'])) {
-						$person = new Person((int)$_REQUEST['personid']);
+						$person = new Person((int) $_REQUEST['personid']);
 						echo ents($person->toString().' (#'.$person->id.')');
 					} else {
-						Person::printSingleFinder('personid', NULL)
+						Person::printSingleFinder('personid', null);
 						?>
 						<p class="help-inline">If the user does not yet exist in the system as a person, you must <a href="?view=families__add">add them first</a></p>
 						<?php
 					}
-					?>
+		?>
 				</div>
 			</div>
 		<?php
@@ -79,7 +80,7 @@ class View__Add_User_Account extends View
 			<?php
 		}
 		 * */
-		 
+
 		?>
 			<hr />
 			<div class="controls">

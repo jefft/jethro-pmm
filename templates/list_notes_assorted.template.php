@@ -13,11 +13,11 @@ if ($reassigning) {
 <table class="table table-condensed table-striped table-hover valign-middle">
 	<thead>
 		<tr>
-			<th><?php echo _('ID')?></th>
-			<th><?php echo _('For')?></th>
-			<th><?php echo _('Subject')?></th>
-			<th><?php echo _('Assignee')?></th>
-			<th><?php echo _('Action Date')?></th>
+			<th><?php echo _('ID'); ?></th>
+			<th><?php echo _('For'); ?></th>
+			<th><?php echo _('Subject'); ?></th>
+			<th><?php echo _('Assignee'); ?></th>
+			<th><?php echo _('Action Date'); ?></th>
 			<th>&nbsp;</th>
 		</tr>
 	</thead>
@@ -54,24 +54,24 @@ if ($reassigning) {
 				} else {
 					echo ents($note['assignee_fn'].' '.$note['assignee_ln']);
 				}
-				?>
+		?>
 			</td>
 			<td class="nowrap"><?php echo format_date($note['action_date']); ?></td>
 			<td class="nowrap action-cell">
-				<a href="<?php echo $view_url; ?>"><i class="icon-pencil"></i><?php echo _('View')?></a> &nbsp;
-				<a href="?view=_edit_note&note_type=<?php echo $type; ?>&noteid=<?php echo $id; ?>&back_to=<?php echo ents($_REQUEST['view']); ?>"><i class="icon-wrench"></i><?php echo _('Edit/Comment')?></a>
+				<a href="<?php echo $view_url; ?>"><i class="icon-pencil"></i><?php echo _('View'); ?></a> &nbsp;
+				<a href="?view=_edit_note&note_type=<?php echo $type; ?>&noteid=<?php echo $id; ?>&back_to=<?php echo ents($_REQUEST['view']); ?>"><i class="icon-wrench"></i><?php echo _('Edit/Comment'); ?></a>
 			</td>
 		</tr>
 		<?php
 	}
-	?>
+?>
 	</tbody>
 </table>
 <?php
 if ($reassigning) {
 	?>
 	<input type="submit" name="reassignments_submitted" value="Save Assignees" class="btn" />
-	<a class="btn" href="<?php echo build_url(Array('reassigning' => 0)); ?>"><?php echo _('Cancel')?></a>
+	<a class="btn" href="<?php echo build_url(['reassigning' => 0]); ?>"><?php echo _('Cancel'); ?></a>
 	</form>
 	<?php
 }

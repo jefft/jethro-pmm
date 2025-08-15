@@ -12,21 +12,20 @@ class View__Add_Roster_Role extends View
 	{
 		$GLOBALS['system']->includeDBClass('roster_role');
 		$this->_role = new Roster_Role();
-		
+
 		if (!empty($_REQUEST['new_role_submitted'])) {
 			$this->_role->processForm();
 			if ($this->_role->create()) {
 				add_message('Role added');
-				redirect('rosters__define_roster_roles', Array()); // exits		
+				redirect('rosters__define_roster_roles', []); // exits
 			}
 		}
 	}
-	
+
 	function getTitle()
 	{
 		return 'Add Roster Role';
 	}
-
 
 	function printView()
 	{
@@ -36,7 +35,7 @@ class View__Add_Roster_Role extends View
 			<h3>New Role Details</h3>
 			<?php
 			$this->_role->printForm();
-			?>
+		?>
 			<div class="controls">
 				<button type="submit" class="btn">Add Role</button>
 				<button type="button" class="btn back">Cancel</button>
