@@ -31,8 +31,11 @@ return (new Config())
 
 		'visibility_required' => false,
         // Clean code rules
-        'strict_param' => true,
-		// Strict types breaks jethrodb.php and others, so disable for now
+        // Turn off 'strict_param', as there are too many occasions where we rely on loose comparison ("16" == 16). E.g.^M
+        // in db_objects/person_query.class.php:^M
+        //      if (in_array($fieldid, array_get($_REQUEST, 'enable_custom_field', Array())))^M
+        'strict_param' => false,
+        // Strict types breaks jethrodb.php and others, so disable for now
         'declare_strict_types' => false,
         'no_unused_imports' => true,
         'ordered_imports' => ['sort_algorithm' => 'alpha'],
