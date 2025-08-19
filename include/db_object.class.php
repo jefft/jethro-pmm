@@ -612,6 +612,17 @@ class db_object
 				trigger_error('The value for '.array_get($details, 'label', $id).' is not the correct length (must be exactly '.$details['fixed_length'].' characters)', E_USER_NOTICE);
 				$res = FALSE;
 			}
+			if ($res) { // If not already errored out..
+				switch ($details['type']) {
+				case 'int':
+					if (!is_null($val) && !is_numeric($val)) {
+						// Triggered e.g. by service component CSV import when int fields like Length_Mins or CCLI_Number aren't ints
+						trigger_error($this->getFieldLabel($id).' value "'.ents($val).'" is not a valid integer', E_USER_NOTICE);
+						$res = FALSE;
+					}
+					break;
+				}
+			}
 		}
 		return $res;
 	}

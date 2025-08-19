@@ -590,9 +590,9 @@ class Person_Query extends DB_Object
 					?>
 				</td>
 				<td class="nowrap">
-					<img src="<?php echo BASE_URL; ?>/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move this item up" />
-					<img src="<?php echo BASE_URL; ?>/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move this item down" />
-					<img src="<?php echo BASE_URL; ?>/resources/img/cross_red.png" class="icon delete-row" title="Delete this item" />
+					<img src="/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move this item up" />
+					<img src="/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move this item down" />
+					<img src="/resources/img/cross_red.png" class="icon delete-row" title="Delete this item" />
 				</td>
 			</tr>
 			<?php
@@ -1776,7 +1776,7 @@ class Person_Query extends DB_Object
 			}
 			if ($groupingname) $hr[] = 'GROUPING';
 
-			fputcsv($fp, $hr);
+			fputcsv($fp, $hr, ",", '"', "");
 			$headerprinted = TRUE;
 		}
 		foreach ($x as $row) {
@@ -1798,7 +1798,7 @@ class Person_Query extends DB_Object
 				}
 			}
 			if ($groupingname) $r[] = str_replace('"', '""', $groupingname);
-			fputcsv($fp, $r);
+			fputcsv($fp, $r, ",", '"', "");
 		}
 		fclose($fp);
 	}

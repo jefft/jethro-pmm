@@ -170,37 +170,6 @@ function redirect($view, $params=Array(), $hash='')
 	exit;
 }
 
-/**
- * If a session cookie HTTP header is to be sent, alter it to make sure it includes the right details
- * Specifically, this is to make sure we have SameSite=Lax even under PHP5.
- */
-function upgrade_session_cookie()
-{
-	$headers_list = headers_list();
-	$header_was_deleted = FALSE;
-	foreach ($headers_list as $i => $header) {
-		if (FALSE !== strpos($header, session_name())) {
-			// There is a session cookie header waiting to be sent. Remove it, and add a better one.
-			$path = parse_url(BASE_URL, PHP_URL_PATH);
-			$domain = parse_url(BASE_URL, PHP_URL_HOST);
-			header_remove('Set-Cookie');
-			unset($headers_list[$i]);
-			$header_was_deleted = TRUE;
-			header("Set-Cookie: ".session_name()."=".session_id()."; path=".$path."; HttpOnly; SameSite=Lax");
-			break;
-		}
-	}
-	if ($header_was_deleted) {
-		foreach ($headers_list as $header) {
-			if (FALSE !== strpos($header, 'Set-Cookie:')) {
-				// Since the call to header_remove above will have deleted ALL Set-Cookie headers, we will reinstate
-				// Any Set-Cookie headers that are not related to the Session ID.
-				header($header, false);
-			}
-		}
-	}
-}
-
 
 function add_message($msg, $class='success', $html=FALSE)
 {
@@ -292,7 +261,7 @@ function print_widget($name, $params, $value)
 			static $includedCK = false;
 			if (!$includedCK) {
 				?>
-				<script src="<?php echo BASE_URL.'resources/ckeditor/ckeditor.js'; ?>"></script>
+				<script src="<?php echo BASE_PATH.'/resources/ckeditor/ckeditor.js'; ?>"></script>
 				<?php
 			}
 			$ckParams = 'disableNativeSpellChecker: false,
@@ -765,26 +734,28 @@ function format_value($value, $params)
 
 function build_url($params)
 {
-	if (array_get($params, '*', 1) == NULL) {
-		$vars = Array();
-	} else {
-		$vars = $_GET;
-	}
-	foreach ($params as $i => $v) {
-		if (is_null($v)) {
-			unset($vars[$i]);
-		} else {
-			$vars[$i] = $v;
-		}
-	}
-	$protocol = (REQUIRE_HTTPS || !empty($_REQUEST['HTTPS'])) ? 'https://' : 'http://';
-	$ubits = parse_url(BASE_URL);
-	$path = (0 === strpos($_SERVER['PHP_SELF'], $ubits['path'])) ? $_SERVER['PHP_SELF'] : $ubits['path'];
-	if (!empty($ubits['port'])) {
-		return $protocol.str_replace('index.php', '', $ubits['host'].':'.$ubits['port'].$path).'?'.http_build_query($vars);
-	} else {
-		return $protocol.str_replace('index.php', '', $ubits['host'].$path).'?'.http_build_query($vars);
-	}
+    // $vars are from GET, unless the caller set $params['*']=null
+    if (isset($params['*']) && $params['*'] === null) {
+        $vars = [];
+    } else {
+        $vars = $_GET;
+    }
+
+    // Merge in provided parameters (null means remove)
+    foreach ($params as $key => $value) {
+        if (is_null($value)) {
+            unset($vars[$key]);
+        } else {
+            $vars[$key] = $value;
+        }
+    }
+
+    // Determine base path from current request
+    // Build query string
+    $query = http_build_query($vars);
+    $query = $query ? '?' . $query : '';
+    // Relative URL
+    return base_url() . $query;
 }
 
 function speed_log($bam=FALSE)
@@ -1069,4 +1040,52 @@ function parse_size($size) {
   else {
     return round($size);
   }
+}
+
+function current_url(): string
+{
+    [$scheme, $host, $path] = _detect_url_parts();
+    return "$scheme://$host$path";
+}
+
+/**
+ * Returns the base URL of the current request.
+ */
+function base_url(): string
+{
+    [$scheme, $host, $path] = _detect_url_parts();
+    $path = explode('?', $path, 2)[0]; // Remove query string
+    return "$scheme://$host$path";
+}
+
+function _detect_url_parts(): array
+{
+    // Detect scheme (proxy-aware)
+    $scheme = $_SERVER['HTTP_X_FORWARDED_PROTO']
+        ?? (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http');
+
+    // Detect host (proxy-aware)
+    $host = $_SERVER['HTTP_X_FORWARDED_HOST']
+        ?? $_SERVER['HTTP_HOST']
+        ?? ($_SERVER['SERVER_NAME']
+            . ((($scheme === 'http' && ($_SERVER['SERVER_PORT'] ?? 80) != 80)
+                || ($scheme === 'https' && ($_SERVER['SERVER_PORT'] ?? 443) != 443))
+                ? ':' . ($_SERVER['SERVER_PORT'] ?? '')
+                : '')
+        );
+
+    // Path + query (default to "/")
+    $path = $_SERVER['REQUEST_URI'] ?? '/';
+
+    return [$scheme, $host, $path];
+}
+
+/**
+ * Determines the base path of the current script's directory.
+ * @return string The base path of the script, or '' if empty.
+ */
+function get_base_path()
+{
+    // Return '' rather than '/', so that if the caller adds another slash we don't end up with double slashes like <img src="//image.png">, which would be bad. If the caller does not append a '/' we simply end up with a page-relative URL like <img src="image.png">, which is likely fine.
+    return rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
 }
