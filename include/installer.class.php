@@ -504,7 +504,7 @@ class Installer
 		?>
 		<h2>Installation Complete!</h2>
 
-		You can now <a href="<?php echo BASE_URL; ?>">log in to the system</a> to start work.
+		You can now <a href="<?php echo BASE_PATH; ?>/">log in to the system</a> to start work.
 
 		<?php
 	}
