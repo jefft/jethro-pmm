@@ -78,7 +78,7 @@ class View_Admin__System_Configuration extends View {
 			<?php
 			foreach (Config_Manager::getSettings() as $symbol => $details) {
 				if ($details['type'] == 'hidden') continue;
-				$details['note'] = str_replace('<system_url>', BASE_URL, $details['note']);
+				$details['note'] = str_replace('<system_url>', base_url(), $details['note']);
 				if ($details['heading']) {
 					echo '<hr /><h4>'.ents($details['heading']).'</h4>';
 				}
@@ -330,8 +330,8 @@ class View_Admin__System_Configuration extends View {
 				<td><input type="text" name="membership_status_<?php echo $i; ?>_label" value="<?php echo ents($label); ?>" /></td>
 				<td><input type="radio" name="membership_status_default_rank" value="<?php echo $i; ?>" <?php if ($id == $default) echo 'checked="checked"'; ?> /></td>
 				<td>
-					<img src="<?php echo BASE_URL; ?>/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move this role up" />
-					<img src="<?php echo BASE_URL; ?>/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move this role down" />
+					<img src="/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move this role up" />
+					<img src="/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move this role down" />
 				</td>
 				<td>
 					<?php
@@ -455,8 +455,8 @@ class View_Admin__System_Configuration extends View {
 				<td><input type="radio" name="age_bracket_default_rank" value="<?php echo $i; ?>" <?php if ($details['is_default']) echo 'checked="checked"'; ?> /></td>
 				<td><?php $ab->printFieldInterface('is_adult', 'age_bracket_'.$i.'_'); ?></td>
 				<td>
-					<img src="<?php echo BASE_URL; ?>/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move this role up" />
-					<img src="<?php echo BASE_URL; ?>/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move this role down" />
+					<img src="/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move this role up" />
+					<img src="/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move this role down" />
 				</td>
 				<td>
 					<?php
@@ -579,8 +579,8 @@ class View_Admin__System_Configuration extends View {
 				<td><?php $ab->printFieldInterface('require_congregation', 'pstatus_'.$i.'_'); ?></td>
 				<td><?php $ab->printFieldInterface('active', 'pstatus_'.$i.'_'); ?></td>
 				<td>
-					<img src="<?php echo BASE_URL; ?>/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move this role up" />
-					<img src="<?php echo BASE_URL; ?>/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move this role down" />
+					<img src="/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move this role up" />
+					<img src="/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move this role down" />
 				</td>
 				<td>
 					<?php
