@@ -536,12 +536,15 @@ class View_Services__List_All extends View
 
 				<tr <?php echo $class_clause; ?>>
 					<td class="service-date"><strong><?php echo date('j M y', strtotime($date)); ?></strong><br />
-					<input type="image" name="delete_all_date" value="<?php echo $date; ?>" src="<?php echo BASE_URL; ?>/resources/img/cross_red.png" class="confirm-shift" title="Delete all services on this date" /></td>
-				<?php
+					<button type="button" name="delete_all_date" value="<?php echo $date; ?>" class="confirm-shift" title="Delete all services on this date">
+						<img  src="<?php echo BASE_PATH; ?>/resources/img/cross_red.png" />
+					</button>
+					</td>
+					<?php
 				foreach ($this->_congregations as $i => $congid) {
 					?>
 					<td class="left-tools">
-						<?php if ($i != 0) echo '<img src="'.BASE_URL.'/resources/img/arrow_left_heavy_blue.png" class="clickable copy-left" title="Click to copy this service\'s details to the previous congregation" />'; ?>
+						<?php if ($i != 0) echo '<img src="'.BASE_PATH.'/resources/img/arrow_left_heavy_blue.png" class="clickable copy-left" title="Click to copy this service\'s details to the previous congregation" />'; ?>
 					</td>
 					<td class="service">
 						<?php $this->_printServiceEditCell($congid, $date, array_get($services, $congid, Array())); ?>
@@ -549,12 +552,16 @@ class View_Services__List_All extends View
 					<td class="right-tools">
 						<?php
 						if ($i != $last_cong) {
-							echo '<img src="'.BASE_URL.'/resources/img/arrow_right_heavy_blue.png" class="clickable copy-right" title="Click to copy this service\'s details to the next congregation" />';
+							echo '<img src="'.BASE_PATH.'/resources/img/arrow_right_heavy_blue.png" class="clickable copy-right" title="Click to copy this service\'s details to the next congregation" />';
 						}
 						if (isset($services[$congid])) {
 							?>
-							<input type="image" name="delete_single" value="<?php echo $services[$congid]['id']; ?>" src="<?php echo BASE_URL; ?>/resources/img/cross_red.png" class="delete-single confirm-shift" title="Delete this service" />
-							<?php
+
+							<button type="button" name="delete_single" value="<?php echo $services[$congid]['id']; ?>"  class="delete-single confirm-shift" title="Delete this service">
+								<img src="<?php echo BASE_PATH; ?>/resources/img/cross_red.png">
+							</button>
+
+<?php
 						}
 						?>
 					</td>
@@ -646,13 +653,13 @@ class View_Services__List_All extends View
 			foreach ($this->_congregations as $congid) {
 				?>
 				<td class="left-tools">
-					<?php if ($j != 0) echo '<img src="'.BASE_URL.'/resources/img/arrow_left_heavy_blue.png" class="clickable copy-left" title="Click to copy this service\'s details to the previous congregation" />'; ?>
+					<?php if ($j != 0) echo '<img src="'.BASE_PATH.'/resources/img/arrow_left_heavy_blue.png" class="clickable copy-left" title="Click to copy this service\'s details to the previous congregation" />'; ?>
 				</td>
 				<td class="service">
 					<?php $this->_printServiceEditCell($congid, 'new_'.$i, Array()); ?>
 				</td>
 				<td class="right-tools">
-					<?php if ($j != count($this->_congregations) -1) echo '<img src="'.BASE_URL.'/resources/img/arrow_right_heavy_blue.png" class="clickable copy-right" title="Click to copy this service\'s details to the next congregation" />'; ?>
+					<?php if ($j != count($this->_congregations) -1) echo '<img src="'.BASE_PATH.'/resources/img/arrow_right_heavy_blue.png" class="clickable copy-right" title="Click to copy this service\'s details to the next congregation" />'; ?>
 				</td>
 				<?php
 				$j++;
@@ -708,8 +715,8 @@ class View_Services__List_All extends View
 									<input type="hidden" name="bible_to_preach[<?php echo $congid; ?>][<?php echo $date; ?>][]" value="<?php echo (int)array_get($reading, 'to_preach'); ?>" />
 								</label>
 
-								<img src="<?php echo BASE_URL; ?>/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move up" />
-								<img src="<?php echo BASE_URL; ?>/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move down" />
+								<img src="<?php echo BASE_PATH; ?>/resources/img/arrow_up_thin_black.png" class="icon move-row-up" title="Move up" />
+								<img src=<?php echo BASE_PATH; ?>"/resources/img/arrow_down_thin_black.png" class="icon move-row-down" title="Move down" />
 								&nbsp;
 							</td>
 						</tr>

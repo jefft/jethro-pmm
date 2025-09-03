@@ -194,7 +194,7 @@ class Service_Component extends db_object
 		}
 		if ($keyword) {
 			$qk = $GLOBALS['db']->quote("%{$keyword}%");
-			$res['where'] .= ' '.$logic.' (service_component.title LIKE '.$qk.' OR alt_title LIKE '.$qk.' OR service_component.ccli_number = '.$GLOBALS['db']->quote($keyword).' OR content_html LIKE '.$qk.')';
+			$res['where'] .= ' '.$logic.' (service_component.title LIKE '.$qk.' OR alt_title LIKE '.$qk.' OR cast(service_component.ccli_number AS char) = '.$GLOBALS['db']->quote($keyword).' OR content_html LIKE '.$qk.')';
 		}
 
 		return $res;
@@ -208,11 +208,15 @@ class Service_Component extends db_object
 		return $res;
 	}
 
+	/**
+     * Return existing songs grouped by Title.
+	 * @return array Song atl_title and id grouped by title, e.g. ["'All who love and serve your city" => [{alt_title => "AHB-562i", id => 1001}, {alt_title => "AHB-562ii", id => 1002}]
+	 */
 	public static function getAllByTitle()
 	{
 		$SQL = "SELECT title, alt_title, id
 				FROM service_component";
-		$res = $GLOBALS['db']->queryAll($SQL, null, null, true, false);
+		$res = $GLOBALS['db']->queryAll($SQL, null, null, true, false, true);
 		return $res;
 	}
 
@@ -230,6 +234,44 @@ class Service_Component extends db_object
 		parent::_printSummaryRows();
 		unset($this->fields['congregationids']);
 		unset($this->fields['tags']);
+	}
+
+
+	public function printUsage() {
+		$res = $GLOBALS['db']->queryAll("SELECT service.id AS serviceid
+			, congregation.id AS congregationid
+			, congregation.name AS congregation
+			, service.date
+			, service.topic_title
+			FROM congregation JOIN service ON service.congregationid=congregation.id
+			JOIN service_item ON service_item.serviceid=service.id
+			WHERE componentid=".(int)$this->id);
+		if ($res) {
+?>
+			<table class="table object-summary">
+				<table style="width: 100%" class="table roster service-program table-hover">
+				<thead>
+					<tr>
+						<th>Date</th>
+						<th>Congregation</th>
+						<th>Service</th>
+					</tr>
+				</thead>
+				<tbody>
+<?php
+			foreach ($res as $row) {
+				echo
+					"<t~r>".
+					"<td>".format_date($row['date'])."</td>".
+					"<td>".$row['congregation']. "</td>".
+					"<td>"."<a href='/?view=services&date=". $row['date']. "&congregationid=". $row['congregationid']. "'>".ents($row['topic_title'])."</a></td>".
+					"</tr></a>";
+			}
+?>
+			</tbody>
+		</table>
+<?php
+		} else echo "Song not used";
 	}
 
 	public function printFieldValue($name, $value=NULL)
@@ -335,7 +377,7 @@ class Service_Component extends db_object
 				?>
 				<tr>
 					<td><?php print_widget('tags[]', $params, $tagid); ?></td>
-					<td><img src="<?php echo BASE_URL; ?>resources/img/cross_red.png" class="icon delete-row" title="Delete this tag from the list" /></td>
+					<td><img src="<?php echo BASE_PATH; ?>/resources/img/cross_red.png" class="icon delete-row" title="Delete this tag from the list" /></td>
 				</tr>
 				<?php
 			}
@@ -347,7 +389,7 @@ class Service_Component extends db_object
 						<?php print_widget('tags[]', $params, NULL); ?>
 						<input style="display: none" placeholder="Type new tag here" type="text" name="new_tags[]" />
 					</td>
-					<td><img src="<?php echo BASE_URL; ?>resources/img/cross_red.png" class="icon delete-row" title="Delete this tag from the list" /></td>
+					<td><img src="<?php echo BASE_PATH; ?>/resources/img/cross_red.png" class="icon delete-row" title="Delete this tag from the list" /></td>
 				</tr>
 			</table>
 			<p class="help-inline"><a href="?view=_manage_service_component_tags">Manage tag library</a></p>
@@ -471,5 +513,34 @@ class Service_Component extends db_object
 		$this->values['congregationids'][] = $newCong;
 		$this->values['congregationids'] = array_unique($this->values['congregationids']);
 	}
+
+    /**
+     * Whether this service component can be deleted. Service components cannot be deleted if any service items refer to them.
+     * @param $trigger_messages If true, reasons why the component cannot be deleted will be logged, and can be retrieved with dump_messages().
+    * @return bool
+     */
+	public function canDelete($trigger_messages=FALSE)
+	{
+        $hasItem = (boolean)$GLOBALS['db']->queryOne("SELECT EXISTS (
+            SELECT 1
+                FROM service
+                JOIN service_item ON service_item.serviceid=service.id
+                WHERE componentid=".$this->id.
+            ") AS items_exist;");
+		$hasPerm = $GLOBALS['user_system']->havePerm(PERM_SERVICECOMPS);
+        if ($trigger_messages) {
+            if ($hasItem) add_message(_("Cannot delete service component because it is used in services"), "error");
+            if (!$hasPerm) add_message(_("Cannot delete service component because the caller lacks permission"), "error");
+        }
+        return !$hasItem && $hasPerm;
+	}
+
+    /**
+     * Disable a service component, which is currently done by disassociating all congregations.
+     */
+    public function disable():bool {
+        $this->values['congregationids'] = [];
+        return $this->save();
+    }
 
 }

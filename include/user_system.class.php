@@ -128,7 +128,6 @@ class User_System extends Abstract_User_System
 	{
 		// Recreate session when logging in
 		session_regenerate_id();
-		upgrade_session_cookie();
 		$_SESSION = Array();
 		$_SESSION['user'] = $user_details;
 		$_SESSION['login_time'] = time();
@@ -515,7 +514,7 @@ class User_System extends Abstract_User_System
 		$emails = $GLOBALS['db']->queryCol($SQL);
 		if (empty($emails)) return;
 
-		$text = "Hi, \n\nThis is an automated message to System Administrators, sent from the Jethro system at ".BASE_URL.".\n\n";
+		$text = "Hi, \n\nThis is an automated message to System Administrators, sent from the Jethro system at ".base_url().".\n\n";
 		$text .= $message;
 
 		$message = Emailer::newMessage()
