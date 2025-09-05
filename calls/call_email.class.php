@@ -9,12 +9,14 @@ class Call_email extends Call
 		$blanks = $archived = Array();
 
 		if (!empty($_REQUEST['queryid'])) {
+			/** @var Person_Query $query */
 			$query = $GLOBALS['system']->getDBObject('person_query', (int)$_REQUEST['queryid']);
 			$personids = $query->getResultPersonIDs();
 			$recips = $GLOBALS['system']->getDBObjectData('person', Array('(id' => $personids, '!email' => '', '!(status' => Person_Status::getArchivedIDs()), 'AND');
 			$blanks = $GLOBALS['system']->getDBObjectData('person', Array('(id' => $personids, 'email' => '', '!(status' => Person_Status::getArchivedIDs()), 'AND');
 			$archived = $GLOBALS['system']->getDBObjectData('person', Array('(id' => $personids, '(status' => Person_Status::getArchivedIDs()), 'AND');
 		} else if (!empty($_REQUEST['groupid'])) {
+			/** @var Person_Group $group */
 			$group = $GLOBALS['system']->getDBObject('person_group', (int)$_REQUEST['groupid']);
 			$personids = array_keys($group->getMembers());
 			$recips = $GLOBALS['system']->getDBObjectData('person', Array('(id' => $personids, '!email' => '', '!(status' => Person_Status::getArchivedIDs()), 'AND');
@@ -23,6 +25,7 @@ class Call_email extends Call
 		} else if (!empty($_REQUEST['roster_view'])) {
 			$recips = Array();
 			foreach ((array)$_REQUEST['roster_view'] as $viewid) {
+				/** @var Roster_View $view */
 				$view = $GLOBALS['system']->getDBObject('roster_view', (int)$viewid);
 				$recips += $view->getAssignees($_REQUEST['start_date'], $_REQUEST['end_date']);
 			}

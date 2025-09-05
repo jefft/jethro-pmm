@@ -7,6 +7,7 @@ class Call_Report_CSV extends Call
 			$queryid = $_REQUEST['queryid'];
 			$queryid = ($queryid == 'TEMP') ? $queryid : (int)$queryid;
 			if ($queryid) {
+				/** @var Person_Query $report */
 				$report = $GLOBALS['system']->getDBObject('person_query', $queryid);
 				$reportname = $report->getValue('name');
 				if (empty($reportname)) $reportname = 'Jethro-Report-'.date('Y-m-d_H:i');
