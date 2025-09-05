@@ -5,6 +5,7 @@ class Call_Service_slides extends Call
 	function run()
 	{
 		//get service data from database
+		/** @var Service $service */
 		$service = $GLOBALS['system']->getDBObject('service', (int)$_REQUEST['serviceid']);
 		$serviceContent = $service->getServiceContent();
 

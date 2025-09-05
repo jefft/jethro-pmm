@@ -6,7 +6,7 @@ class View_services extends View
 {
 	private $date = NULL;
 	private $congregationid = NULL;
-	private $service = FALSE;
+	private ?Service $service = NULL;
 	private $editing = FALSE;
 
 	static function getMenuPermissionLevel()
