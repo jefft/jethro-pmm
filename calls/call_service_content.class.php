@@ -9,6 +9,7 @@ class Call_Service_Content extends Call
 	 */
 	function run()
 	{
+		/** @var Service $service */
 		$service = $GLOBALS['system']->getDBObject('service', (int)$_REQUEST['serviceid']);
 
 		?>

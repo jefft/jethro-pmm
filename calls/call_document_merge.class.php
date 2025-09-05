@@ -246,6 +246,7 @@ class Call_Document_Merge extends Call
 					// If our merge has originated from a person report, add the report's columns
 					// (eg "selected groups", "other family members" etc) to the merge data.
 					// Make sure the report returns a 'flat' array by removing grouping.
+					/** @var Person_Query $query */
 					$query = $GLOBALS['system']->getDBObject('person_query',$_REQUEST['queryid']);
 					$params = $query->getValue('params');
 					$params['group_by'] = NULL;
