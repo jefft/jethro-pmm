@@ -43,7 +43,7 @@ class View_services extends View
 						return;
 					}
 
-					if (!empty($_REQUEST['copy_service_id'])) {
+					if (!empty($_REQUEST['copy_service_id']) && !empty($_REQUEST['copy_category_ids'])) {
 						$fromService = new Service((int)$_REQUEST['copy_service_id']);
 						if (!$fromService) {
 							trigger_error("Service ".(int)$_REQUEST['copy_service_id']." not found - could not copy");
@@ -64,7 +64,7 @@ class View_services extends View
 								unset($newItems[$k]);
 							}
 						}
-						$this->service->saveItems($newItems);
+						$this->service->saveItems(array_merge($this->service->getItems(), $newItems));
 						// Retain lock and stay in editing mode
 					}
 
@@ -138,7 +138,12 @@ class View_services extends View
 			<?php
 			$this->service->printRunSheetPersonnelFlexi();
 			if ($this->editing) {
-				?>
+			?>
+				<script>
+				$(function() {
+					JethroServicePlannerCopier.init();
+				});
+				</script>
 				<div class="row-fluid" id="service-planner">
 				<?php
 				$this->printRunSheetEditor();
@@ -207,9 +212,6 @@ class View_services extends View
 		?>
 		<div class="span6">
 			<h3>
-				<?php
-				if (empty($items)) {
-					?>
 					<span class="pull-right">
 							<small>
 								<a href="#" data-toggle="modal" data-target="#copy-previous-modal">
@@ -217,9 +219,6 @@ class View_services extends View
 								</a>
 							</small>
 					</span>
-					<?php
-				}
-				?>
 				Run Sheet
 			</h3>
 			<form method="post" id="service-planner-form" data-lock-length="<?php echo db_object::getLockLength() ?>">
@@ -396,20 +395,24 @@ class View_services extends View
 		</div>
 
 		<!-- copy-from-previous modal -->
-		<div class="modal hide fade-in" id="copy-previous-modal" role="dialog">
+		<div class="modal modal-wide hide fade-in" id="copy-previous-modal" role="dialog">
 			<form method="post">
 			<div class="modal-header">
 				<h4>Copy items from another service</h4>
 			</div>
 			<div class="modal-body form-horizontal">
-				<div class="control-group">
-					<label class="control-label">
-						Service to copy from
-					</label>
-					<div class="controls">
+				<div class="row-fluid">
+					<div class="span6">
+						<div class="control-group">
+							<label class="control-label">
+								Service to copy from
+							</label>
+							<div class="controls">
 						<?php
 						$options = Array();
 						$selectedID = NULL;
+						// If we just copied stuff from a service, make that service the default 'Service to copy from'
+						if (!empty($_REQUEST['copy_service_id'])) $selectedID = $_REQUEST['copy_service_id'];
 						$services = $GLOBALS['system']->getDBObjectData('service', Array('>date' => date('Y-m-d', strtotime('-1 year'))), 'AND', 'date DESC');
 						$dummyService = new Service();
 						foreach ($services as $id => $s) {
@@ -425,34 +428,40 @@ class View_services extends View
 						}
 						print_widget('copy_service_id', Array('type' => 'select', 'options' => $options), $selectedID);
 						?>
+							</div>
+						</div>
+						<!-- Modal bg is white and table is transparent, so give previewed service items a yellow bg -->
+						<div id="copy-previous-preview"  style='background-color: #ffffe0;'></div>
 					</div>
-				</div>
-				<div class="control-group">
-					<label class="control-label">
-						Items to copy
-					</label>
-					<div class="controls">
-						<?php
-						$cats = $GLOBALS['system']->getDBOBjectData('service_component_category', Array());
-						foreach ($cats as $id => $c) {
-							$cat_options[$id] = $c['category_name'];
-						}
-						$cat_options['!'] = 'Ad hoc items';
-						$params = Array(
-							'type' => 'select',
-							'options' => $cat_options,
-							'allow_multiple' => TRUE,
-							'height' => 5,
-						);
-						print_widget('copy_category_ids[]', $params, '*');
-						?>
+					<div class="span6">
+						<div class="control-group">
+							<label class="control-label">
+								Items to copy
+							</label>
+							<div class="controls">
+								<?php
+								$cats = $GLOBALS['system']->getDBOBjectData('service_component_category', Array());
+								foreach ($cats as $id => $c) {
+									$cat_options[$id] = $c['category_name'];
+								}
+								$cat_options['!'] = 'Ad hoc items';
+								$params = Array(
+									'type' => 'select',
+									'options' => $cat_options,
+									'allow_multiple' => TRUE,
+									'height' => count($cat_options),
+								);
+								print_widget('copy_category_ids[]', $params, '*');
+								?>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
-			<div class="modal-footer">
-				<input class="btn" type="submit" value="Copy items" />
-				<input class="btn" type="button" value="Cancel" data-dismiss="modal" />
-			</div>
+				<div class="modal-footer">
+					<input class="btn" type="submit" value="Copy items"/>
+					<input class="btn" type="button" value="Cancel" data-dismiss="modal"/>
+				</div>
 			</form>
 		</div>
 		<?php
@@ -613,4 +622,3 @@ class View_services extends View
 		print_widget('service_comments', $this->service->fields['comments'], $this->service->getValue('comments'));
 	}
 }
-
