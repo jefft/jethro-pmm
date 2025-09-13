@@ -187,8 +187,7 @@ $(document).ready(function() {
 
 		$($(this).attr('data-require-fields')).each(function() {
 			if (!this.value) {
-				alert('A mandatory field has been left blank');
-				TBLib.markErroredInput(this);
+				TBLib.markErroredInput(this, 'A mandatory field has been left blank');
 				ok = false;
 				return;
 			}
@@ -453,18 +452,12 @@ TBLib.selectBasename = function() {
 	}
 }
 
-TBLib.invalidRegexInput = null;
 TBLib.handleRegexInputBlur = function()
 {
 	if (r = this.getAttribute('regex')) {
-		$(this).parents('.control-group').removeClass('error');
 		var ro = new RegExp(r, 'i');
 		if ((this.value != '') && !ro.test(this.value)) {
-			this.focus();
-			$(this).parents('.control-group').addClass('error');
-			alert('The value of the highlighted field is not valid');
-			TBLib.invalidRegexInput = this;
-			setTimeout('TBLib.invalidRegexInput.select()', 100);
+			TBLib.markErroredInput(this, 'Invalid value - does not match regex');
 			return false;
 		}
 	}
@@ -649,11 +642,24 @@ TBLib.cancelValidation = function()
 	TBLib.doTBLibValidation = false;
 }
 
-TBLib.markErroredInput = function(input) {
-	if ($(input).parents('.control-group').length) {
-		$(input).parents('.control-group').addClass('error');
+TBLib.markErroredInput = function(input, msg) {
+	let cg = $(input).closest('.control-group');
+
+	if (!cg.length) {
+		cg = $(input).parent().addClass('control-group'); // fallback: add to parent
+	}
+	cg.addClass('error');
+	if (!cg.find('.help-block').length) {
+		$(`<p class="help-block"></p>`).text(msg).insertAfter($(input));
 	} else {
-		$(input).parents(':first').addClass('control-group').addClass('error');
+		cg.find('.help-block').text(msg);
+	}
+	$(input).focus();
+	const cgOffset = cg.offset();
+	if (cgOffset) {
+		$('html, body').animate({
+			scrollTop: Math.max(0, cgOffset.top - 20)
+		}, 300);
 	}
 }
 
@@ -668,19 +674,14 @@ TBLib.handleFormSubmit = function()
 	var compulsoryInputs = ($(this).find('input.compulsory, select.compulsory, textarea.compulsory'));
 	for (var i=0; i < compulsoryInputs.size(); i++) {
 		if ((compulsoryInputs.get(i).value == '') && (!compulsoryInputs.get(i).disabled)) {
-			TBLib.markErroredInput(compulsoryInputs.get(i));
-			compulsoryInputs.get(i).focus();
-			alert('A mandatory field has been left blank');
-			compulsoryInputs.get(i).focus();
+			TBLib.markErroredInput(compulsoryInputs.get(i), 'This field is required');
 			return false;
 		}
 	}
 	var multiOK = true;
 	$('.compulsory.multi-select').each(function() {
 		if ($(this).find('input:checked').length==0) {
-			TBLib.markErroredInput(this);
-			alert('A mandatory field has been left blank');
-			this.focus();
+			TBLib.markErroredInput(this, 'This field is required');
 			multiOK = false;
 			return false;
 		}
@@ -693,9 +694,7 @@ TBLib.handleFormSubmit = function()
 		with (phoneInputs.get(i)) {
 			if (value == '') continue;
 			if (value.match(/[A-Za-z]/)) {
-				TBLib.markErroredInput(phoneInputs.get(i));
-				alert('Phone numbers cannot contain letters');
-				phoneInputs.get(i).focus();
+				TBLib.markErroredInput(phoneInputs.get(i), 'Phone numbers cannot contain letters');
 				return false;
 			}
 			var numVal = value.replace(/[^0-9]/g, '');
@@ -713,9 +712,7 @@ TBLib.handleFormSubmit = function()
 				}
 			}
 			if (!lengthOK) {
-				TBLib.markErroredInput(phoneInputs.get(i));
-				alert('The highlighted phone number must have '+digitOptions+' digits');
-				phoneInputs.get(i).focus();
+				TBLib.markErroredInput(phoneInputs.get(i), 'The highlighted phone number must have '+digitOptions+' digits');
 				return false;
 			}
 		}
@@ -727,8 +724,7 @@ TBLib.handleFormSubmit = function()
 			var other = $('input[name='+this.name.substring(0,this.name.length-1)+'2]');
 			if (other.length == 1) {
 				if (other.get(0).value != this.value) {
-					TBLib.markErroredInput(this);
-					alert('The passwords you have entered don\'t match - please re-enter');
+					TBLib.markErroredInput(this, 'The passwords you have entered don\'t match - please re-enter');
 					this.select();
 					passwordsOK = false;
 					return;
@@ -736,9 +732,7 @@ TBLib.handleFormSubmit = function()
 			}
 			var minLength = $(this).attr('data-minlength');
 			if (minLength && (this.value.length < minLength)) {
-				TBLib.markErroredInput(this);
-				alert('The password you entered is too short - it must be at least '+minLength+' characters');
-				this.select();
+				TBLib.markErroredInput(this, 'The password you entered is too short - it must be at least '+minLength+' characters');
 				passwordsOK = false;
 				return;
 			}
@@ -749,9 +743,7 @@ TBLib.handleFormSubmit = function()
 				if (this.value[i].match(/[A-Za-z]/)) num_letters++;
 			}
 			if (num_nums < 2 || num_letters < 2) {
-				TBLib.markErroredInput(this);
-				this.select();
-				alert('The password you entered is too simple - passwords must contain at least 2 letters and 2 numbers');
+				TBLib.markErroredInput(this, 'The password you entered is too simple - passwords must contain at least 2 letters and 2 numbers');
 				passwordsOK = false;
 			}
 		}
@@ -764,9 +756,7 @@ TBLib.handleFormSubmit = function()
 		if (r = this.getAttribute('regex')) {
 			var ro = new RegExp(r, 'i');
 			if ((this.value != '') && !ro.test(this.value)) {
-				TBLib.markErroredInput(this);
-				alert('The value of the highlighted field is not valid');
-				this.focus();
+				TBLib.markErroredInput(this, 'Invalid value.');
 				regexesOK = false;
 				return false;
 			}
@@ -836,6 +826,86 @@ TBLib.handleFormSubmit = function()
 			return false;
 		}
 	}
+
+	$(this).find('.require-noduplicates').each(function () {
+		var fieldkey = $(this).data("fieldkey");
+		var fieldname = $(this).data("fieldname");
+		labelids = {};
+		$(this).find("tr").each(function () {
+			var id = $(this).find(`td input[name^="${fieldkey}_"][name$="_id"]`);
+			var labelfield = $(this).find(`td input[name^="${fieldkey}_"][name$="_label"]`);
+			if (!id.val() && labelfield.val() == '') return true; // ignore new, blank labels, because the backend ignores them too
+			if (labelids[labelfield.val()]) {
+				// if (!labelids[labelfield.val()] || !id.val()) return true; // A duplicate, but
+				console.log(`Duplicate label '${labelfield.val()}'`);
+				TBLib.markErroredInput(labelfield, `Duplicate ${fieldname} labels '${labelfield.val()}'`);
+				ok = false;
+				return false;
+			} else {
+				labelids[labelfield.val()] = id;
+			}
+		});
+	});
+	/*	$(this).find('.required-noduplicates').each(function() {
+		var fieldkey = $(this).data("fieldkey");
+		console.log("Validating that there are no duplicates of ", fieldkey);
+		var idField = $(this).find(`input[name^="${fieldkey}_"][name$="_id"]`);
+		var labelFields = $(this).find(`input[name^="${fieldkey}_"][name$="_label"]`);
+		var seen = {};
+		var duplicates = $(); // start empty jQuery set
+
+		labelFields.each(function () {
+			var val = $(this).val().trim();
+
+			if (val !== '') {
+				if (seen[val]) {
+					// add this input to duplicates
+					duplicates = duplicates.add($(this));
+					// also add the first one that had this value (if not already added)
+					if (seen[val] !== true) {
+						duplicates = duplicates.add(seen[val]);
+						seen[val] = true; // mark as "fully handled"
+					}
+				} else {
+					// store first input element with this value
+					seen[val] = $(this);
+				}
+			}
+		});
+		console.log("Duplicates: ", duplicates);
+		if (duplicates.length) {
+			TBLib.markErroredInput(duplicates);
+			duplicates.get(0).focus();
+			alert(`Duplicate ${fieldkey} values`);
+			ok = false;
+			return false;
+		}
+	})*/
+	if (!ok) return false;
+
+/*	$(this).find('.required-nonblank-or-delete').each(function() {
+		var fieldkey = $(this).data("fieldkey");
+		var fieldname = $(this).data("fieldname");
+		console.log("Validating that all fields are non-blank, or marked for deletion: ", fieldkey);
+		$(this).find('tr:has(td)').each(function () {
+			var idField = $(this).find(`input[name^="${fieldkey}_"][name$="_id"]`);
+			var labelField = $(this).find(`input[name^="${fieldkey}_"][name$="_label"]`);
+			var deleteBox = $(this).find(`input[name="${fieldkey}_delete[]"]`);
+
+			if (idField.val()) {
+				if (labelField.val().trim() === '' && !deleteBox.prop('checked')) {
+					// Mark the label as errored
+					TBLib.markErroredInput(labelField);
+					console.log("error row has id ", idField.val());
+					alert(`${fieldname} Options must be non-blank. If you wish to delete an option, check the 'Delete?' checkbox`);
+					labelField.focus();
+					ok = false;
+					return false; // break out of .each
+				}
+			}
+		});
+	})*/
+	if (!ok) return false;
 
 	if ($(this).hasClass('disable-submit-buttons')) {
 		$(this).find('input[type=submit]').attr('disabled', 'disabled');

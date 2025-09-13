@@ -309,7 +309,7 @@ class View_Admin__System_Configuration extends View {
 					<th>Delete?</th>
 				</tr>
 			</thead>
-			<tbody>
+            <tbody data-fieldkey="membership_status" data-fieldname="Group Membership Status" class="require-noduplicates">
 		<?php
 		$GLOBALS['system']->includeDBClass('person_group');
 		list($options, $default) = Person_Group::getMembershipStatusOptionsAndDefault();
@@ -356,6 +356,7 @@ class View_Admin__System_Configuration extends View {
 	{
 		$db = $GLOBALS['db'];
 		if (!empty($_POST['group_membership_statuses_submitted'])) {
+			if ($this->hasDuplicateValues("membership_status", "Group Membership Status")) return;
 			$i = 0;
 			$saved_default = false;
 			$rankMap = $_REQUEST['membership_status_ranking'];
@@ -431,7 +432,7 @@ class View_Admin__System_Configuration extends View {
 					<th>Delete? <i class="clickable icon-question-sign icon-white" data-toggle="visible" data-target="#tooltip-agebracket-delete"></i></th>
 				</tr>
 			</thead>
-			<tbody>
+            <tbody data-fieldkey="age_bracket" data-fieldname="Age Bracket" class="require-noduplicates">
 		<?php
 		$options = $GLOBALS['system']->getDBObjectData('age_bracket', Array(), 'OR', 'rank');
 		$options[''] = Array('label' => '', 'is_default' => FALSE, 'is_adult' => FALSE);
@@ -483,6 +484,8 @@ class View_Admin__System_Configuration extends View {
 	{
 		$db = $GLOBALS['db'];
 		if (!empty($_POST['age_brackets_submitted'])) {
+			if ($this->hasDuplicateValues("age_bracket", "Age Bracket")) return;
+
 			$i = 0;
 			$saved_default = false;
 			$rankMap = $_REQUEST['age_bracket_ranking'];
@@ -551,7 +554,7 @@ class View_Admin__System_Configuration extends View {
 					<th>Delete? <i class="clickable icon-question-sign icon-white" data-toggle="visible" data-target="#tooltip-status-delete"></i></th>
 				</tr>
 			</thead>
-			<tbody>
+			<tbody data-fieldkey="pstatus" data-fieldname="Person Status" class="required-nodups">
 		<?php
 		$usage_counts = Person::getStatusStats();
 		$options = $GLOBALS['system']->getDBObjectData('person_status', Array(), 'OR', 'rank');
@@ -618,6 +621,8 @@ class View_Admin__System_Configuration extends View {
 	{
 		$db = $GLOBALS['db'];
 		if (!empty($_POST['person_status_submitted'])) {
+
+            if ($this->hasDuplicateValues("pstatus", "Person Status")) return;
 			$i = 0;
 			$saved_default = false;
 			$got_an_archived = false;
@@ -681,5 +686,25 @@ class View_Admin__System_Configuration extends View {
 
 	}
 
+	private function hasDuplicateValues($fieldkey, $fielddesc)
+	{
+		$status_labels = array_filter(
+			$_POST,
+			function($key) use ($fieldkey) {
+				if (preg_match("/^{$fieldkey}_(.*)_label$/", $key, $matches)) {
+                    $fieldid = $matches[1];
+					return array_key_exists("{$fieldkey}_{$fieldid}_id", $_POST);
+				}
+//				return str_starts_with($key, "{$fieldkey}_") && str_ends_with($key, '_label');
+			},
+			ARRAY_FILTER_USE_KEY
+		);
+		$counts = array_count_values($status_labels);
+		$duplicates = array_keys(array_filter($counts, function($count) {return $count > 1;}));
+		foreach ($duplicates as $dup) {
+			add_message("Did not save {$fielddesc} options because the label '{$dup}' is duplicated", "error");
+		}
+        return (count($duplicates) > 0);
+	}
 }
 
