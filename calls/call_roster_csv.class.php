@@ -19,6 +19,7 @@ class Call_Roster_CSV extends Call
 	{
 		$roster_id = (int)array_get($_REQUEST, 'roster_view');
 		if (empty($roster_id)) return;
+		/** @var Roster_View $view */
 		$view = $GLOBALS['system']->getDBObject('roster_view', $roster_id);
 		$start_date = substr(array_get($_REQUEST, 'start_date', ''), 0, 10);
 		$end_date = substr(array_get($_REQUEST, 'end_date', ''), 0, 10);

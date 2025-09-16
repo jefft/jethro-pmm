@@ -1,13 +1,14 @@
 {
-    "require": {
-       "phpoffice/phpword": "v0.18.*",
-       "swiftmailer/swiftmailer" : "@stable",
-       "drewm/mailchimp-api" : "@stable"
-    },
-	"config": {
-		"platform-check" : false,
-		"platform": {
-			"php" : "5.3.23"
-		}
-	}
+  "require": {
+    "php": ">=8.3",
+    "phpoffice/phpword": "v0.18.*",
+    "swiftmailer/swiftmailer": "@stable",
+    "drewm/mailchimp-api": "@stable"
+  },
+  "config": {
+    "platform-check": false,
+    "platform": {
+      "php": "8.3.22"
+    }
+  }
 }
