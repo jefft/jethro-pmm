@@ -184,6 +184,7 @@ class service extends db_object
 	function getValue($field)
 	{
 		if (0 === strpos($field, 'bible_')) {
+			// If modified, update help text in call_service_comp_help_runsheet_format.class.php
 			// eg bible_read_1  or bible_preach_all
 			$bits = explode('_', $field);
 			@list($bible, $type, $number) = $bits;
@@ -196,11 +197,11 @@ class service extends db_object
 					$res[] = $br->toString($short);
 				}
 				return implode(', ', $res);
-			} else {
-				$bc = array_get($candidate_readings, $number-1);
+			} elseif (filter_var($number, FILTER_VALIDATE_INT) !== false) {
+				$bc = array_get($candidate_readings, (int)$number-1);
 				if ($bc) {
 					$br = new Bible_Ref($bc['bible_ref']);
-					return $br->toString();
+					return $br->toString($short);
 				} else {
 					return '';
 				}
@@ -387,8 +388,7 @@ class service extends db_object
 					$res = Array();
 					foreach ($this->getItems(FALSE, $compCatID) as $item) {
 						$line = nbsp(ents($item['title']));
-						if (!$printableMode && (strlen($item['ccli_number'] ?? '') + strlen($item['comments'] ?? '') > 0)) {
-							
+						if (!$printableMode && (strlen($item['ccli_number'] ?? '') + strlen($item['comments'] ?? '') > 0) && $this->checkPerm(PERM_VIEWSERVICE)) {
 							// yuck, but oh well...
 							ob_start();
 							$dummy_comp = new Service_Component();
@@ -400,7 +400,11 @@ class service extends db_object
 							$compid = $item['componentid'];
 							$line .= ' <i class="clickable icon-info-sign" data-toggle="visible" data-target="#compdetail'.$compid.'-'.$this->id.'"></i>';
 							$line .= '<table class="help-block custom-field-tooltip" id="compdetail'.$compid.'-'.$this->id.'"><tr><td class="narrow">CCLI #:</td><td>'.$ccli_code.'</td>';
-							$line .= '<td class="narrow"><a title="Edit this component" href="'.BASE_URL.'?view=_edit_service_component&service_componentid='.$compid.'"><i class="icon-wrench"></i></a></td></tr>';
+							$line .= '<td class="narrow">';
+							if ($this->checkPerm(PERM_SERVICECOMPS)) {
+								$line .= '<a title="Edit this component" href="'.BASE_URL.'?view=_edit_service_component&service_componentid='.$compid.'"><i class="icon-wrench"></i></a>';
+							}
+							$line .= '</td></tr>';
 							$line .= '<tr><td>Comments:</td><td colspan="2">'.linkUrlsInTrustedHtml(nl2br($item['comments'] ?? '')).'</td></tr></table>';
 						}
 						$res[] = $line;
@@ -515,6 +519,7 @@ class service extends db_object
 
 	public function getKeywordReplacement($keyword)
 	{
+		// If modified, update help text in call_service_comp_help_runsheet_format.class.php
 		if (0 === strpos($keyword, 'NAME_OF_')) {
 			$role_title = substr($keyword, strlen('NAME_OF_'));
 			return $this->getPersonnelByRoleTitle($role_title);
@@ -542,6 +547,21 @@ class service extends db_object
 		return $this->getPersonnelByRoleTitle($keyword);
 	}
 
+	/**
+	 * Get roster role info. Used to generate keywords in help text.
+	 */
+	static function getPersonnelRoleTitles() {
+		$sql = "select id, title, UPPER(REPLACE(rr.title, ' ', '_')) AS title_uppercase from roster_role rr ORDER BY id";
+		$tokens = JethroDB::get()->queryAll($sql);
+		return $tokens;
+	}
+
+	/**
+	 * @param $role_title Uppercase role title with underscores replacing whitespace, e.g. 'SOUND'. End with '_n' to get the Nth person, e.g. 'SOUND_1' = first assigned Sound person.
+	 * @param $first_name_only
+	 * @param $index Return the $index'th person in $role_title.
+	 * @return string Comma-separated name(s) of person/people serving as $role_title for this service.
+	 */
 	function getPersonnelByRoleTitle($role_title, $first_name_only=FALSE, $index=NULL)
 	{
 		$sql = 'SELECT roster_role_id, first_name, last_name

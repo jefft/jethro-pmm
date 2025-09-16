@@ -4,6 +4,7 @@ class Call_Service_Comp_Slides extends Call
 	function run()
 	{
 		$GLOBALS['system']->initErrorHandler();
+		/** @var Service_Component $comp */
 		$comp = $GLOBALS['system']->getDBObject('service_component', (int)$_REQUEST['id']);
 		if ($comp) {
 			

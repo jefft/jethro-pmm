@@ -14,6 +14,7 @@ class Call_Envelopes extends Call
 		$env = new Envelope_List();
 		$GLOBALS['system']->includeDBClass('family');
 		if (!empty($_REQUEST['familyid'])) {
+			/** @var Family $family */
 			$family = $GLOBALS['system']->getDBObject('family', (int)$_REQUEST['familyid']);
 			$env->addAddress($family->getAdultMemberNames()."\n".$family->getPostalAddress());
 		}
@@ -53,7 +54,9 @@ class Call_Envelopes extends Call
 					$env->addAddress($to."\n".$dummy->getPostalAddress());
 				}
 			} else {
+				/** @var Person $person */
 				$person = $GLOBALS['system']->getDBObject('person', (int)$_REQUEST['personid']);
+				/** @var Family $family */
 				$family = $GLOBALS['system']->getDBObject('family', $person->getValue('familyid'));
 				$env->addAddress($person->toString()."\n".$family->getPostalAddress());
 			}

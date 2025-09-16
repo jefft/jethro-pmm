@@ -567,7 +567,6 @@ ul {
 	opacity: 0.4;
 }
 #body a:not(.label), .modal a, .clickable, button.btn-link, input.btn-link {
-	text-decoration: underline;
 	color: @linkColor;
 }
 #body a.btn, .modal a.btn {
@@ -738,7 +737,9 @@ tr:last-child .insert-row-below {
 	font-style: italic;
 	color: @gray;
 }
-
+.error.help-inline, .error.help-block {
+    font-size: 14px;
+}
 #body .soft, .soft { /* low-key links */
 	font-size: 85%;
 	padding-top: 1px;
@@ -2518,6 +2519,17 @@ div#send-sms-modal div.results {
 
 #body .action-plan .fields td {
 	vertical-align: middle;
+}
+
+/* for callout "pay attention to this" text. Used by highlightControlGroup() */
+.floating-box {
+	display: inline-block;           /* Shrink to content */
+	padding: 0.5em 1em;              /* Space around text */
+	background: transparent;                /* Box color */
+	border-radius: 4px;              /* Rounded corners */
+	box-shadow: 0 4px 12px rgba(0,0,0,0.25); /* Floating shadow */
+	font-size: 1rem;
+	margin: 1em 1em 1em 5em;
 }
 
 /************ PRINT **************/

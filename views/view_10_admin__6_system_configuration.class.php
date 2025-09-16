@@ -95,9 +95,11 @@ class View_Admin__System_Configuration extends View {
 							if (Config_Manager::allowSettingInFile($symbol) && constant($symbol)) {
 								// Don't show the value here - sensitive
 								print_message('This setting has been set in the system config file', 'warning');
+								if ($details['note']) echo '<p class="smallprint">'.ents($details['note']).'</p>';
 							} else {
 								$this->printValue($symbol, $details);
 								print_message('This setting has been set in the system config file. To make it editable here, remove it from the config file.', 'warning');
+								if ($details['note']) echo '<p class="smallprint">'.ents($details['note']).'</p>';
 							}
 						} else {
 							$this->printWidget($symbol, $details);
@@ -309,7 +311,7 @@ class View_Admin__System_Configuration extends View {
 					<th>Delete?</th>
 				</tr>
 			</thead>
-			<tbody>
+            <tbody class="required-noduplicates" data-noduplicates-fieldkey="membership_status">
 		<?php
 		$GLOBALS['system']->includeDBClass('person_group');
 		list($options, $default) = Person_Group::getMembershipStatusOptionsAndDefault();
@@ -431,7 +433,7 @@ class View_Admin__System_Configuration extends View {
 					<th>Delete? <i class="clickable icon-question-sign icon-white" data-toggle="visible" data-target="#tooltip-agebracket-delete"></i></th>
 				</tr>
 			</thead>
-			<tbody>
+            <tbody class="required-noduplicates" data-noduplicates-fieldkey="age_bracket">
 		<?php
 		$options = $GLOBALS['system']->getDBObjectData('age_bracket', Array(), 'OR', 'rank');
 		$options[''] = Array('label' => '', 'is_default' => FALSE, 'is_adult' => FALSE);
@@ -483,6 +485,7 @@ class View_Admin__System_Configuration extends View {
 	{
 		$db = $GLOBALS['db'];
 		if (!empty($_POST['age_brackets_submitted'])) {
+
 			$i = 0;
 			$saved_default = false;
 			$rankMap = $_REQUEST['age_bracket_ranking'];
@@ -551,7 +554,7 @@ class View_Admin__System_Configuration extends View {
 					<th>Delete? <i class="clickable icon-question-sign icon-white" data-toggle="visible" data-target="#tooltip-status-delete"></i></th>
 				</tr>
 			</thead>
-			<tbody>
+			<tbody class="required-noduplicates" data-noduplicates-fieldkey="pstatus">
 		<?php
 		$usage_counts = Person::getStatusStats();
 		$options = $GLOBALS['system']->getDBObjectData('person_status', Array(), 'OR', 'rank');
@@ -618,6 +621,7 @@ class View_Admin__System_Configuration extends View {
 	{
 		$db = $GLOBALS['db'];
 		if (!empty($_POST['person_status_submitted'])) {
+
 			$i = 0;
 			$saved_default = false;
 			$got_an_archived = false;
