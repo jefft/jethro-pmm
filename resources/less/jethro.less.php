@@ -567,7 +567,6 @@ ul {
 	opacity: 0.4;
 }
 #body a:not(.label), .modal a, .clickable, button.btn-link, input.btn-link {
-	text-decoration: underline;
 	color: @linkColor;
 }
 #body a.btn, .modal a.btn {
@@ -738,7 +737,9 @@ tr:last-child .insert-row-below {
 	font-style: italic;
 	color: @gray;
 }
-
+.error.help-inline, .error.help-block {
+    font-size: 14px;
+}
 #body .soft, .soft { /* low-key links */
 	font-size: 85%;
 	padding-top: 1px;

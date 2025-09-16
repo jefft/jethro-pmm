@@ -19,6 +19,7 @@ class Call_Display_Roster extends Call
 	{
 		$roster_id = (int)array_get($_REQUEST, 'viewid');
 		if (empty($roster_id)) return;
+		/** @var Roster_View $view */
 		$view = $GLOBALS['system']->getDBObject('roster_view', $roster_id);
 
 		?>
