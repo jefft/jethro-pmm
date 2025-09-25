@@ -4,7 +4,7 @@ class View_Documents extends View
 	public static function getMenuRequiredFeature()
 	{
 		// Only make it visible if the config is set
-		return strlen(ifdef('MEMBER_FILES_DIRS', '')) ? 'DOCUMENTS' : '-1';
+		return (Documents_Manager::getMemberFilesDirs() ? 'DOCUMENTS' : '-1');
 	}
 	
 	function processView()
@@ -18,7 +18,7 @@ class View_Documents extends View
 
 	function printView()
 	{
-		$dirs = explode('|', MEMBER_FILES_DIRS);
+		$dirs = Documents_Manager::getMemberFilesDirs();
 		chdir(Documents_Manager::getRootPath());
 		if (count($dirs) > 1) {
 			foreach ($dirs as $dir) {
@@ -52,5 +52,4 @@ class View_Documents extends View
 			}
 		}
 	}
-
 }

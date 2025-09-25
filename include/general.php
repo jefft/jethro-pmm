@@ -1070,3 +1070,16 @@ function parse_size($size) {
     return round($size);
   }
 }
+
+/**
+ * Returns $path relative to $base, where $path is a relative or absolute directory inside $base.
+ * E.g. given $base='/jethro/docs' and $path='Folder', returns 'Folder' if /jethro/docs/Folder exists.
+ * E.g. given $base='/jethro/docs' and $path='/sub/Folder', returns 'sub/Folder' if /jethro/docs/sub/Folder exists.
+ * Returns Canonicalized $path, or false if $path does not exist.
+ */
+function realpath_relative($base, $path) {
+    if ($realpath = realpath($base . DIRECTORY_SEPARATOR . $path)) {
+        if (file_exists($realpath)) return substr($realpath, strlen($base) + 1);
+    }
+    return false;
+}
