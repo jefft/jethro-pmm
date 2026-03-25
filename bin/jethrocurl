@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# jethrocurl — authenticated curl to a Jethro instance
+#
+# Usage:  jethrocurl URL [curl options...]
+#   e.g.  jethrocurl 'http://coastec.easyjethro.internal/?view=documents'
+#         jethrocurl '?view=persons&personid=1'
+#
+# For absolute URLs (http:// or https://), scheme and host are parsed
+# from the URL itself.  For relative URLs, the instance is inferred
+# from the current working directory:
+#     /home/jethro/code/<instance>  →  http://<instance>.easyjethro.internal
+#
+# The script scrapes the login page for pre-filled credentials and
+# login_key, then POSTs login with -L to follow the redirect to the
+# authenticated page.
+#
+# Extra arguments after the URL are passed through to the final curl
+# invocation (e.g. -I, -o, -v).
+#
+set -euo pipefail
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    awk 'NR>=4 && /^[^#]/ {exit} NR>=4' "$0"
+    exit 0
+fi
+
+if [ $# -lt 1 ]; then
+    echo "Usage: jethrocurl <URL> [curl options...]" >&2
+    echo "  Try  jethrocurl --help  for details." >&2
+    exit 1
+fi
+
+url="$1"; shift
+
+# ── Resolve base URL and target ──────────────────────────────────────
+
+if [[ "$url" =~ ^https?:// ]]; then
+    # Absolute URL — parse scheme, host, and path.
+    if [[ "$url" =~ ^(https?)://([^/]+)(/.*)?$ ]]; then
+        scheme="${BASH_REMATCH[1]}"
+        host="${BASH_REMATCH[2]}"
+        # shellcheck disable=SC2034  # path not used (target=$url used directly)
+        path="${BASH_REMATCH[3]:-/}"
+    else
+        echo "Error: Could not parse URL: $url" >&2
+        exit 2
+    fi
+    base="$scheme://$host"
+    target="$url"
+else
+    # Relative URL — infer base from the current directory.
+    # /home/jethro/code/<instance>  →  http://<instance>.easyjethro.internal
+    cwd="$(pwd)"
+    if [[ "$cwd" =~ ^/home/jethro/code/([^/]+) ]]; then
+        instance="${BASH_REMATCH[1]}"
+        if [[ $instance = current ]]; then instance="demo"; fi
+    else
+        echo "Error: Cannot infer instance from current directory: $cwd" >&2
+        echo "  Run from /home/jethro/code/<instance> or pass an absolute URL." >&2
+        exit 2
+    fi
+    base="http://$instance.easyjethro.internal"
+    target="${base}/${url#/}"
+fi
+
+# ── Login flow ───────────────────────────────────────────────────────
+
+cookie_jar="$(mktemp)"
+trap 'rm -f "$cookie_jar"' EXIT
+
+# Step 1 — GET the target URL to obtain a session cookie and scrape the
+# hidden login_key plus any pre-filled credentials.  We use the target URL
+# itself rather than $base/ because Jethro may be installed under a
+# subdirectory (e.g. http://localhost:9091/tests/functional/sms/sms-bulk/).
+login_page="$(curl -sS -c "$cookie_jar" "$target")"
+
+login_key="$(echo "$login_page" | grep -oP 'name="login_key"\s+value="\K[^"]+' || true)"
+username="$( echo "$login_page" | grep -A1 'id="username"'  | grep -oP 'value="\K[^"]+' || true)"
+password="$( echo "$login_page" | grep -A1 'id="password"'  | grep -oP 'value="\K[^"]+' || true)"
+
+if [ -z "$login_key" ]; then
+    echo "Error: Could not scrape login_key from $target" >&2
+    exit 3
+fi
+if [ -z "$username" ] || [ -z "$password" ]; then
+    echo "Error: Could not scrape credentials from $target" >&2
+    echo "  Ensure PREFILL_USERNAME and PREFILL_PASSWORD are set in conf.php." >&2
+    exit 3
+fi
+
+# Step 2 — POST login with the scraped credentials, following redirects.
+# POST back to the same URL that served the login form.
+curl -sS -L -c "$cookie_jar" -b "$cookie_jar" \
+    --data-urlencode "username=$username" \
+    --data-urlencode "password=$password" \
+    --data-urlencode "login_key=$login_key" \
+    "$target" "$@"
