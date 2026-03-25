@@ -1,0 +1,4 @@
+#!/bin/bash
+# SYNOPSIS: Regression tests: testall
+
+tests/regression/jethro_regression_tests.nu --testall
