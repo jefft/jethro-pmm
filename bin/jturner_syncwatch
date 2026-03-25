@@ -1,0 +1,20 @@
+#!/usr/bin/env nu
+# Watches editable/ and sync to ../current/ if a relevant file changes. This allows editable/ files to be owned by $USER:$USER, and ../current/ to be correct for deployment.
+# Note that watch --glob does not like {}. https://github.com/nushell/nushell/issues/14172
+
+if ($env.USER != root) {
+  error make "Must be run as root"
+}
+if not ('ATL_APPDIR_BASE' in $env) {
+  error make "ATL_APPDIR_BASE env var not set"
+}
+watch ($env.ATL_APPDIR_BASE | path join "editable") { |op, path, new_path|
+  match ($path | path parse | get extension) {
+# "php" | "js" | "css" | "html" | "nu" | "sql" | "tpl" => {
+    "php" | "js" | "css" => {
+    print --no-newline $"($op) ($path) — refreshing... "
+#^($env.ATL_APPDIR_BASE | path join 'editable/bin/jturner_refresh.sh')
+   }
+    _ => { print $"No change for changed ($path)"; return; }
+  }
+}
