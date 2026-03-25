@@ -1,0 +1,209 @@
+#!/bin/bash -u
+# review_loop — the jj and beads mechanics of the multi-agent review loop.
+# Workflow, roles and rules: agents/review-loop/README.md
+#
+#   review_loop init [DIR]        create the shared beads workspace (default ~/beads/jethro-review)
+#   review_loop workspace BUG     fixer: new jj workspace with a fix change on the bug's target commit
+#   review_loop submit BUG        fixer: move the fix (everything but devbox.json) into the fix change
+#   review_loop integrate BUG [GATE-ARGS...]
+#                                 integrator: gate the fix on the tip, then squash it into its target
+#   review_loop cleanup BUG       forget the bug's workspace once it is integrated or abandoned
+#
+# Bug metadata (bd update BUG --set-metadata key=value):
+#   target      jj change ID the fix belongs in (set when the bug is filed)
+#   verify      shell command that fails before the fix and passes after it
+#   fix_change  set by `workspace`; workspace, ports likewise
+#
+# Needs BEADS_DIR (see init) and BEADS_ACTOR (who you are) in the environment.
+
+set -o pipefail
+
+die() { echo >&2 "review_loop: $*"; exit 1; }
+
+meta() {
+	bd show "$1" --json 2>/dev/null | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+d = d[0] if isinstance(d, list) else d
+print((d.get("metadata") or {}).get(sys.argv[1], ""))' "$2"
+}
+
+field() {
+	bd show "$1" --json 2>/dev/null | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+d = d[0] if isinstance(d, list) else d
+print(d.get(sys.argv[1], ""))' "$2"
+}
+
+need_env() {
+	[[ -n ${BEADS_DIR:-} ]] || die "set BEADS_DIR (review_loop init prints it)"
+	[[ -n ${BEADS_ACTOR:-} ]] || die "set BEADS_ACTOR to your agent name"
+}
+
+change_exists() {
+	jj --ignore-working-copy log --no-graph -r "$1" -T 'change_id.short()' > /dev/null 2>&1
+}
+
+# A pair of TCP ports (web, functest) that nothing listens on and no other
+# workspace of this repo has claimed in its devbox.json.
+free_ports() {
+	local root used n web ft
+	used=$(jj --ignore-working-copy workspace list -T 'self.root() ++ "\n"' 2>/dev/null | while read -r root; do
+		grep -hoE '"(NGINX|FUNCTEST)_WEB_PORT":\s*"[0-9]+"' "$root/devbox.json" 2>/dev/null | grep -oE '[0-9]+'
+	done)
+	for n in $(seq 0 49); do
+		web=$((8500 + 2 * n)); ft=$((web + 1))
+		if ss -ltnH "( sport = :$web or sport = :$ft )" 2>/dev/null | grep -q .; then continue; fi
+		if grep -qxE "$web|$ft" <<< "$used"; then continue; fi
+		echo "$web $ft"; return 0
+	done
+	return 1
+}
+
+cmd_init() {
+	local dir=${1:-$HOME/beads/jethro-review}
+	mkdir -p "$dir"
+	if [[ ! -d $dir/.beads ]]; then
+		# Ignore any BEADS_DIR inherited from another workspace: bd init would use it.
+		(cd "$dir" && env -u BEADS_DIR bd init --prefix jr --non-interactive > /dev/null 2>&1) || die "bd init failed in $dir"
+	fi
+	export BEADS_DIR=$dir/.beads
+	# Bug reports must say where the fix goes and how to prove it.
+	bd config set lint.sections.bug "Target commit, Verify" > /dev/null
+	# Idempotent; 'bd merge-slot check' exits 0 even when there is no slot.
+	bd merge-slot create > /dev/null || die "could not create the merge slot"
+	echo "export BEADS_DIR=$BEADS_DIR"
+}
+
+cmd_workspace() {
+	local bug=$1 target title fix local_change dir ports web ft name
+	need_env
+	target=$(meta "$bug" target); [[ -n $target ]] || die "$bug has no target metadata"
+	change_exists "$target" || die "target $target of $bug does not exist"
+	[[ -z $(meta "$bug" fix_change) ]] || die "$bug already has fix change $(meta "$bug" fix_change)"
+	title=$(field "$bug" title)
+	name=fix-$bug
+	dir="$(dirname "$(jj root)")/$(basename "$(jj root)")-$bug"
+	[[ ! -e $dir ]] || die "$dir already exists"
+	ports=$(free_ports) || die "no free port pair in 8500-8599"
+	read -r web ft <<< "$ports"
+
+	jj workspace add --name "$name" -r "$target" "$dir" > /dev/null || die "jj workspace add failed"
+	cd "$dir" || exit 1
+	jj new "$target" -m "Fix $bug: $title" > /dev/null
+	fix=$(jj log --no-graph -r @ -T 'change_id.short()')
+	# Workspace-only port settings live in a separate change on top, so they
+	# never reach the fix (see submit).
+	jj new "$fix" -m "local: $name ports" > /dev/null
+	sed -i -E "s/(\"NGINX_WEB_PORT\":\s*)\"[0-9]+\"/\1\"$web\"/; s/(\"FUNCTEST_WEB_PORT\":\s*)\"[0-9]+\"/\1\"$ft\"/" devbox.json
+	local_change=$(jj log --no-graph -r @ -T 'change_id.short()')
+
+	bd update "$bug" --claim --set-metadata "fix_change=$fix" --set-metadata "workspace=$dir" \
+		--set-metadata "ports=$web/$ft" > /dev/null
+	bd comment "$bug" "Fixing in workspace $dir: fix change $fix (on target $target), local change $local_change, ports $web/$ft." > /dev/null
+	cat <<-EOF
+	Workspace: $dir
+	Fix change: $fix (edit in @; 'review_loop submit $bug' moves your edits into it)
+	Ports: web $web, functest $ft. Start services there: devbox services up -b
+	EOF
+}
+
+cmd_submit() {
+	local bug=$1 fix moved
+	need_env
+	fix=$(meta "$bug" fix_change); [[ -n $fix ]] || die "$bug has no fix change; run review_loop workspace first"
+	jj status > /dev/null || exit 1
+	jj squash --into "$fix" 'all() & ~devbox.json' > /dev/null 2>&1 || true
+	moved=$(jj --ignore-working-copy diff -r "$fix" --name-only)
+	[[ -n $moved ]] || die "fix change $fix is empty"
+	bd label add "$bug" ready-to-integrate > /dev/null
+	bd comment "$bug" "Fix submitted in change $fix. Files: $(echo "$moved" | tr '\n' ' ')" > /dev/null
+	echo "Submitted $fix:"; echo "$moved"
+}
+
+cmd_integrate() {
+	local bug=$1; shift
+	local fix target verify wc trial trial_parents op_before squash_op summary status=0 log
+	need_env
+	fix=$(meta "$bug" fix_change); target=$(meta "$bug" target); verify=$(meta "$bug" verify)
+	[[ -n $fix && -n $target ]] || die "$bug needs target and fix_change metadata"
+	[[ -n $verify ]] || die "$bug has no verify command"
+	change_exists "$fix" || die "fix change $fix does not exist"
+
+	bd merge-slot acquire --holder "$BEADS_ACTOR" > /dev/null 2>&1 || die "merge slot is held: $(bd merge-slot check 2>&1 | tail -1)"
+	# shellcheck disable=SC2064  # expand the actor now
+	trap "bd merge-slot release --holder '$BEADS_ACTOR' > /dev/null 2>&1" EXIT
+
+	jj status > /dev/null || exit 1
+	wc=$(jj --ignore-working-copy log --no-graph -r @ -T 'change_id.short()')
+	trial_parents=$(jj --ignore-working-copy log --no-graph -r '@-' -T 'change_id.short() ++ " "')
+	[[ -z $(jj --ignore-working-copy diff -r @ --name-only 'all() & ~devbox.json') ]] \
+		|| die "the working copy has edits other than devbox.json; commit or move them first"
+
+	# 1. Trial: the current tip plus the fix, as the working copy, keeping this
+	# checkout's devbox.json ports. Nothing is rewritten yet, so a failure needs
+	# no undo.
+	# shellcheck disable=SC2086  # trial_parents is a list of change IDs
+	jj new $trial_parents "$fix" -m "trial: integrate $bug" > /dev/null 2>&1 || die "could not create the trial merge"
+	trial=$(jj --ignore-working-copy log --no-graph -r @ -T 'change_id.short()')
+	jj restore --from "$wc" devbox.json > /dev/null 2>&1
+	log=$(mktemp)
+	jethro_gate --also "$verify" "$@" 2>&1 | tee "$log"
+	status=${PIPESTATUS[0]}
+	summary=$(sed -n '/^Summary:/,$p' "$log")
+
+	# Back to the original working copy, whatever happened.
+	jj edit "$wc" > /dev/null 2>&1 && jj abandon "$trial" > /dev/null 2>&1 \
+		|| echo >&2 "review_loop: could not return to working copy $wc / abandon trial $trial; check jj log"
+
+	if [[ $status != 0 ]]; then
+		bd label remove "$bug" ready-to-integrate > /dev/null 2>&1
+		bd label add "$bug" needs-work > /dev/null
+		bd comment "$bug" "Integration gate FAILED on the tip + $fix; nothing was squashed.
+$summary" > /dev/null
+		rm -f "$log"
+		die "gate failed; $bug labelled needs-work"
+	fi
+
+	# 2. Squash the fix into its target. Revert just this operation (not
+	# other agents' concurrent ones) if it leaves conflicts.
+	op_before=$(jj op log --no-graph -n 1 -T 'id.short()')
+	jj squash --from "$fix" --into "$target" -u > /dev/null 2>&1 || die "squash of $fix into $target failed"
+	squash_op=$(jj op log --no-graph -n 1 -T 'id.short()')
+	if [[ -n $(jj --ignore-working-copy log --no-graph -r "conflicts() & ($target::)" -T 'change_id.short()') ]]; then
+		jj op revert "$squash_op" > /dev/null
+		bd label add "$bug" needs-work > /dev/null
+		bd comment "$bug" "Gate passed but squashing $fix into $target left conflicts; reverted operation $squash_op (previous $op_before)." > /dev/null
+		rm -f "$log"
+		die "squash left conflicts; reverted"
+	fi
+
+	bd label remove "$bug" ready-to-integrate > /dev/null 2>&1
+	bd label add "$bug" integrated > /dev/null
+	bd comment "$bug" "Integrated: $fix squashed into $target. Gate on tip + fix:
+$summary" > /dev/null
+	rm -f "$log"
+	echo "Integrated $bug: $fix -> $target"
+}
+
+cmd_cleanup() {
+	local bug=$1 dir
+	need_env
+	dir=$(meta "$bug" workspace)
+	jj workspace forget "fix-$bug" > /dev/null 2>&1 || true
+	[[ -n $dir && -d $dir ]] && echo "Workspace forgotten; remove its directory when done: rm -rf $dir"
+	bd update "$bug" --unset-metadata workspace > /dev/null
+}
+
+[[ $# -ge 1 ]] || { sed -n '2,18s/^# \?//p' "$0"; exit 2; }
+sub=$1; shift
+case "$sub" in
+	init) cmd_init "$@" ;;
+	workspace) [[ $# -eq 1 ]] || die "usage: review_loop workspace BUG"; cmd_workspace "$1" ;;
+	submit) [[ $# -eq 1 ]] || die "usage: review_loop submit BUG"; cmd_submit "$1" ;;
+	integrate) [[ $# -ge 1 ]] || die "usage: review_loop integrate BUG [GATE-ARGS...]"; cmd_integrate "$@" ;;
+	cleanup) [[ $# -eq 1 ]] || die "usage: review_loop cleanup BUG"; cmd_cleanup "$1" ;;
+	-h|--help|help) sed -n '2,18s/^# \?//p' "$0" ;;
+	*) die "unknown command $sub" ;;
+esac
