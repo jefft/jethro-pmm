@@ -1,0 +1,9 @@
+#!/bin/bash -eu
+
+olddesc="$(jj log -r @ --no-graph -T 'description')"
+{
+	if [[ -n $olddesc ]]; then
+		echo "$olddesc"
+	fi
+	cat -
+} | jj desc --stdin
