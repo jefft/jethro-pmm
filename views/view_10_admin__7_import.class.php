@@ -737,7 +737,7 @@ class View_Admin__Import extends View
 			$family = new Family();
 			$family->fromCSVRow($familyrow);
 			if (!$family->create()) {
-				trigger_error('Family: '.$familydata['family_name']." not created");
+				trigger_error('Family: '.$familyrow['family_name']." not created");
 				continue;
 			}
 			foreach ($members as $member) {
@@ -769,12 +769,12 @@ class View_Admin__Import extends View
 		foreach ($this->_sess['family_updates'] as $familyid => $familyrow) {
 			$family = new Family($familyid);
 			if (!$family->acquireLock()) {
-				trigger_error("Could not update ".$familydata['family_name'].' because another user is editing it. Please try again later.', E_USER_WARNING);
+				trigger_error("Could not update ".$familyrow['family_name'].' because another user is editing it. Please try again later.', E_USER_WARNING);
 				continue;
 			}
 			$family->fromCSVRow($familyrow, $this->_sess['overwrite_existing']);
 			if (!$family->save()) {
-				trigger_error('Family: '.$familydata['family_name']." not updated");
+				trigger_error('Family: '.$familyrow['family_name']." not updated");
 			}
 			$family->releaseLock();
 			$this->_printProgress($done++, $todo);

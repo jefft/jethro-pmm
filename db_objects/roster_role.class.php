@@ -290,7 +290,7 @@ class Roster_Role extends db_object
 	function printChooser($date, $currentval=Array(''), $absentees=Array())
 	{
 		if ($groupid = $this->getValue('volunteer_group')) {
-			$volunteers = $this->_getVolunteers();
+            $volunteers = $this->_getVolunteers();
 			if ($this->getValue('assign_multiple')) {
 				if (empty($currentval)) $currentval = Array('');
 				?>
@@ -334,6 +334,9 @@ class Roster_Role extends db_object
 			$GLOBALS['system']->includeDBClass('person');
 			if ($this->getValue('assign_multiple')) {
 				Person::printMultipleFinder('assignees['.$this->id.']['.$date.']', $currentval, $date);
+				// Sentinel: always submit something so processAllocations can distinguish
+				// "user deleted all assignees" from "cell was read-only (not submitted at all)".
+				echo '<input type="hidden" name="assignees_submitted['.$this->id.']['.$date.']" value="1" />';
 			} else {
 				$currentID = (int)reset($currentval);
 				Person::printSingleFinder('assignees['.$this->id.']['.$date.']', $currentID, $date);
