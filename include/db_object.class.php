@@ -202,7 +202,7 @@ class db_object
 
 		$parent_class =  strtolower(get_parent_class($this));
 		if ($parent_class != 'db_object') {
-            /** @var DB_Object $parent_obj */
+			/* @var DB_Object $parent_obj */
 			$parent_obj = new $parent_class();
 			$parent_obj->populate(0, $this->values);
 			if (!$parent_obj->create()) {
