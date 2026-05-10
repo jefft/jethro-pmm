@@ -380,32 +380,31 @@ $(document).ready(function() {
 		var target = $($(this).attr('data-target'));
 		var t = '';
 		if (target.is('input, textarea')) {
-			t = target.attr('value');
+			t = target.val();
 			target.get(0).select();
 		} else {
-			t = target.get(0).innerText;
+			t = target.get(0).innerText || target.text();
 		}
-		try {
-			if (navigator.clipboard.writeText(t)) {
-				var oldLink = this;
-				var oldLabel = this.value || this.innerHTML;
-				if ($(this).is('input')) {
-					this.value = '✔ Copied';
-					setTimeout(function() {
-						oldLink.value = oldLabel;
-					}, 2000);				
-				} else {
-					this.innerHTML = '✔ Copied';
-					setTimeout(function() {
-						oldLink.innerHTML = oldLabel;
-					}, 2000);
-				}
+
+		if (!window.isSecureContext) {
+			alert("Clipboard access requires HTTPS");
+			return false;
+		}
+
+		navigator.clipboard.writeText(t).then(function() {
+			var el = this;
+			var oldLabel = el.value || el.innerHTML;
+			if ($(el).is('input')) {
+				el.value = '✔ Copied';
+				setTimeout(function() { el.value = oldLabel; }, 2000);
 			} else {
-				alert("Sorry, browser settings do not allow copying");
+				el.innerHTML = '✔ Copied';
+				setTimeout(function() { el.innerHTML = oldLabel; }, 2000);
 			}
-		} catch (e) {
-				alert("Sorry, browser settings do not allow copying");
-		}	
+		}.bind(this)).catch(function() {
+			alert("Clipboard access was denied — check your browser permissions");
+		});
+
 		return false;
 	});
 
