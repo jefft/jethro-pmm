@@ -233,8 +233,14 @@ if (isset($tabs['notes'])) {
 
 	if ($GLOBALS['user_system']->havePerm(PERM_EDITNOTE)) {
 		?>
-		<div class="pull-right"><a href="?view=_add_note_to_person&personid=<?php echo $person->id; ?>"><i class="icon-plus-sign"></i><?php echo _('Add Note')?></a></div>
+		<div class="pull-right"><a href="#add-note-modal" class="note-link" data-toggle="note-modal" data-personid="<?php echo $person->id; ?>" data-name="<?php echo ents($person->getValue('first_name').' '.$person->getValue('last_name')); ?>"><i class="icon-plus-sign"></i><?php echo _('Add Note')?></a></div>
 		<?php
+		static $printedNoteModal = false;
+		if (!$printedNoteModal) {
+			include_once JETHRO_ROOT.'/include/note_modal.php';
+			printNoteModal();
+			$printedNoteModal = true;
+		}
 	}
 	if (empty($notes)) {
 		?>
