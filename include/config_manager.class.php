@@ -33,6 +33,7 @@ class Config_Manager {
 		if (0 === strpos($symbol, 'SMS_')) return TRUE;
 		if (0 === strpos($symbol, '2FA_')) return TRUE;
 		if (0 === strpos($symbol, 'SMTP')) return TRUE;
+		if (0 === strpos($symbol, 'BIBLE_')) return TRUE;
 		return FALSE;
 	}
 
@@ -137,6 +138,8 @@ class Config_Manager {
 	public static function saveSetting($symbol, $value)
 	{
 		$db = $GLOBALS['db'];
+		// UPDATE-only: every valid setting symbol must already exist in the DB
+		// (created by installer.class.php or an upgrade SQL script).
 		$SQL = 'UPDATE setting
 				SET value = '.$db->quote($value).'
 				WHERE symbol = '.$db->quote($symbol);
