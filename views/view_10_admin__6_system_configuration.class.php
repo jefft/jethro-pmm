@@ -73,14 +73,19 @@ class View_Admin__System_Configuration extends View {
 		}
 		$this->_doConfigChecks();
 		?>
-		<form method="post">
+		<div class="settings-page">
+			<nav id="settings-nav" class="settings-nav hidden-phone"></nav>
+			<form method="post" class="settings-form">
 			<div class="form-horizontal">
 			<?php
+			$headings = [];
 			foreach (Config_Manager::getSettings() as $symbol => $details) {
 				if ($details['type'] == 'hidden') continue;
 				$details['note'] = str_replace('<system_url>', BASE_URL, $details['note']);
 				if ($details['heading']) {
-					echo '<hr /><h4>'.ents($details['heading']).'</h4>';
+					$slug = strtolower((string) preg_replace('/[^A-Za-z0-9]+/', '-', $details['heading']));
+					$headings[] = ['slug' => $slug, 'label' => $details['heading']];
+					echo '<hr /><h4 id="'.ents($slug).'">'.ents($details['heading']).'</h4>';
 				}
 				?>
 				<div class="control-group" id="<?php echo $symbol; ?>">
@@ -118,6 +123,75 @@ class View_Admin__System_Configuration extends View {
 				</div>
 			</div>
 		</form>
+		</div>
+		<script>
+		(function() {
+			var headings = <?php echo json_encode($headings); ?>;
+			if (!headings.length) return;
+			var nav = document.getElementById('settings-nav');
+			var links = {};
+			headings.forEach(function(h) {
+				var a = document.createElement('a');
+				a.href = '#' + h.slug;
+				a.textContent = h.label;
+				nav.appendChild(a);
+				links[h.slug] = a;
+			});
+
+			var activeEl = null;
+
+			function setActive(slug) {
+				if (activeEl === links[slug]) return;
+				if (activeEl) activeEl.classList.remove('active');
+				activeEl = links[slug] || null;
+				if (activeEl) activeEl.classList.add('active');
+			}
+
+			function refresh() {
+				var bestSlug = null;
+				var bestTop = Infinity;
+				var viewTop = window.scrollY + 80; // small offset so the heading itself is visible
+				headings.forEach(function(h) {
+					var el = document.getElementById(h.slug);
+					if (!el) return;
+					var top = el.getBoundingClientRect().top + window.scrollY;
+					if (top <= viewTop && (viewTop - top) < bestTop) {
+						bestTop = viewTop - top;
+						bestSlug = h.slug;
+					}
+				});
+				setActive(bestSlug);
+			}
+
+			// Clicking a nav link also highlights it immediately
+			nav.addEventListener('click', function(e) {
+				var a = e.target.closest('a');
+				if (a) {
+					var slug = a.getAttribute('href').slice(1);
+					setActive(slug);
+				}
+			});
+
+			var ticking = false;
+			window.addEventListener('scroll', function() {
+				if (!ticking) {
+					requestAnimationFrame(function() { refresh(); ticking = false; });
+					ticking = true;
+				}
+			});
+
+			refresh();
+		})();
+		</script>
+		<style>
+		.settings-page { display: flex; gap: 2rem; align-items: flex-start; }
+		.settings-nav { position: sticky; top: 10rem; width: 14rem; flex-shrink: 0; }
+		.settings-nav a { display: block; padding: 0.35rem 0.75rem; color: #555; text-decoration: none; font-size: 0.85rem; border-radius: 4px; margin-bottom: 1px; }
+		.settings-nav a:hover { background: #f0f0f0; color: #333; }
+		.settings-nav a.active { font-weight: 600; color: #08c; background: #e8f4fc; }
+		.settings-nav a.active::before { content: ''; display: none; }
+		.settings-form { flex: 1; min-width: 0; }
+		</style>
 		<?php
 	}
 
