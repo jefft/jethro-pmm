@@ -33,6 +33,7 @@ class Config_Manager {
 		if (0 === strpos($symbol, 'SMS_')) return TRUE;
 		if (0 === strpos($symbol, '2FA_')) return TRUE;
 		if (0 === strpos($symbol, 'SMTP')) return TRUE;
+		if (0 === strpos($symbol, 'MAILCHIMP_')) return TRUE;
 		return FALSE;
 	}
 
