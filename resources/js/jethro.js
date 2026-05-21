@@ -428,7 +428,10 @@ $(document).ready(function() {
 	/***************** LAYOUT FIXES *******************/
 
 	layOutMatchBoxes();
-	$('a[data-toggle="tab"]').on('shown', layOutMatchBoxes);
+	$('a[data-toggle="tab"]').on('shown', function(e) {
+		layOutMatchBoxes();
+		persistActiveTab(e);
+	});
 	$(window).resize(layOutMatchBoxes);
 
 	// Make sure the width doesn't bounce around when we change tabs
@@ -1840,6 +1843,15 @@ function layOutMatchBoxes()
 		sameTop = (lastTop == $(this).position().top);
 	});
 	if (sameTop) $('.match-height').height(maxHeight);
+}
+
+/**
+ * Write the clicked tab's hash to the URL so the active tab survives page reload.
+ */
+function persistActiveTab(e) {
+	if (e.target.hash && history.replaceState) {
+		history.replaceState(null, '', e.target.hash);
+	}
 }
 
 /************************** LOCKING ********************************/
