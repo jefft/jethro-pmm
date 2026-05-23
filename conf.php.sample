@@ -87,7 +87,7 @@ define('2FA_ENABLED', true);
 // define('SMS_MAX_LENGTH', 160);
 
 // URL of the SMS gateway to send SMSes through
-// define('SMS_HTTP_URL', 'https://www.5centsms.com.au:/api/v4/sms');
+// define('SMS_HTTP_URL', 'https://www.5centsms.com.au/api/v4/sms');
 // define('SMS_HTTP_URL', 'https://api.smsbroadcast.com.au/api-adv.php');
 // define('SMS_HTTP_URL', "");
 
