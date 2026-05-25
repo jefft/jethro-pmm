@@ -78,14 +78,18 @@ $(document).ready(function() {
 		history.back();
 	});
 
-	// Ability to click anywhere on a table row to activate the first link within it
+	// Ability to click anywhere on a table row to activate the primary link.
+	// If a <a class="rowlink"> exists in the row, it takes priority;
+	// otherwise the first <a> in the row is used (backwards-compatible).
 	$('table.clickable-rows td').click(function(e) {
 		var t = $(this);
 		var myLinks = t.find('a, input');
 		if (!myLinks.length) {
-			childLinks = $(this).parent('tr').find('td>a[href!=#]');
-			if (childLinks.length) {
-				self.location = childLinks[0].href;
+			var row = $(this).parent('tr');
+			var rowLinks = row.find('td>a[href!=#]');
+			if (rowLinks.length) {
+				var primary = rowLinks.filter('.rowlink');
+				self.location = (primary.length ? primary : rowLinks).first()[0].href;
 			}
 		} else if (myLinks.filter('a').length == 1) {
 			self.location = myLinks[0].href;
