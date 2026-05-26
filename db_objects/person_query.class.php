@@ -2238,7 +2238,7 @@ class Person_Query extends DB_Object
 								break;
 							case 'view_link':
 								?>
-								<a class="med-popup no-print" href="?view=persons&personid=<?php echo $row[$label]; ?>"><i class="icon-user"></i>View</a>
+								<a class="med-popup no-print rowlink" href="?view=persons&personid=<?php echo $row[$label]; ?>"><i class="icon-user"></i>View</a>
 								<?php
 								break;
 							case 'note_link':
