@@ -1,11 +1,15 @@
 <?php
 
-class Call_Service_slides extends Call
+class Call_Service_Slides extends Call
 {
 	function run()
 	{
 		//get service data from database
 		$service = $GLOBALS['system']->getDBObject('service', (int)$_REQUEST['serviceid']);
+		if (!$service) {
+			trigger_error('Service #'.(int)$_REQUEST['serviceid'].' not found', E_USER_WARNING);
+			return;
+		}
 		$serviceContent = $service->getServiceContent();
 
 		//options

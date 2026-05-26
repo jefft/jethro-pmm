@@ -1520,6 +1520,13 @@ ul.nav-tabs {
 	padding: 15px;
 	border-radius: 0px 0px 5px 5px;
 }
+/* Override Bootstrap's overflow:auto (which breaks position:sticky descendants) while
+   still containing floats via display:flow-root. Scoped to view-person to avoid
+   affecting service-planner which intentionally scrolls its tab-content. */
+.tab-content.view-person {
+	overflow: visible;
+	display: flow-root;
+}
 .preview-pane, .tab-content, .nav-tabs > .active > a, .nav-tabs > .active > a:hover, .nav-tabs > .active > a:focus {
 	background: @jethroLightest; /* lighter yellow */
 }
@@ -1863,6 +1870,29 @@ table.service-details td table td input {
 .notes-history-entry .comments {
 	margin-left: 25px;
 	margin-top: 15px;
+}
+
+/* Note filter sidebar — checkboxes to filter by status and assignee.
+   position:sticky keeps the panel visible while scrolling through long lists.
+   top:5px (not 80px) because #jethro-nav is not position:fixed — it scrolls away,
+   so there is no persistent header to clear. */
+.panel-sidebar {
+	border-left: 1px solid #ddd;
+	padding: 8px 8px 0 8px;
+	position: sticky;
+	top: 5px;
+}
+.panel-sidebar fieldset {
+	border: 0;
+	margin: 0;
+	padding: 0;
+}
+.panel-sidebar legend {
+	display: inline;
+	width: auto;
+	margin: 1em 0 0.5em 0;
+	padding-right: 8px;
+	font-size: 0.85em;
 }
 
 /********* ATTENDANCE AND COLOURED RADIO BUTTONS **********/
@@ -2520,13 +2550,20 @@ td.run-sheet-comments * {
 
 
 /*************** SMS MESSAGING ************************/
-button.sms-success, #body tr.sms-success .mobile-tel, #body tr.sms-success .mobile-tel:hover {
+a.sms-success, #body tr.sms-success .mobile-tel, #body tr.sms-success .mobile-tel:hover {
 	background: #d8e9cb; /* Old browsers */
 	background: -moz-linear-gradient(top, #d8e9cb 0%, #abdc88 99%, #abdc88 99%, #d8e9cb 100%); /* FF3.6-15 */
 	background: -webkit-linear-gradient(top, #d8e9cb 0%,#abdc88 99%,#abdc88 99%,#d8e9cb 100%); /* Chrome10-25,Safari5.1-6 */
 	background: linear-gradient(to bottom, #d8e9cb 0%,#abdc88 99%,#abdc88 99%,#d8e9cb 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
 	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#d8e9cb', endColorstr='#d8e9cb',GradientType=0 ); /* IE6-9 */
 	background-position: 0 0 !important;
+}
+.note-modal {
+	width: 700px;
+	margin-left: -350px;
+}
+#body tr.note-success .note-link {
+	background-color: #d8e9cb !important;
 }
 #body tr.sms-failure .mobile-tel, #body tr.sms-failure .mobile-tel:hover {
 	background-image: linear-gradient(linear, 0 0, 0 100%, from(#ff9c9c), to(#d22c2c)) !important;
@@ -2601,6 +2638,37 @@ div#send-sms-modal div.results {
 	box-shadow: 0 4px 12px rgba(0,0,0,0.25); /* Floating shadow */
 	font-size: 1rem;
 	margin: 1em 1em 1em 5em;
+}
+
+
+/*************** SCRIPTURE VERSES *****************/
+
+.scripture-styles .v {
+	font-size: .7em;
+	font-weight: bold;
+	vertical-align: super;
+	line-height: 0;
+}
+
+
+.scripture-styles .v::after {
+	content: "\00a0";
+}
+
+.scripture-styles .s1 {
+	font-style: italic;
+}
+.scripture-styles .q1 {
+	margin-left: 0;
+}
+.scripture-styles .q2 {
+	margin-left: 1.5em;
+}
+.scripture-styles .q3 {
+	margin-left: 3em;
+}
+.scripture-styles .q4 {
+	margin-left: 4.5em;
 }
 
 /************ PRINT **************/

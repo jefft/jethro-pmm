@@ -38,6 +38,17 @@ http {
         access_log access.log jethrolog;
         error_log  error.log;
 
+        # ====================================================================
+        # Docusaurus static documentation site
+        # Browse at http://localhost:${NGINX_WEB_PORT}/jethro-pmm/
+        # ====================================================================
+
+        location ^~ /jethro-pmm/ {
+            alias ../../../docs/build/;
+            index index.html;
+            try_files $uri $uri/ $uri.html /jethro-pmm/404.html;
+        }
+
         # -- Temp paths (relative to -p prefix) --
         client_body_temp_path temp/client_body;
         proxy_temp_path       temp/proxy;
@@ -79,6 +90,22 @@ http {
         location = /          { rewrite ^ /index.php last; }
         location = /members/  { rewrite ^ /members/index.php last; }
         location = /public/   { rewrite ^ /public/index.php last; }
+
+        # ====================================================================
+        # Test-scenario virtual paths: /tests/functional/<name>/...
+        #
+        # In test mode (JETHRO_TEST_MODE=true), conf.php defines BASE_URL as
+        # the scenario prefix.  Assets (resources/*, favicon.ico) are
+        # rewritten to strip the prefix; everything else routes to Jethro.
+        # ====================================================================
+
+        location ^~ /tests/functional/ {
+            # Assets: strip the dynamic scenario prefix so static files
+            # resolve on disk under the real /resources/ or /favicon.ico.
+            rewrite ^/tests/functional/.+?/(resources/.+|favicon\.ico)$ /$1 last;
+            # Everything else: Jethro front controller.
+            rewrite ^ /index.php last;
+        }
 
         # ====================================================================
         # PHP-FPM handler

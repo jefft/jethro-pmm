@@ -3,7 +3,7 @@
 /**
  * Help page for the 'Run sheet format' field when editing a Service Component.
  */
-class call_service_comp_help_runsheet_format extends Call
+class Call_Service_Comp_Help_Runsheet_Format extends Call
 {
 	protected function getField()
 	{
@@ -123,6 +123,11 @@ class call_service_comp_help_runsheet_format extends Call
 							<code>Psalm 111</code><br>
 							<code>%SERVICE_BIBLE_PREACH_ALL%</code> expands to
 							<code>Psalm 111</code>
+						</p>
+						<p>
+							Add <code>_CONTENT</code> to fetch the full passage text instead of just the reference:
+							<code>%SERVICE_BIBLE_READ_1_CONTENT%</code> — fetches and displays the passage
+							using the preferred Bible translation (set in System Configuration).
 						</p>
 					</td>
 				</tr>

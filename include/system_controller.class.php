@@ -77,8 +77,8 @@ class System_Controller
 	 * @return string A hash
 	 */
 	private function getViewHash(): string {
-        $currentUser = $GLOBALS['user_system']->getCurrentUser();
-        return sha1(ENABLED_FEATURES . ($currentUser ? $currentUser['permissions'] : ''));
+		$currentUser = $GLOBALS['user_system']->getCurrentUser();
+		return sha1(ifdef('ENABLED_FEATURES', '') . ($currentUser ? $currentUser['permissions'] : ''));
 	}
 
 	/**
@@ -214,7 +214,7 @@ class System_Controller
 	public function includeDBClass($classname)
 	{
 		$classname = strtolower($classname);
-		require_once dirname(__FILE__).'/db_object.class.php';
+		require_once 'db_objects/db_object.class.php';
 		require_once 'db_objects/'.$classname.'.class.php';
 	}
 

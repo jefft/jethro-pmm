@@ -15,6 +15,10 @@ class Call_Envelopes extends Call
 		$GLOBALS['system']->includeDBClass('family');
 		if (!empty($_REQUEST['familyid'])) {
 			$family = $GLOBALS['system']->getDBObject('family', (int)$_REQUEST['familyid']);
+			if (!$family) {
+				trigger_error('Family #'.(int)$_REQUEST['familyid'].' not found', E_USER_WARNING);
+				return;
+			}
 			$env->addAddress($family->getAdultMemberNames()."\n".$family->getPostalAddress());
 		}
 		if (!empty($_REQUEST['personid'])) {
@@ -54,7 +58,11 @@ class Call_Envelopes extends Call
 				}
 			} else {
 				$person = $GLOBALS['system']->getDBObject('person', (int)$_REQUEST['personid']);
-				$family = $GLOBALS['system']->getDBObject('family', $person->getValue('familyid'));
+				if (!$person) {
+					trigger_error('Person #'.(int)$_REQUEST['personid'].' not found', E_USER_WARNING);
+					return;
+				}
+				$family = $person->getFamily();
 				$env->addAddress($person->toString()."\n".$family->getPostalAddress());
 			}
 		}
