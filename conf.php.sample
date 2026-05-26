@@ -176,6 +176,8 @@ define('2FA_ENABLED', true);
 // Password to use when authenticating with the SMTP server. Can be left blank for no auth.
 // define('SMTP_PASSWORD', '');
 
+// Mailchimp API key for list synchronization
+// define('MAILCHIMP_API_KEY', '');
 
 
 ///////////////////////////////////////////////////////////////////////////
