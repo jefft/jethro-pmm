@@ -432,7 +432,9 @@ class View_Documents extends View
 		if (empty($filelist) && empty($dirlist)) {
 			?>
 			<p><i>There are no files in this folder</i></p>
+			<?php if ($this->getPrintedDir() !== ''): ?>
 			<p class="parent-folder"><a href="<?php echo build_url(Array('dir' => $this->getPrintedDir(dirname($this->_realdir)))); ?>"><i class="icon-circle-arrow-up"></i>Parent folder</a></p>
+			<?php endif; ?>
 			<?php
 			return;
 		} else {
