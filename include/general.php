@@ -756,7 +756,8 @@ function build_url($params)
 
 /**
  * * Get the relative 'base URL' path below which Jethro lives, e.g. '' or '/jethro'. No trailing slash. This is the default value for BASE_URL, and is used to link to root-relative resources. Unlike get_url_pathprefix, there is no '/members' or '/public' part - just the base.
- * The base is inferred from SCRIPT_NAME, which may contain any number of leading
+ * If BASE_URL is already defined (e.g. in conf.php), its path component is authoritative.
+ * Otherwise the base is inferred from SCRIPT_NAME, which may contain any number of leading
  * path segments (e.g. '/a/b/jethro/index.php' => '/a/b/jethro').
  *  - 'https://jethro.mychurch.org'   returns ''
  *  - 'https://jethro.mychurch.org/'   returns ''
@@ -768,6 +769,11 @@ function build_url($params)
  */
 function baseurl_relative()
 {
+    if (defined('BASE_URL')) {
+        // BASE_URL may be absolute ('https://church.org/jethro/') or a bare path ('/jethro').
+        $path = parse_url(BASE_URL, PHP_URL_PATH);
+        return is_string($path) ? rtrim($path, '/') : '';
+    }
     // SCRIPT_NAME is the path part of the URL, e.g. /index.php or /jethro/index.php, or /jethro/members/index.php
     $dir = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
     // The '/members' and '/public' areas sit one level below the base.
