@@ -38,6 +38,17 @@ http {
         access_log access.log jethrolog;
         error_log  error.log;
 
+        # ====================================================================
+        # Docusaurus static documentation site
+        # Browse at http://localhost:${NGINX_WEB_PORT}/jethro-pmm/
+        # ====================================================================
+
+        location ^~ /jethro-pmm/ {
+            alias ../../../docs/build/;
+            index index.html;
+            try_files $uri $uri/ $uri.html /jethro-pmm/404.html;
+        }
+
         # -- Temp paths (relative to -p prefix) --
         client_body_temp_path temp/client_body;
         proxy_temp_path       temp/proxy;
