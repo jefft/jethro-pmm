@@ -1,6 +1,12 @@
 <?php
 class Call_Note_Template_Widgets extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_EDITNOTE;
+	}
+
 	function run()
 	{
 		$GLOBALS['system']->initErrorHandler();

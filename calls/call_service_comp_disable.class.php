@@ -4,6 +4,12 @@
  */
 class Call_Service_Comp_Disable extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_SERVICECOMPS;
+	}
+
 	function run()
 	{
 		$GLOBALS['system']->includeDBClass('service_component');

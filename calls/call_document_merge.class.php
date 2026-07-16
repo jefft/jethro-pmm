@@ -1,6 +1,12 @@
 <?php
 class Call_Document_Merge extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWDOC;
+	}
+
 	const SHOWKEYWORDS = '@@DUMP_KEYWORDS@@';
 
 	public static function getSavedTemplatesDir()

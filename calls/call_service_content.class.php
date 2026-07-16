@@ -1,6 +1,12 @@
 <?php
 class Call_Service_Content extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWSERVICE;
+	}
+
 	/**
 	 * Execute this call
 	 *

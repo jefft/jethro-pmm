@@ -5,6 +5,12 @@
  */
 class Call_Service_Plan_Runsheet extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWSERVICE;
+	}
+
 	function run()
 	{
 		if (!$GLOBALS['user_system']->havePerm(PERM_VIEWSERVICE)) $this->failReturningJson("You don't have permission to view services");

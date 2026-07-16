@@ -1,6 +1,12 @@
 <?php
 class Call_Search_Service_Components_Json extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWSERVICE;
+	}
+
 	function run()
 	{
 		$GLOBALS['system']->includeDBClass('service_component');

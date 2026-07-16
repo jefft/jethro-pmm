@@ -1,6 +1,12 @@
 <?php
 class Call_Sample_Import extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_SYSADMIN;
+	}
+
 	function run()
 	{
 		$fp = fopen('php://output', 'w');

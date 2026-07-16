@@ -1,6 +1,13 @@
 <?php
 class Call_Find_Family_JSON extends Call
 {
+ 	// 0 = any authenticated staff (Jethro has no PERM_VIEWPERSON).
+ 
+ 	public static function getRequiredPermissionLevel()
+ 	{
+		return PERM_NONE;
+ 	}
+ 
 	function run()
 	{
 		$results = Array();

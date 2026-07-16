@@ -9,6 +9,12 @@
  */
 class Call_Roster_CSV extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWROSTER;
+	}
+
 	/**
 	 * Execute this call
 	 *

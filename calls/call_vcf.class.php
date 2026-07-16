@@ -1,6 +1,13 @@
 <?php
 class Call_vcf extends Call
 {
+ 	// 0 = any authenticated staff (Jethro has no PERM_VIEWPERSON).
+ 
+ 	public static function getRequiredPermissionLevel()
+ 	{
+		return PERM_NONE;
+ 	}
+ 
 	function run()
 	{
 		// Ref: https://en.wikipedia.org/wiki/VCard

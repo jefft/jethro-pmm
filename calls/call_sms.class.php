@@ -1,6 +1,11 @@
 <?php
 class Call_sms extends Call
 {
+	static function getRequiredPermissionLevel()
+	{
+		return PERM_SENDSMS;
+	}
+
   function run()
   {
     require_once('include/sms_sender.class.php');

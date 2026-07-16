@@ -112,6 +112,12 @@ class System_Controller
 				include_once dirname(__FILE__).'/call.class.php';
 				include_once $filename;
 				$classname = 'Call_'.$call_name;
+				// Permission registry (findings Z1/Z2): every call declares the
+				// level it requires; NULL opts out (pre-auth / self-checking).
+				$required_perm = $classname::getRequiredPermissionLevel();
+				if ($required_perm !== NULL && !$GLOBALS['user_system']->havePerm($required_perm)) {
+					throw new \RuntimeException("You don't have permission to perform this operation"); // exits
+				}
 				$call_obj = new $classname;
 				$call_obj->run();
 			} else {

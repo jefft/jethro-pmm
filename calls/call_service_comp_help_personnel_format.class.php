@@ -2,6 +2,12 @@
 
 class call_service_comp_help_personnel_format extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWSERVICE;
+	}
+
 	function run()
 	{
 		?>
