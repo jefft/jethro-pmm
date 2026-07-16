@@ -6,7 +6,6 @@ warn() { echo "$*"; }
 warn_if_extra_js_files_found() {
   local version=$1
   local allowed=(
-    "jethro-sms-test.js"   # Get rid of this later
     "jquery.js"
     "jquery-ui.min.js"
     "bootstrap.js"
