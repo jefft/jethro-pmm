@@ -89,9 +89,7 @@ person-ID-aware recipient resolver, then delegates to the same CLI core.
 
 ## 6. Bridge decorators stay in Jethro — deliberately
 
-`DbLoggingSmsProvider`, `SessionSmsCache`, `LocalBalanceSmsProvider`
-(reads `sms_purchases`), `EJSmsProvider` (sends email via Jethro's
-`Emailer`), and the deprecated `sms_ej.php` all remain in Jethro. They
+`DbLoggingSmsProvider` and `SessionSmsCache` remain in Jethro. They
 implement the package's `SmsProvider` interface, which *is* the extension
 seam — a host application composes its own decorators around the package's
 raw providers. Inventing package-side interfaces for them would
