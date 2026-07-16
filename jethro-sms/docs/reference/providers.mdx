@@ -76,10 +76,6 @@ provider. Serves as base class for `FiveCentSmsV4Provider`.
 The provider chain is assembled from the inside out. See [SMS
 Architecture](./smsarchitecture) for the full chain order.
 
-**EJSmsProvider** (`include/Jethro/Sms/Providers/EJSmsProvider.php`) —
-outermost decorator, EasyJethro-only. Rewrites `registerSenderId()`
-phase-2 `contact`/`instructions` for EasyJethro support.
-
 **LocalBalanceSmsProvider**
 (`include/Jethro/Sms/Providers/LocalBalanceSmsProvider.php`) — overrides
 `getBalance()` from `sms_purchases` table when `SMS_BALANCE` is set.
