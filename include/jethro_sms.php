@@ -91,6 +91,7 @@ require_once __DIR__ . '/Jethro/Sms/JethroSmsDelivery.php';
 require_once __DIR__ . '/Jethro/Sms/JethroSmsDeliveryBatch.php';
 require_once __DIR__ . '/Jethro/Sms/SessionSmsCache.php';
 require_once __DIR__ . '/Jethro/Sms/Providers/LocalBalanceSmsProvider.php';
+require_once __DIR__ . '/url_shortener.php';
 
 use Sms\AllSent;
 use Sms\Failed;
