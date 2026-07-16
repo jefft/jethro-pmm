@@ -26,7 +26,7 @@ class View__Mixed_Search extends View
 		if (!empty($tel)) {
 			if ($prefix = preg_replace('[^0-9]', '', ifdef('SMS_INTERNATIONAL_PREFIX'))) {
 				if (str_starts_with($tel, $prefix)) {
-					$tel = SMS_LOCAL_PREFIX.substr($tel, strlen($prefix));
+					$tel = ifdef('SMS_LOCAL_PREFIX', '0').substr($tel, strlen($prefix));
 				}
 			}
 			// Look for phone number matches

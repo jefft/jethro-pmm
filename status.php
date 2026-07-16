@@ -85,7 +85,7 @@ $result['xdebug.start_with_request'] = ini_get('xdebug.start_with_request'); // 
 $result['php_incompatible_version'] = !version_compare(PHP_VERSION, '8.2', '>=');
 
 # Required PHP extensions per README.md
-$required_extensions = ['gettext', 'zip', 'xmlwriter', 'gd', 'curl', 'exif'];
+$required_extensions = ['gettext', 'zip', 'xmlwriter', 'gd', 'curl', 'exif', 'mbstring'];
 $missing = array_values(array_filter($required_extensions, fn($ext) => !extension_loaded($ext)));
 $result['php_extensions_installed'] = empty($missing) ? true : "Missing extensions: " . join(', ', $missing);
 

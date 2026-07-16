@@ -48,10 +48,24 @@ require_once JETHRO_ROOT.'/include/init.php';
 
 // Set up the user system
 require_once JETHRO_ROOT.'/include/user_system.class.php';
+
 require_once JETHRO_ROOT.'/include/system_controller.class.php';
 $GLOBALS['user_system'] = new User_System();
 
 if ($GLOBALS['user_system']->getCurrentUser() == NULL) {
+	// Handle the 2FA verify link-click before showing the login page.
+	if (($_REQUEST['call'] ?? '') === '2fa_verify') {
+		require_once JETHRO_ROOT.'/include/call.class.php';
+		require_once JETHRO_ROOT.'/calls/call_2fa_verify.class.php';
+		(new Call_2FA_Verify())->run();
+		exit;
+	}
+	if (($_REQUEST['call'] ?? '') === '2fa_wait') {
+		require_once JETHRO_ROOT.'/include/call.class.php';
+		require_once JETHRO_ROOT.'/calls/call_2fa_wait.class.php';
+		(new Call_2FA_Wait())->run();
+		exit;
+	}
 	// Nobody is logged in, so show login screen or installer
 	if (!$GLOBALS['db']->hasTables()) {
 		require_once JETHRO_ROOT.'/include/installer.class.php';
