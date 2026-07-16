@@ -19,6 +19,7 @@ warn_if_extra_js_files_found() {
     "jquery.ui.touch-punch.min.js"
     "stupidtable.min.js"
     "treeview.js"
+    "datastar.min.js"
   )
 
   # Build pattern dynamically to avoid manual regex maintenance
