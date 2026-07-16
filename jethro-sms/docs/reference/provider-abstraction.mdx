@@ -49,12 +49,10 @@ first (see [Provider chain](./smsarchitecture#provider-chain)
 for the full rationale):
 
 ```
-EJSmsProvider              ← EasyJethro-only support-contact rewriting
-  → LocalBalanceSmsProvider    ← local/DB balance override + enforcement
-    → OverridingSmsProvider    ← sender validation + send cooloff
-      → DbLoggingSmsProvider   ← database persistence
-        → TokenExpandingSmsProvider  ← per-recipient token expansion
-          → [Concrete Provider]      ← talks to the gateway
+OverridingSmsProvider      ← sender validation + send cooloff
+  → DbLoggingSmsProvider   ← database persistence
+    → TokenExpandingSmsProvider  ← per-recipient token expansion
+      → [Concrete Provider]      ← talks to the gateway
 ```
 
 Each decorator implements `SmsProvider` and delegates to the inner provider
