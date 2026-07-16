@@ -1,5 +1,44 @@
 <?php
 
+/**
+ * AJAX handler for creating Person_Note records (?call=note).
+ *
+ * Called from two places in jethro.js:
+ *
+ *   1. #add-note-modal submit handler (single person)
+ *      ─ User opens the "Add Note" modal on a person row, fills in subject/
+ *        details/status, clicks Save Note. The response is processed by
+ *        NoteCallHandler.handleResponse() which displays errors in
+ *        #call-failures and returns TRUE if there were issues.
+ *
+ *   2. SMS submit handlers (bulk and modal, via .saveasnote checkbox)
+ *      ─ After an SMS is sent, Call_SMS creates notes server-side if
+ *      "Create Note" was checked — no separate AJAX call needed here.
+ *
+ * Response contract (read by NoteCallHandler.handleResponse in jethro.js):
+ *
+ *   Failure:
+ *     {error: "message"}                          — top-level error (permission, no recipients, empty subject, all failed)
+ *     {failed: {count: N, recipients: {id: {first_name, last_name}}}}  — partial failure
+ *
+ *   Success (all notes created):
+ *     {sent: {count: N, recipients: {id: {first_name, last_name}}, confirmed: true}}
+ *     ─ No `error` or `failed` keys present, so NoteCallHandler.handleResponse returns FALSE.
+ *
+ *   Partial success:
+ *     Combines `sent` + `failed` keys.
+ *
+ * URL parameters:
+ *   personid          int|int[]  — person ID(s) to attach the note to
+ *   subject           string     — note subject (required)
+ *   details           string     — note body text
+ *   status            string     — note status (default: 'no_action')
+ *   assignee          int        — person ID of the assignee
+ *   action_date       string     — action date (default: today)
+ *   related_messages  JSON       — {personId: broadcastId} map from call_sms,
+ *                                  creates sms_note rows linking notes to SMS sends
+ *   ajax              1          — indicates AJAX request
+ */
 class Call_Note extends Call
 {
 	function run(): void
@@ -39,10 +78,22 @@ class Call_Note extends Call
 		$details = trim((string) ($_REQUEST['details'] ?? ''));
 		$status = $_REQUEST['status'] ?? 'no_action';
 		$assignee = !empty($_REQUEST['assignee']) ? (int) $_REQUEST['assignee'] : null;
+		$actionDate = $_REQUEST['action_date'] ?? date('Y-m-d');
+
+		// Parse related_messages: JSON map of personId => broadcastId from call_sms
+		$relatedMessages = [];
+		$relatedRaw = $_REQUEST['related_messages'] ?? '';
+		if (is_string($relatedRaw) && $relatedRaw !== '') {
+			$decoded = json_decode($relatedRaw, true);
+			if (is_array($decoded)) {
+				$relatedMessages = $decoded;
+			}
+		}
 
 		$GLOBALS['system']->includeDBClass('person_note');
 		$successIds = [];
 		$failureIds = [];
+		$successNoteIds = [];
 
 		foreach ($personIds as $personId) {
 			$note = new Person_Note();
@@ -50,12 +101,26 @@ class Call_Note extends Call
 			$note->setValue('subject', $subject);
 			$note->setValue('details', $details);
 			$note->setValue('status', $status);
+			$note->setValue('action_date', $actionDate);
 			if ($assignee !== null) {
 				$note->setValue('assignee', $assignee);
 			}
 
 			if ($note->create()) {
 				$successIds[] = $personId;
+				$successNoteIds[(string)$personId] = (int)$note->id;
+				// Link note to the SMS broadcast if one was provided for this person
+				$broadcastId = $relatedMessages[(string)$personId] ?? null;
+				if ($broadcastId !== null) {
+					$db = $GLOBALS['db'];
+					$db->query(
+						'INSERT IGNORE INTO sms_note (note_personid, note_id, smsdelivery_id) VALUES ('
+						. $db->quote((string)$personId) . ', '
+						. $db->quote((string)$note->id) . ', '
+						. $db->quote((string)$broadcastId)
+						. ')'
+					);
+				}
 			} else {
 				$failureIds[] = $personId;
 			}
@@ -69,6 +134,7 @@ class Call_Note extends Call
 			$ajax['sent']['count'] = count($successIds);
 			$ajax['sent']['recipients'] = self::_personIdsToRecords($successIds);
 			$ajax['sent']['confirmed'] = true;
+			$ajax['sent']['note_ids'] = $successNoteIds;
 		}
 
 		if ($successIds === []) {
