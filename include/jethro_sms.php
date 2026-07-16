@@ -92,7 +92,7 @@ require_once __DIR__ . '/Jethro/Sms/JethroSmsDelivery.php';
 require_once __DIR__ . '/Jethro/Sms/JethroSmsDeliveryBatch.php';
 require_once __DIR__ . '/Jethro/Sms/SessionSmsCache.php';
 require_once __DIR__ . '/Jethro/Sms/Providers/LocalBalanceSmsProvider.php';
-require_once __DIR__ . '/Jethro/Sms/Providers/EJSmsProvider.php';
+require_once __DIR__ . '/url_shortener.php';
 
 use Sms\AllSent;
 use Sms\Failed;
@@ -115,7 +115,7 @@ use Sms\SmsStatus;use Sms\Providers\TemplateSmsProvider;
  *   4. SMS_HTTP_URL → FiveCentSmsV4Provider
  *
  * The returned provider chain is (outermost first):
- *   EJSmsProvider → LocalBalanceSmsProvider → OverridingSmsProvider → DbLoggingSmsProvider → TokenExpandingSmsProvider → RawProvider
+ *   LocalBalanceSmsProvider → OverridingSmsProvider → DbLoggingSmsProvider → TokenExpandingSmsProvider → RawProvider
  *
  * Memoized per unique ($tfa, $logToDb) pair. PHP constants are immutable
  * within a request, so the chain is identical on every call with the same
@@ -222,8 +222,6 @@ function getSmsProvider(bool $tfa = false, bool $logToDb = true): \Result
 		$provider = new \Jethro\Sms\Providers\LocalBalanceSmsProvider($provider, SMS_BALANCE);
 	}
 
-+    $provider = new \Jethro\Sms\Providers\EJSmsProvider($provider);
-+
 	$result = \Result::success($provider);
 	$GLOBALS['__sms_provider_memo'][$memoKey] = $result;
 	return $result;
