@@ -1,5 +1,12 @@
 {
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/jefft/jethro-url-shortener"
+        }
+    ],
     "require": {
+       "jefft/jethro-url-shortener": "^0.1",
        "phpoffice/phpword": "v0.18.*",
        "swiftmailer/swiftmailer" : "@stable",
        "drewm/mailchimp-api" : "@stable"
