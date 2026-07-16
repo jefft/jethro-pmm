@@ -1,0 +1,50 @@
+---
+sidebar_position: 14
+---
+
+# Send Pipeline
+
+A step-by-step walkthrough of what happens when a user clicks Send.
+
+## Phase 1: Client-Side Guard
+
+The Send button is disabled reactively by Datastar
+(`data-attr:disabled="$smsSendBlocked"`) whenever the server-rendered
+statusline reports unicode-blocked or balance-insufficient — see
+[Character Counting](./character-counting). The submit handler additionally
+guards against an empty recipient set or blank message before POSTing to
+`?call=sms`; sender validity is enforced server-side at send time.
+
+## Phase 2: Server-Side Processing
+
+`Call_SMS` handles the request:
+
+1. **Parse recipients** — `getRecipientsFromRequest()` extracts recipients, splitting out blanks/archived/opted-out
+2. **Parse sender** — `getSenderFromRequest()` determines the sender
+3. **Build provider chain** — `getSmsProvider()` returns the fully wired decorator chain
+4. **Send** — `sendSms()` traverses the chain in one call; see [Per-recipient message editing and batch sending](./smsarchitecture#per-recipient-message-editing-and-batch-sending) for how token-bearing and overridden messages are partitioned into entries
+
+## Phase 3: Response
+
+`Call_SMS` returns JSON keyed by outcome — `sent`, `failed`,
+`failed_archived`, `failed_blank`, `failed_opted_out` — each with a `count`
+and a `recipients` map (`{personId: {first_name, last_name}}`). A fully
+successful send also carries `confirmed`, `msgid`, and `scheduled` under
+`sent`.
+
+## Phase 4: Client-Side Result Handling
+
+The success handler in `resources/js/jethro-sms.js` marks recipient rows
+with success/failure styling and surfaces the response counts to the user.
+
+## Phase 5: Save as Note
+
+When "Save as Note" is checked, `Call_SMS` creates the `Person_Note` (or,
+for family sends, one `Family_Note` per family) **in the same request** —
+not a separate AJAX round-trip — and links each note to its `smsdelivery`
+row via `sms_note`.
+
+## See Also
+
+- [SMS Architecture](./smsarchitecture)
+- [Design Decisions](./design-decisions)

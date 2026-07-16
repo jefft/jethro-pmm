@@ -1,0 +1,140 @@
+---
+sidebar_position: 4
+---
+
+# SMS Database Tables
+
+Schema source: `upgrades/2026-upgrade-to-2.40-sms.sql` (SMS tables) and
+`upgrades/2026-upgrade-to-2.40.sql` (main schema). All tables and columns
+are defined there. This page documents the semantics that aren't obvious from
+column names alone.
+
+## Entity-Relationship Diagram
+
+```mermaid
+erDiagram
+    sms {
+        INT id PK
+        TEXT body "message template with %tokens%"
+        INT sender FK "NULL for script sends"
+        VARCHAR wire_sender "alphanumeric ID or phone number on the wire"
+        DATETIME created
+        DATETIME scheduled_send_at "NULL = immediate"
+    }
+
+    smsdelivery {
+        INT id PK
+        INT sms_id FK
+        INT personid FK "NULL if raw mobile number"
+        VARCHAR remote_id "upstream provider message ID"
+        TEXT raw_response "provider JSON/line response"
+        TEXT body "expanded per-recipient message"
+        ENUM provider "5centsmsv5 cellcast smsbroadcast 5csmsv4"
+        ENUM status "queued sent delivered failed in-progress scheduled cancelled sending test-message unknown"
+        DATETIME delivered_at "carrier confirmation time"
+    }
+
+    sms_note {
+        INT note_personid PK_FK
+        INT note_id PK_FK
+        INT smsdelivery_id PK_FK
+    }
+
+    sms_registered_sender {
+        VARCHAR phone PK
+        DATETIME registered_at
+    }
+
+    sms_purchases {
+        INT id PK
+        DATE purchasedate
+        INT quantity
+        DECIMAL cost
+    }
+
+    _person {
+        INT id PK
+        VARCHAR first_name
+        VARCHAR last_name
+        VARCHAR mobile_tel
+        INT congregationid FK
+        INT familyid FK
+    }
+
+    _abstract_note {
+        INT id PK
+        VARCHAR subject
+        TEXT details
+        VARCHAR status
+        INT creator FK
+        INT assignee FK
+    }
+
+    person_note {
+        INT personid PK_FK
+        INT id PK_FK
+    }
+
+    sms ||--o{ smsdelivery : "sms_id"
+    smsdelivery ||--o{ sms_note : smsdelivery_id
+    sms }o--|| _person : "sender → _person.id"
+    smsdelivery }o--o| _person : "personid → _person.id"
+    sms_note }o--|| person_note : "personid id"
+    person_note ||--|| _abstract_note : "id → _abstract_note.id"
+    person_note }o--|| _person : "personid"
+```
+
+**Key relationships:**
+
+- `sms` → `smsdelivery`: one send produces one delivery row per recipient (CASCADE delete)
+- `smsdelivery` → `sms_note`: a delivery may have zero or one linked notes (CASCADE delete)
+- `sms_note` → `person_note`: the note lives in the `person_note` / `_abstract_note` system (CASCADE delete both ways)
+- `sms_registered_sender`: standalone — read as a first-check cache before upstream API calls
+- `sms_purchases`: standalone — queried by `LocalBalanceSmsProvider` for `SMS_BALANCE = 'database'`
+
+All FK relationships reference `_person`, never `person` (MySQL cannot create
+foreign keys against views — see below).
+
+## Jethro Views and the `_`-prefixed Tables
+
+Jethro uses MySQL views to enforce row-level security. Every queryable entity
+has two names: the **`_`-prefixed base table** (the physical storage) and the
+**view** (the security-filtered access path). Foreign keys always reference
+the base table.
+
+| View | Base table | Filter |
+|---|---|---|
+| `person` | `_person` | Current user's congregation + group restrictions via `getCurrentUserID()` |
+| `person_group` | `_person_group` | Group restrictions via `getCurrentUserID()` |
+| `member` | `_person` + `_family` | Flattened join; visible only when the current user shares a member-sharing group with the person |
+| `abstract_note` | `_abstract_note` | Assignee is current user AND status is 'pending', OR user has permission bits 48 |
+
+The views use `getCurrentUserID()`, a MySQL stored function that returns the
+session variable `@current_user_id`. In CLI/testing contexts, set it before
+querying through views:
+
+```sql
+SET @current_user_id = 1;
+SELECT * FROM person WHERE id = 42;
+```
+
+Without this, views return empty results (the function sees NULL, and no row
+matches `NULL = …`).
+
+### Why `_person` not `person` in FKs?
+
+MySQL does not allow foreign keys to reference views — only base tables. So
+`sms.sender REFERENCES _person(id)` and `smsdelivery.personid REFERENCES
+_person(id)`. This is correct: the FK ensures referential integrity at the
+storage level; the view layer adds security on top.
+
+### Legacy SMS notes
+
+Before 2.40, each SMS send created a `person_note` + `_abstract_note` row
+(subject `'SMS Sent'`). The `2026-upgrade-to-2.40-sms.sql` migration converts
+these into `sms` + `smsdelivery` rows and removes the old note records.
+
+## See Also
+
+- [Status Codes](./status-codes)
+- [Delivery Tracking](./delivery-tracking)

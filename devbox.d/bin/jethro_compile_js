@@ -5,7 +5,6 @@ fail() { echo >&2 "$*"; exit 1; }
 ensure_no_extra_js_files_added() {
   local allowed=(
     "jethro-${JETHRO_VERSION}.js"
-    "jethro-sms-test.js"   # Get rid of this later
     "jquery.js"
     "jquery-ui.min.js"
     "bootstrap.js"

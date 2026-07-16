@@ -1,0 +1,58 @@
+---
+sidebar_position: 3
+---
+
+# SMS Configuration Reference
+
+All SMS settings are PHP constants in `conf.php`. Each provider reads its own
+constants via a `fromConstants()` static factory — see the provider's docblock
+for the definitive list:
+
+| Provider | Source |
+|---|---|
+| FiveCentSMS v5 | `jethro-sms/src/Providers/FiveCentSmsV5Provider.php` (class docblock) |
+| Cellcast | `jethro-sms/src/Providers/CellcastSmsProvider.php` (class docblock) |
+| SMS Broadcast | `jethro-sms/src/Providers/SmsBroadcastSmsProvider.php` |
+| Template / v4 | `jethro-sms/src/Providers/TemplateSmsProvider.php` |
+
+## Provider Selection
+
+`SMS_PROVIDER` — FQN, short key (`'5centsmsv5'`, `'cellcast'`,
+`'smsbroadcast'`), or `'auto'`. When unset or `'auto'`, auto-detection
+iterates providers by `usagePreference()` descending. See
+[Provider auto-detection](./providers#auto-detection).
+
+## 2FA Variants
+
+Each provider-specific constant has a `2FA_*` variant tried first when the
+provider is used for two-factor authentication (the `$tfa` flag passed to
+`fromConstants()` and `getSmsProvider()`). This works field-by-field: a 2FA
+send can share the same API credentials by simply not defining the `2FA_*`
+variants — they fall through to the standard constants.
+
+## Cross-cutting constants
+
+These are read by the bridge layer, not individual providers. See
+`include/jethro_sms.php` and `Sms\OverridingSmsProvider` for usage.
+
+- `SMS_SENDER` — hardcoded sender, overrides dropdown. Supports `_USER_MOBILE_`.
+- `SMS_SENDER_OPTIONS` — comma-separated selectable sender IDs. Tokens: `_USER_MOBILE_`, `_SENDER_IDS_`. Was `SMS_SENDERIDS`.
+- `SMS_SENDER_DEFAULT` — default selection (blank = first option).
+- `SMS_SEND_COOLOFF` — undo-window delay for immediate sends (default 30s). Set 0 to disable.
+- `SMS_MAX_LENGTH` — character limit (default 160).
+- `SMS_SEGMENT_COST` — per-segment cost override. Falls back to provider hardcoded value.
+- `SMS_UNICODE_PERMITTED` — `'0'` / `'when_free'` (default) / `'1'`.
+- `SMS_BALANCE` — numeric = hardcoded, `'database'` = from `sms_purchases`.
+- `SMS_BALANCE_ENFORCED` — block sends exceeding balance.
+- `SMS_SAVE_TO_NOTE_SUBJECT` — default note subject.
+- `SMS_SAVE_TO_NOTE_BY_DEFAULT` — pre-check "Save as Note".
+- `SMS_TESTMODE` — dry-run without delivering.
+- `SMS_VERBOSE` — log HTTP to error_log.
+
+Also see the [SMS Administration page](../../../administration/config/sms.mdx) for the
+user-facing reference.
+
+## See Also
+
+- [SMS Providers](./providers)
+- [User Manual: SMS](../../../user-manual/sms)
