@@ -1,0 +1,79 @@
+---
+sidebar_position: 9
+---
+
+# SMS Delivery Tracking
+
+Delivery status polling tracks whether sent messages actually reached the recipient's handset.
+
+## How It Works
+
+1. On page load, JavaScript scans for `<span data-delivery-id="N">` elements
+2. These are emitted by view templates for non-final statuses
+3. Each triggers a GET to `?call=sms_info&id=N` (capped at 20 lookups per page)
+
+## Call_SMS_Info
+
+The server-side handler:
+
+1. Loads the `smsdelivery` row by ID
+2. Checks the current provider matches the delivery's provider (skips if providers differ)
+3. Reconstructs a `SmsDelivery` from the DB row
+4. Calls `updateDelivery()` which goes through `DbLoggingSmsProvider`
+5. `DbLoggingSmsProvider` checks if the DB row is already in a final status — returns early without upstream API call if so
+6. Otherwise delegates to the inner provider's `updateDelivery()` which hits the upstream API
+7. Writes the result back to `smsdelivery` (status, raw_response, delivered_at)
+8. Returns HTML — either a ✓✓ with tooltip (delivered with timestamp), or status label (with optional cancel link for scheduled messages)
+
+## Provider Support
+
+| Provider | Status Polling |
+|---|---|
+| FiveCentSms v5 | ✓ (GET /v5/sms/\{id\}) |
+| Cellcast | ✓ (GET /api/v2/report/message/\{id\}) |
+| SMS Broadcast | ✗ |
+| FiveCentSms v4 | ✗ |
+| Template | ✗ |
+
+## Caching
+
+`DbLoggingSmsProvider` caches the upstream response in `smsdelivery.raw_response` and `smsdelivery.status`. When a final status is found in the database, subsequent polls skip the API call entirely.
+
+## Final Statuses
+
+Once a delivery reaches a final status (per `SmsStatus::isFinal()` —
+`jethro-sms/src/SmsStatus.php`), polling stops and subsequent polls
+skip the API call entirely:
+
+- `DELIVERED` — confirmed on handset
+- `FAILED` — permanent delivery failure
+- `CANCELLED` — scheduled send was cancelled
+- `TEST_MESSAGE` — test mode (terminal)
+
+Non-final statuses (`QUEUED`, `SENT`, `SCHEDULED`, `SENDING`,
+`DELIVERY_IN_PROGRESS`, `UNKNOWN`) continue to poll — the delivery may
+still transition.
+
+## Cancel Link
+
+For scheduled messages (`SCHEDULED`), the info response includes a Cancel link. This only appears when:
+- The user has `PERM_SENDSMS`
+- The delivery status is `SCHEDULED`
+- The provider has `DEFERRED_SEND_CANCEL` capability
+
+Clicking Cancel fires `POST ?call=sms_cancel&sms_id=<sms_id>` — the cancel span carries `data-sms-id` and `data-scheduled-count` attributes. The JS handler shows a confirm dialog (count from `data-scheduled-count`) then posts to `Call_SMS_Cancel`.
+
+## Cancel Flow
+
+`Call_SMS_Cancel` accepts only `sms_id` (POST). It calls `loadSmsBatch($smsId)` to hydrate the batch from DB (no inline SQL in the handler), checks ownership via `$batch->senderPersonId`, filters to `SCHEDULED` deliveries, and calls `cancelSms(batch)` which delegates to `SmsProvider::cancel(SmsDeliveryBatch)`.
+
+Providers loop over deliveries internally; per-delivery gateway failures leave that delivery unchanged. The response counts CANCELLED vs unchanged deliveries.
+
+## Page Limit
+
+To prevent excessive API calls, only the first 20 non-final deliveries on a page are polled.
+
+## See Also
+
+- [Status Codes](./status-codes)
+- [Database Tables](./database)
