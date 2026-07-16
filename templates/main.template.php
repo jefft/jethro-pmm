@@ -119,5 +119,10 @@
 		</div>
 	</div>
 	</div>
+<?php
+if (\Jethro\Sms\isUsable()) {
+	\Jethro\Sms\printSmsModal();
+}
+?>
 </body>
 </html>
