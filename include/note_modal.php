@@ -21,6 +21,7 @@ function printNoteModal(): void
 		</div>
 		<div class="modal-footer">
 			<div class="results"></div>
+			<div id="call-failures"></div>
 			<button class="btn note-submit" accesskey="s">Save Note</button>
 			<button class="btn" data-dismiss="modal" aria-hidden="true">Close</button>
 		</div>
