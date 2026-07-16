@@ -15,7 +15,7 @@ monoliths (`jethro-sms/src/sms.php`, `sms_cellcast.php`, `sms_smsbroadcast.php`,
 | `jethro-sms/src/` | Pure layer: `SmsProvider`, `SmsCapability`, `SmsStatus`, decorators, value objects, HTTP, Result monad, statusline maths |
 | `jethro-sms/src/Providers/` | Concrete providers: `FiveCentSmsV5Provider`, `CellcastSmsProvider`, `SmsBroadcastSmsProvider`, `FiveCentSmsV4Provider`, `TemplateSmsProvider` |
 | `include/Jethro/Sms/` | Bridge value objects: `JethroSmsRecipient`, `JethroSmsDelivery`, `JethroSmsDeliveryBatch`, `SmsRequestRecipients`, `SessionSmsCache`, `SmsStatusIcon` |
-| `include/Jethro/Sms/Providers/` | Bridge decorators: `DbLoggingSmsProvider`, `LocalBalanceSmsProvider`, `EJSmsProvider` |
+| `include/Jethro/Sms/Providers/` | Bridge decorators: `DbLoggingSmsProvider`, `LocalBalanceSmsProvider` |
 | `include/jethro_sms.php` | Bridge functions: `getSmsProvider()` factory, send pipeline, request parsing, UI rendering |
 | `calls/call_sms*.class.php` | AJAX handlers: `Call_SMS`, `Call_SMS_Info`, `Call_SMS_Cancel`, `Call_SMS_Balance`, `Call_SMS_SenderNum`, `Call_SMS_Statusline`, `Call_Admin_Statuspanel_Sms` |
 | `resources/js/jethro-sms.js` | Send flow, delivery polling, message-history filters |
