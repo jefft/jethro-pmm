@@ -56,7 +56,7 @@ class View_Admin__System_Configuration extends View {
 
 	private function _doConfigChecks()
 	{
-		if ((ifdef('2FA_REQUIRED_PERMS') > 0) && SMS_Sender::usesUserMobile() && strlen(ifdef('2FA_SENDER_ID')) == 0) {
+		if ((ifdef('2FA_REQUIRED_PERMS') > 0) && Jethro\Sms\usesUserMobile() && (string) ifdef('2FA_SENDER_ID', '') === '') {
 			print_message("2-Factor authentication will not work until you set the 2FA_SENDER_ID setting", 'error');
 		}
 	}
@@ -189,26 +189,26 @@ class View_Admin__System_Configuration extends View {
 		})();
 		</script>
 		<script>
-		// Status panel AJAX loader
-		(function() {
-			document.querySelectorAll('.status-panel').forEach(function(panel) {
-				var prefix = panel.getAttribute('data-prefix');
-				if (!prefix) return;
-				var xhr = new XMLHttpRequest();
-				xhr.open('GET', '?call=admin_statuspanel_' + prefix);
-				xhr.onload = function() {
-					if (xhr.status === 200) {
-						panel.innerHTML = xhr.responseText;
-					} else {
-						panel.innerHTML = '';
-					}
-				};
-				xhr.onerror = function() {
-					panel.innerHTML = '';
-				};
-				xhr.send();
-			});
-		})();
+ 		// Status panel AJAX loader
+ 		(function() {
+ 			document.querySelectorAll('.status-panel').forEach(function(panel) {
+ 				var prefix = panel.getAttribute('data-prefix');
+ 				if (!prefix) return;
+ 				var xhr = new XMLHttpRequest();
+ 				xhr.open('GET', '?call=admin_statuspanel_' + prefix);
+ 				xhr.onload = function() {
+ 					if (xhr.status === 200) {
+ 						panel.innerHTML = xhr.responseText;
+ 					} else {
+ 						panel.innerHTML = '';
+ 					}
+ 				};
+ 				xhr.onerror = function() {
+ 					panel.innerHTML = '';
+ 				};
+ 				xhr.send();
+ 			});
+ 		})();
 		</script>
 		<style>
 		.settings-page { display: flex; gap: 2rem; align-items: flex-start; }
@@ -219,14 +219,16 @@ class View_Admin__System_Configuration extends View {
 		.settings-nav a.active::before { content: ''; display: none; }
 		.settings-form { flex: 1; min-width: 0; }
 
-		.status-panel { margin: 0.5rem 0 1rem 0; }
-		.status-panel .control-group { margin-bottom: 0.25rem; }
-		.status-panel .control-group:last-child { margin-bottom: 0; }
-		.status-panel .control-label { padding-top: 0; }
-		.collapse.in.status-panel-details { border: 1px solid #e0e0e0; border-radius: 4px; padding: 0.5rem 0.75rem; }
-		.status-panel p { margin: 0.15rem 0; }
-		.status-panel-help { font-style: italic; color: #777; }
-		.status-panel-loading { color: #999; font-style: italic; }
+ 		.status-panel { margin: 0.5rem 0 1rem 0; }
+ 		.status-panel .control-group { margin-bottom: 0.25rem; }
+ 		.status-panel .control-group:last-child { margin-bottom: 0; }
+ 		.status-panel .control-label { padding-top: 0; }
+ 		.collapse.in.status-panel-details { border: 1px solid #e0e0e0; border-radius: 4px; padding: 0.5rem 0.75rem; }
+ 		.status-panel p { margin: 0.15rem 0; }
+ 		.status-panel-help { font-style: italic; color: #777; }
+ 		.status-panel-loading { color: #999; font-style: italic; }
+		/* Status panel rules live in resources/less/jethro.less.php — the panels
+		   load by AJAX and their markup is reused off this page. */
 		</style>
 		<?php
 	}
@@ -241,7 +243,8 @@ class View_Admin__System_Configuration extends View {
 			) {
 				$panelsRendered[] = $key;
 ?>
-				<div class="status-panel" id="status-panel-<?php echo ents($key); ?>" data-prefix="<?php echo ents($key); ?>">
+				<div id="status-panel-<?php echo ents($key); ?>" class="status-panel"
+				     data-init="@get('?call=admin_statuspanel_<?php echo ents($key); ?>')">
 				    <div class="status-panel-loading">Loading&hellip;</div>
 				</div>
 <?php
@@ -300,6 +303,7 @@ class View_Admin__System_Configuration extends View {
 				$params['width'] = 60;
 				break;
 			case 'int':
+			case 'person':
 			case 'select':
 			case 'email':
 			case 'hidden':
@@ -397,14 +401,11 @@ class View_Admin__System_Configuration extends View {
 		}
 	}
 
-	private function print2FARequiredPermsField()
+	private function print2FARequiredPermsField(): void
 	{
-		if (!SMS_Sender::canSend()) {
-			SMS_Sender::setConfigPrefix ('2FA_SMS');
-			if (!SMS_Sender::canSend()) {
-				print_message("2 Factor auth is only available once a SMS gateway has been configured. Contact your System Administrator to set this up.", 'warning');
-				return;
-			}
+		if (!Jethro\Sms\getSmsProvider(tfa: true)->isSuccess()) {
+			print_message("2 Factor auth is only available once a SMS gateway has been configured. Contact your System Administrator to set this up.", 'warning');
+			return;
 		}
 		echo '<div style="columns: 2">';
 		$selected_perms = explode(',', constant('2FA_REQUIRED_PERMS'));
