@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c39fd786a9d9ca09d8fc16866f8fc63d",
+    "content-hash": "0fec0c7bfed2d0d95055ba14dac48fd7",
     "packages": [
         {
             "name": "doctrine/lexer",
@@ -185,6 +185,44 @@
                 }
             ],
             "time": "2020-12-29T14:50:06+00:00"
+        },
+        {
+            "name": "jefft/jethro-url-shortener",
+            "version": "v0.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jefft/jethro-url-shortener.git",
+                "reference": "c409ff7466a007873ef85e99792c8899c9ae6e92"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jefft/jethro-url-shortener/zipball/c409ff7466a007873ef85e99792c8899c9ae6e92",
+                "reference": "c409ff7466a007873ef85e99792c8899c9ae6e92",
+                "shasum": ""
+            },
+            "require": {
+                "ext-curl": "*",
+                "ext-hash": "*",
+                "ext-json": "*",
+                "php": ">=8.1"
+            },
+            "type": "project",
+            "autoload": {
+                "files": [
+                    "src/UrlShortener.php"
+                ]
+            },
+            "scripts": {
+                "test": [
+                    "php test.php"
+                ]
+            },
+            "description": "Self-hosted URL shortener on Cloudflare Workers with deterministic codes and multi-key auth",
+            "support": {
+                "source": "https://github.com/jefft/jethro-url-shortener/tree/v0.1.0",
+                "issues": "https://github.com/jefft/jethro-url-shortener/issues"
+            },
+            "time": "2026-10-08T12:52:30+00:00"
         },
         {
             "name": "laminas/laminas-escaper",
@@ -783,7 +821,7 @@
     "platform": {},
     "platform-dev": {},
     "platform-overrides": {
-        "php": "5.3.23"
+        "php": "8.2.0"
     },
     "plugin-api-version": "2.9.0"
 }
