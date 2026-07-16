@@ -49,8 +49,7 @@ first (see [Provider chain assembly](./smsarchitecture#provider-chain-assembly)
 for the full rationale):
 
 ```
-EJSmsProvider              ← EasyJethro-only support-contact rewriting
-  → LocalBalanceSmsProvider    ← local/DB balance override + enforcement
+  LocalBalanceSmsProvider    ← local/DB balance override + enforcement
     → OverridingSmsProvider    ← sender validation + send cooloff
       → DbLoggingSmsProvider   ← database persistence
         → TokenExpandingSmsProvider  ← per-recipient token expansion
