@@ -11,7 +11,7 @@ require_once __DIR__ . '/../include/general.php';
  *    is the feature toggled on? Links to the ENABLED_FEATURES section.
  *
  * 2. Configured — are the required credentials/constants in place? This is a
- *    cheap check ({@see isConfigured()}) that does not touch external services.
+ *    cheap check ({@see self::isConfigured()}) that does not touch external services.
  *
  * 3. (If configured) Status message with optional collapsible details — is the feature actually
  *    working right now? This is a live operational check ({@see getStatus()})
@@ -46,13 +46,36 @@ abstract class Call_Admin_Statuspanel extends Call
     /**
      * Live operational check — is the feature actually working right now?
      *
-     * The 'success' field is about operational health, not config existence.
+     * The 'success' field is about operational health, not config existence. E.g. a SMS provider might be configured correctly (isConfigured succeeds), but its API might be offline (getStatus returns false).
      * Subclasses should use a message like "Connected" / "Not available" rather
      * than "Configured" / "Not configured" to avoid redundancy with the Configured line.
+     * 'message' is an overall summary. 'details' is key:value pairs displayed in a table.
      *
      * @return array{success: bool, message: string, details?: array<string, string>}
      */
     abstract protected function getStatus(): array;
+
+    /**
+     * Operations the admin can initiate from this status panel.
+     *
+     * Each entry maps an operation name to a human-readable button label.
+     * When non-empty, the status panel renders a row of buttons; clicking a
+     * button fires a Datastar @get to the operation handler which returns the
+     * form HTML; submitting the form triggers a Datastar @post to the same
+     * handler which returns the result HTML — both morphed into the container
+     * by ID.
+     *
+     * The operation handler URL is derived from the status panel class name:
+     *
+     *   Call_Admin_Statuspanel_Sms →
+     *   ?call=admin_statuspanel_operation_sms
+     *
+     * @return array<string, string>  operation name => label
+     */
+    protected function getOperations(): array
+    {
+        return [];
+    }
 
     public function run(): void
     {
@@ -60,19 +83,17 @@ abstract class Call_Admin_Statuspanel extends Call
             return;
         }
 
+        $suffix = strtolower(substr(static::class, strlen('Call_Admin_Statuspanel_')));
         ?>
+        <div id="status-panel-<?php echo ents($suffix); ?>" class="status-panel">
         <p class="status-panel-help"><?php echo $this->getHelpText(); ?></p>
         <?php
 
         $feature = $this->linkedFeature();
         if ($feature !== null) {
             $enabled = $GLOBALS['system']->featureEnabled($feature);
-            $icon = $enabled
-                ? '<span style="color:#468847">&#10003;</span>'
-                : '<span style="color:#b94a48">&#10007;</span>';
-            $label = $enabled ? 'Enabled' : 'Disabled';
             ?>
-            <p><?php echo $icon; ?> <?php echo $label; ?>
+            <p><?php echo $this->statusIcon($enabled); ?> <?php echo $enabled ? 'Enabled' : 'Disabled'; ?>
                 <a href="<?php echo baseurl_relative(); ?>/?view=admin__system_configuration#ENABLED_FEATURES"><i>(link)</i></a>
             </p>
             <?php
@@ -80,29 +101,31 @@ abstract class Call_Admin_Statuspanel extends Call
 
         $configuredResult = $this->isConfigured();
         $configured = $configuredResult->isSuccess();
-        $icon = $configured
-                ? '<span style="color:#468847">&#10003;</span> Configured'
-                : '<span style="color:#b94a48">&#10007;</span> Not configured';
         ?>
-        <p><?php echo $icon; ?> <?php
-        if (!$configured) {
-            echo ' &mdash; ' . ents($configuredResult->getError());
-        }
-        ?></p>
+        <p><?php echo $this->statusIcon($configured); ?>
+        <?php echo $configured ? 'Configured' : 'Not configured'; ?>
         <?php
-
-        if ($configured) {
+        if (!$configured) {
+            $error = $configuredResult->getError();
+            echo ' &mdash; ' . (is_array($error) ? $error['message'] : $error);
+            if (is_array($error) && !empty($error['details'])) {
+                $id = 'config-panel-details-' . $suffix;
+                ?>
+                <a href="#" data-toggle="collapse" data-target="#<?php echo $id; ?>" onclick="return false"><i>(details)</i></a>
+                <div id="<?php echo $id; ?>" class="collapse status-panel-details">
+                    <?php echo $error['details']; ?>
+                </div>
+                <?php
+            }
+        } else {
             $status = $this->getStatus();
-            $icon = $status['success']
-                    ? '<span style="color:#468847">&#10003;</span>'
-                    : '<span style="color:#b94a48">&#10007;</span>';
             ?>
             <p>
             <?php
-            echo $icon.' ';
+            echo $this->statusIcon($status['success']) . ' ';
             echo ents($status['message']);
             if (!empty($status['details'])) {
-                $id = 'status-panel-details-' . strtolower(substr(static::class, strlen('Call_Admin_Statuspanel_')));
+                $id = 'status-panel-details-' . $suffix;
                 ?>
                 <a href="#" data-toggle="collapse" data-target="#<?php echo $id; ?>" onclick="return false"><i>(details)</i></a>
                 <div id="<?php echo $id; ?>" class="collapse status-panel-details form-horizontal">
@@ -116,6 +139,40 @@ abstract class Call_Admin_Statuspanel extends Call
             <?php } ?>
             </p>
             <?php
+
+            // Operation buttons
+            $operations = $this->getOperations();
+            if ($operations !== []) {
+                $opCall = 'admin_statuspanel_operation_' . $suffix;
+                $opId = 'status_panel-ops-' . $suffix;
+                ?>
+                <div class="status_panel-operations" id="<?php echo ents($opId); ?>">
+                    <?php foreach ($operations as $method => $label): ?>
+                        <a href="javascript:void()"
+                            class="status_panel-op-btn"
+                            data-on:click="@get('?call=<?php echo ents($opCall); ?>&operation=<?php echo ents($method); ?>')">
+                            <i class="icon-plus-sign"></i><?php echo ents($label); ?>
+                        </a>
+                    <?php endforeach; ?>
+                    <div class="status_panel-op-container" id="<?php echo ents($opId); ?>-container"></div>
+                </div>
+                <?php
+            }
         }
+        ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Green check or red cross icon for use in status lines.
+     *
+     * @param bool $ok true → ✓ (green), false → ✗ (red)
+     */
+    private function statusIcon(bool $ok): string
+    {
+        return $ok
+            ? '<span style="color:#468847">✓</span>'
+            : '<span style="color:#b94a48">✗</span>';
     }
 }

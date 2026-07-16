@@ -903,8 +903,9 @@ class Service extends DB_Object
 			}
 			$assignments_output = ob_get_clean();
 			$email_href = get_email_href($GLOBALS['user_system']->getCurrentUser('email'), NULL, array_unique($emails), $this->toString());
-			if (SMS_Sender::canSend()) {
-				SMS_Sender::printModal();
+			if (Jethro\Sms\isUsable()
+) {
+				\Jethro\Sms\printSmsModal();
 			}
 
 			?>
@@ -923,7 +924,8 @@ class Service extends DB_Object
 					?>
 						<a href="<?php echo $email_href; ?>"><i class="icon-email">@</i>Email</a>
 					<?php
-					if (SMS_Sender::canSend()) {
+					if (Jethro\Sms\isUsable()
+) {
 						?>
 						&nbsp;
 						<a href="#send-sms-modal" data-personid="<?php echo implode(',', array_unique($personids)); ?>" data-toggle="sms-modal" data-name="Personnel for <?php echo ents($this->toString());?>"><i class="icon-envelope"></i>SMS</a>

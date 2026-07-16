@@ -146,7 +146,6 @@ class Config_Manager {
 				WHERE symbol = '.$db->quote($symbol);
 		$res = $db->exec($SQL);
 		return TRUE;
-
 	}
 
 	public static function deleteSetting($symbol)

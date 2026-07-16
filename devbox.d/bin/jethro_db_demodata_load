@@ -82,6 +82,17 @@ upgrade() {
 	# We could create a static post-v2.40 version of the demo data with SMS tables, but this lets us test the upgrade SQL too
 	echo "Applying upgrade SQL: upgrades/2026-upgrade-to-2.39.sql"
 	runsql < upgrades/2026-upgrade-to-2.39.sql
+	echo "Applying upgrade SQL: upgrades/2026-upgrade-to-2.40.sql"
+	runsql < upgrades/2026-upgrade-to-2.40.sql
+	echo "Applying upgrade SQL: upgrades/2026-upgrade-to-2.40-sms.sql"
+	runsql < upgrades/2026-upgrade-to-2.40-sms.sql
+	echo "Truncating SMS tables from previous run..."
+	runsql -sNBe "SET foreign_key_checks = 0; TRUNCATE TABLE sms_note; TRUNCATE TABLE smsdelivery; TRUNCATE TABLE sms; SET foreign_key_checks = 1;"
+	echo "Loading fake SMSes: tests/functional/testdata/fakesmses.sql"
+	runsql < tests/functional/testdata/fakesmses.sql
+	echo "Fixing SMS collation.."
+	runsql -sNBe "ALTER TABLE sms MODIFY COLUMN body TEXT COLLATE utf8mb4_unicode_ci;"  # Fix sms table
+	echo "2.40 upgrade complete"
 }
 
 main "$@"

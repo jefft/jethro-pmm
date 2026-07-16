@@ -160,7 +160,13 @@ if ($sendemail) $email_subject = str_replace($tokens, $replacements, $email_subj
 $assignees=$view->getAssignees($start_date, $end_date);
 
 if ($sendsms) { // make the sms message!
-	define('OVERRIDE_USER_MOBILE', $smsfrom);
+	require_once JETHRO_ROOT.'/include/jethro_sms.php';
+	$smsSenderNumber = $smsfrom ? new \Sms\PhoneNumber($smsfrom) : null;
+	$smsSender = $smsSenderNumber ?? Jethro\Sms\getSenderFromRequest();
+	if ($smsSender === null) {
+		fwrite(STDERR, "No sender configured. Set SMS_FROM in the ini file, or set SMS_SENDER_OPTIONS/SMS_SENDER in conf.php.\n");
+		exit(1);
+	}
 	$sms_notification = "No SMS Notification was sent for " . $roster_name . ". There were no people assigned.\n";
 
 	if (!ctype_digit($roster_coordinator_id)) {
@@ -212,50 +218,52 @@ if ($sendsms) { // make the sms message!
 		}
 		if (strlen($sms_message) > SMS_MAX_LENGTH) {
 			$assignees = $coordinator;
-			$sms_message = 'Roster email is too long for SMS. Increase SMS size limit.';
+			$sms_message = 'Roster message is too long for SMS ('.strlen($sms_message).'>'.SMS_MAX_LENGTH.'). Increase SMS size limit.';
+			fwrite(STDERR, $sms_message);  // Alert CLI user
 		}
+		// Build a name lookup from person records (keyed by person ID)
+		$nameLookup = [];
+		foreach ($assignees as $person) {
+			$pid = (int)($person['id'] ?? 0);
+			if ($pid) {
+				$nameLookup[$pid] = ($person['first_name'] ?? '') . ' ' . ($person['last_name'] ?? '');
+			}
+		}
+
 		// now, actually send the messages!
-		require_once JETHRO_ROOT.'/include/sms_sender.class.php';
 		$notification_sms = '';
 		if (!empty($assignees))  {
-			$sendResponse = SMS_Sender::sendMessage($sms_message, $assignees, FALSE);
-			$successes = $failures = $rawresponse = Array();
-			$executed = $sendResponse['executed'];
-			$successes = array_values($sendResponse['successes']);
-			$failures = array_values($sendResponse['failures']);
-			$rawresponse = $sendResponse['rawresponse'];
-			$error = $sendResponse['error'];
-			if (!$executed) {
-				$sms_notification = "Unable to send SMS\n\n$error\n";
+			$smsRecipients = Jethro\Sms\getRecipientsFromPersonRecords($assignees);
+			$sendWrapper = Jethro\Sms\sendSms($sms_message, $smsRecipients, $smsSender);
+			if ($sendWrapper->isFailure()) {
+				fwrite(STDERR, $sendWrapper->getError() . "\n");
 			} else {
-				if ((count($successes) <= 0) && (count($failures) <= 0)) {
-					$sms_notification = "SMS for $roster_name sent, but sending cannot be confirmed.\n";
-				}
-				if (count($successes) > 0 ) {
-					$sms_notification = "Sent roster successfully to:\n";
-					for ($i=0; $i < count($successes); $i++) {
-						$sms_notification .= $successes[$i]['first_name'] . ' ' . $successes[$i]['last_name'];
-						if ($i < (count($successes) - 1)) { $sms_notification .= ', '; } else { $sms_notification .= ".\n\n";}
-					}
-				}
-				if (count($failures) > 0 ) {
-					$sms_notification .= "Failed to send roster to:\n";
-					for ($i=0; $i < count($failures); $i++) {
-						$sms_notification .= $failures[$i]['first_name'] . ' ' . $failures[$i]['last_name'];
-						if ($i < (count($failures) - 1)) { $sms_notification .= ', '; } else { $sms_notification .= ".\n\n";}
-					}
+				$batch = $sendWrapper->getValue();
+				$summary = $batch->sendSummary($smsRecipients);
+				$sms_notification = Jethro\Sms\formatSendSummary($summary, $nameLookup, $roster_name);
+				if ($summary instanceof \Sms\Failed) {
+					fwrite(STDERR, $sms_notification);
 				}
 			}
 		}
 	}
 	// Notify about sending the notifications!
-	$sendResponse = SMS_Sender::sendMessage($sms_notification, $coordinator, FALSE);
-	if (!empty($verbose)) {
-		echo "$sms_notification\n";
-		if (!$sendResponse['executed'] || empty($sendResponse['successes'])) {
-			echo "Unable to send Notification SMS:\n\n" . $sendResponse['error'] . "\n";
+	if (!empty($coordinator)) {
+		$sendWrapper = Jethro\Sms\sendSms($sms_notification, Jethro\Sms\getRecipientsFromPersonRecords($coordinator), $smsSender);
+		if ($sendWrapper->isFailure()) {
+			fwrite(STDERR, $sendWrapper->getError() . "\n");
+			exit(1);
 		}
-		echo "\nFull Server Response:\n\n" . $sendResponse['rawresponse'] . "\n";
+		$batch = $sendWrapper->getValue();
+		$summary = $batch->sendSummary(Jethro\Sms\getRecipientsFromPersonRecords($coordinator));
+		if ($summary instanceof \Sms\Failed) {
+			fwrite(STDERR, Jethro\Sms\formatSendSummary($summary, [], 'notification'));
+			exit(1);
+		}
+		if (!empty($verbose)) {
+			echo "$sms_notification\n";
+			echo Jethro\Sms\formatSendSummary($summary, [], 'notification') . "\n";
+		}
 	}
 }
 
@@ -424,7 +432,7 @@ if ($sendemail) {
 			}
 		} else {
 			echo "Failed to send roster ($roster_name) reminder notification to coordinator\n";
-			exit;
+			exit(1);
 		}
 	}
 }

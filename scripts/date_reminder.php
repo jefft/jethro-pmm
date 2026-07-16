@@ -73,11 +73,8 @@ if (empty($res) && !empty($ini['VERBOSE'])) {
 }
 
 if (!empty($ini['SMS_MESSAGE'])) {
-	
-	if (!empty($ini['SMS_FROM'])) {
-		define('OVERRIDE_USER_MOBILE', $ini['SMS_FROM']);
-	}
-	require_once JETHRO_ROOT.'/include/sms_sender.class.php';
+	require_once JETHRO_ROOT.'/include/jethro_sms.php';
+	$smsSenderNumber = !empty($ini['SMS_FROM']) ? new \Sms\PhoneNumber($ini['SMS_FROM']) : null;
 	if (!ifdef('SMS_HTTP_URL')) {
 		trigger_error("You have specified an SMS message in ".$_SERVER['argv'][1].' but this Jethro system does not have an SMS gateway configured. No SMS messages will be sent.');
 		$ini['SMS_MESSAGE'] = '';
@@ -131,7 +128,7 @@ foreach ($summaries as $supervisors => $remindees) {
 
 function send_reminder($person, $expiryDate)
 {
-	global $ini;
+	global $ini, $smsSenderNumber;
 	
 	$sentSomething = FALSE;
 	if (!empty($ini['EMAIL_BODY'])) {
@@ -166,14 +163,22 @@ function send_reminder($person, $expiryDate)
 		if (strlen($person['mobile_tel'])) {
 			$toNumber = $person['mobile_tel'];
 			if (!empty($ini['OVERRIDE_RECIPIENT_SMS'])) $toNumber = $person['mobile_tel'] = $ini['OVERRIDE_RECIPIENT_SMS'];
-			$message = replace_keywords($ini['SMS_MESSAGE'], $person, $expiryDate);
-			$res = SMS_Sender::sendMessage($message, Array($person), FALSE);
-			if (!$res['executed'] || (count($res['successes']) != 1)) {
-				echo "Failed to send SMS to ".$toNumber."\n";
+			if ($smsSenderNumber === null) {
+				echo "SMS not sent to ".$toNumber.": SMS_FROM not configured\n";
 			} else {
-				$sentSomething = TRUE;
-				if (!empty($ini['VERBOSE'])) {
-					echo "Sent SMS reminder to ".$person['first_name'].' '.$person['last_name'].' '.$toNumber."\n";
+				$message = replace_keywords($ini['SMS_MESSAGE'], $person, $expiryDate);
+				$recipient = new \Jethro\Sms\JethroSmsRecipient(
+					$person['id'],
+					new \Sms\PhoneNumber($person['mobile_tel']),
+				);
+				$result = \Jethro\Sms\sendSms($message, [$recipient], $smsSenderNumber, logToDb: true);
+				if ($result->isFailure()) {
+					echo "Failed to send SMS to ".$toNumber.": " . $result->getError() . "\n";
+				} else {
+					$sentSomething = TRUE;
+					if (!empty($ini['VERBOSE'])) {
+						echo "Sent SMS reminder to ".$person['first_name'].' '.$person['last_name'].' '.$toNumber."\n";
+					}
 				}
 			}
 		} else {

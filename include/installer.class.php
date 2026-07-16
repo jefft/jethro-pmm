@@ -157,6 +157,24 @@ class Installer
 				CONSTRAINT 2fatrust_person FOREIGN KEY (userid) REFERENCES staff_member (id) ON DELETE CASCADE
 			) ENGINE=InnoDB;",
 
+			"-- Synced with upgrades/2026-upgrade-to-2.40.sql:83-91 — SMS-note join table
+			CREATE TABLE IF NOT EXISTS sms_note (
+				note_personid INT NOT NULL,
+				note_id INT NOT NULL,
+				smsdelivery_id INT NOT NULL,
+				PRIMARY KEY (note_personid, note_id, smsdelivery_id),
+				INDEX smsdelivery_id (smsdelivery_id),
+				CONSTRAINT sms_note_pn_fk FOREIGN KEY (note_personid, note_id) REFERENCES person_note (personid, id) ON DELETE CASCADE,
+				CONSTRAINT sms_note_sd_fk FOREIGN KEY (smsdelivery_id) REFERENCES smsdelivery (id) ON DELETE CASCADE
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+
+			"-- Synced with upgrades/2026-upgrade-to-2.40.sql:95-98 — persisting sender number registrations
+			CREATE TABLE IF NOT EXISTS sms_registered_sender (
+				phone VARCHAR(20) PRIMARY KEY,
+				registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+
+
 			'CREATE VIEW member AS
 			SELECT mp.id, mp.first_name, mp.last_name, mp.gender, mp.age_bracketid, mp.congregationid,
 			mp.email, mp.mobile_tel, mp.work_tel, mp.familyid,
@@ -207,8 +225,10 @@ class Installer
 			 VALUES
 			(@rank:=@rank+5, '','SYSTEM_NAME','Label displayed at the top of every page','text',''),
 
-			(@rank:=@rank+5, 'Permissions and Security','ENABLED_FEATURES','Which Jethro features are visible to users?','multiselect{\"NOTES\":\"Notes\",\"PHOTOS\":\"Photos\",\"ATTENDANCE\":\"Attendance\",\"ROSTERS&SERVICES\":\"Rosters & Services\",\"SERVICEDETAILS\":\"Service Details\",\"DOCUMENTS\":\"Documents\",\"SERVICEDOCUMENTS\":\"Service documents\"}','NOTES,PHOTOS,ATTENDANCE,ROSTERS&SERVICES,SERVICEDETAILS,DOCUMENTS,SERVICEDOCUMENTS'),
-			(@rank:=@rank+5, '',                         'DEFAULT_PERMISSIONS','Permissions to grant to new user accounts by default','int','7995391'),
+			-- Synced with upgrades/2026-upgrade-to-2.40.sql:196-200 — SMS in ENABLED_FEATURES
+			(@rank:=@rank+5, 'Permissions and Security','ENABLED_FEATURES','Which Jethro features are visible to users?','multiselect{\"NOTES\":\"Notes\",\"PHOTOS\":\"Photos\",\"ATTENDANCE\":\"Attendance\",\"ROSTERS&SERVICES\":\"Rosters & Services\",\"SERVICEDETAILS\":\"Service Details\",\"DOCUMENTS\":\"Documents\",\"SERVICEDOCUMENTS\":\"Service documents\",\"SMS\":\"SMS\"}','NOTES,PHOTOS,ATTENDANCE,ROSTERS&SERVICES,SERVICEDETAILS,DOCUMENTS,SERVICEDOCUMENTS,SMS'),
+			-- Synced with upgrades/2026-upgrade-to-2.40.sql:211-213 — PERM_VIEWSMS in DEFAULT_PERMISSIONS
+			(@rank:=@rank+5, '',                         'DEFAULT_PERMISSIONS','Permissions to grant to new user accounts by default','int','8519679'),
 			(@rank:=@rank+5, '',                         'RESTRICTED_USERS_CAN_ADD','Allow users with group/congregation restrictions to create new persons and families?','bool','0'),
 			(@rank:=@rank+5, '',                         'PASSWORD_MIN_LENGTH','Minimum password length','int','8'),
 			(@rank:=@rank+5, '',                         'SESSION_TIMEOUT_MINS','Inactive sessions will be logged out after this number of minutes','int','90'),
@@ -217,7 +237,7 @@ class Installer
 			(@rank:=@rank+5, '2-Factor Authentication',  '2FA_REQUIRED_PERMS','Users who hold permission levels selected here will be required to complete 2-factor authentication at login.','text',''),
 			(@rank:=@rank+5, '',                         '2FA_EVEN_FOR_RESTRICTED_ACCTS','Require 2-factor auth even for accounts with group/congregation restrictions?','bool','0'),
 			(@rank:=@rank+5, '',                         '2FA_TRUST_DAYS','Users can tick a box to skip 2-factor auth for this many days. Set to 0 to disable.','int','30'),
-			(@rank:=@rank+5, '',                         '2FA_SENDER_ID','Sender ID for 2-factor auth messages','text','Jethro'),
+			(@rank:=@rank+5, '',                         '2FA_SENDER_ID','Sender ID for 2-factor auth messages. Mirrors SMS_SENDER.','text','Jethro'),
 
 			(@rank:=@rank+5, 'Jethro Behaviour Options','REQUIRE_INITIAL_NOTE','Whether an initial note is required when adding new family','bool','1'),
 			(@rank:=@rank+5, '',                         'DEFAULT_NOTE_STATUS','Default status when creating a new note','select{\"no_action\":\"No Action Required\",\"pending\":\"Requires Action\"}', 'pending'),
@@ -291,18 +311,34 @@ class Installer
 			-- Synced with upgrades/2017-upgrade-to-2.21.sql:5 — configurable SMTP port
 			(@rank:=@rank+5, '',                         'SMTP_PORT','Port to connect to the SMTP server. Usually 25, 465 for SSL, or 587 for TLS.','int','25'),
 
-			(@rank:=@rank+5, 'SMS Gateway',              'SMS_MAX_LENGTH','','int','160'),
+			-- Synced with upgrades/2026-upgrade-to-2.40.sql:108-180 — SMS settings reordered into logical groups
+			-- SMS settings in logical groups: Sender → Message → Behaviour → Debugging → Provider
+			(@rank:=@rank+5, 'SMS Gateway',              'SMS_SENDER','Hardcoded sender ID or mobile number that SMSes will appear to come from','text',''),
+			(@rank:=@rank+5, '',                         'SMS_SENDER_OPTIONS','Sender options for the SMS dropdown. Tokens: _USER_MOBILE_ (user\'s mobile), _SENDER_IDS_ (upstream-registered IDs).','text','_SENDER_IDS_,_USER_MOBILE_'),
+			(@rank:=@rank+5, '',                         'SMS_SENDER_DEFAULT','Default sender selected in the SMS sender dropdown.','text',''),
+			(@rank:=@rank+5, '',                         'SMS_MAX_LENGTH','','int','160'),
+			-- Synced with upgrades/2026-upgrade-to-2.40.sql:33 — unicode/emoji control
+			(@rank:=@rank+5, '',                         'SMS_UNICODE_PERMITTED','Whether to permit emojis and other unicode in SMSes','select{\"when_free\":\"When it costs nothing extra\",\"true\":\"Permitted (may cost extra)\",\"false\":\"Not permitted\"}','when_free'),
+			(@rank:=@rank+5, '',                         'SMS_SAVE_TO_NOTE_BY_DEFAULT','Whether to save each sent SMS as a person note by default','bool',''),
+			-- Synced with upgrades/2026-upgrade-to-2.40.sql:141 — SMS_SAVE_TO_NOTE_SUBJECT default changed to 'SMS follow-up'
+			(@rank:=@rank+5, '',                         'SMS_SAVE_TO_NOTE_SUBJECT','','text','SMS follow-up'),
+			(@rank:=@rank+5, '',                         'SMS_TESTMODE','In Test Mode no SMSes are actually sent','bool','false'),
+			(@rank:=@rank+5, '',                         'SMS_VERBOSE','Log HTTP requests to upstream SMS provider','bool','false'),
+			(@rank:=@rank+5, '',                         'SMS_BALANCE_LOW_THRESHOLD','Notify a staff member when SMS account balance drops below this amount (0 = disabled)','int','0'),
+			(@rank:=@rank+5, '',                         'SMS_BALANCE_LOW_NOTIFICANT','Person ID of the staff member to notify when SMS balance is low','person',''),
+			-- Synced with upgrades/2026-upgrade-to-2.40.sql:116 — provider selection with auto-detect
+			(@rank:=@rank+5, '',                         'SMS_PROVIDER','Which SMS provider to use for sending','select{\"\":\"Auto-detect (based on settings)\",\"5centsmsv5\":\"5CentSMS v5\",\"cellcast\":\"Cellcast\",\"smsbroadcast\":\"SMS Broadcast\"}',''),
+			(@rank:=@rank+5, '',                         'SMS_5CENTSMS_APIKEY_ID','FiveCent SMS v5 API key ID','text',''),
+			(@rank:=@rank+5, '',                         'SMS_5CENTSMS_APIKEY','FiveCent SMS v5 API key secret','text',''),
+			(@rank:=@rank+5, '',                         'SMS_CELLCAST_APIKEY','Cellcast API bearer token','text',''),
 			(@rank:=@rank+5, '',                         'SMS_HTTP_URL','URL of the SMS messaging service','text',''),
 			(@rank:=@rank+5, '',                         'SMS_HTTP_HEADER_TEMPLATE','Template for the headers of a request to the SMS messaging service','text_ml',''),
 			(@rank:=@rank+5, '',                         'SMS_HTTP_POST_TEMPLATE','Template for the body of a request to the SMS messaging service','text_ml',''),
 			(@rank:=@rank+5, '',                         'SMS_RECIPIENT_ARRAY_PARAMETER','','text',''),
 			(@rank:=@rank+5, '',                         'SMS_HTTP_RESPONSE_OK_REGEX','Regex for recognising a successful send','text_ml',''),
 			(@rank:=@rank+5, '',                         'SMS_HTTP_RESPONSE_ERROR_REGEX','Regex for recognising an API error','text_ml',''),
-			(@rank:=@rank+5, '',                         'SMS_LOCAL_PREFIX','Used for converting local to international numbers.  eg 0','text',''),
-			(@rank:=@rank+5, '',                         'SMS_INTERNATIONAL_PREFIX','Used for converting local to international numbers. eg +61','text',''),
-			(@rank:=@rank+5, '',                         'SMS_SAVE_TO_NOTE_BY_DEFAULT','Whether to save each sent SMS as a person note by default','bool',''),
-			(@rank:=@rank+5, '',                         'SMS_SAVE_TO_NOTE_SUBJECT','','text','SMS Sent'),
-			(@rank:=@rank+5, '',                         'SMS_SEND_LOGFILE','File on the server to save a log of sent SMS messages','text',''); "
+			(@rank:=@rank+5, '',                         'SMS_LOCAL_PREFIX','Used for converting local to international numbers.  eg 0','text','0'),
+			(@rank:=@rank+5, '',                         'SMS_INTERNATIONAL_PREFIX','Used for converting local to international numbers. eg +61','text','61'); "
 		);
 		foreach ($sql as $s) {
 			$allSQL[] = $s;
