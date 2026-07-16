@@ -10,7 +10,7 @@ namespace Sms;
  * Replaces the loosely-typed `array` that registerSenderId() and
  * registerSenderNumber() previously returned.  Every consumer —
  * renderRegistrationStepHtml(), renderRegistrationStepText(),
- * EJSmsProvider, DbLoggingSmsProvider, and the status-panel dispatch —
+ * DbLoggingSmsProvider, and the status-panel dispatch —
  * now receives this object instead of a stringly-typed bag.
  *
  * @see docs/sms/improvements/45-registration-result-value-object.md
