@@ -82,7 +82,7 @@ $result['xdebug.start_with_request'] = ini_get('xdebug.start_with_request'); // 
 
 // ── Derived verdicts ──
 // Return a bool. Reporting the actual PHP version would be an info-disclosure risk.
-$result['php_incompatible_version'] = !version_compare(PHP_VERSION, '8.1', '>');
+$result['php_incompatible_version'] = !version_compare(PHP_VERSION, '8.2', '>=');
 
 # Required PHP extensions per README.md
 $required_extensions = ['gettext', 'zip', 'xmlwriter', 'gd', 'curl', 'exif'];
