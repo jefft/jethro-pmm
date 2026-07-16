@@ -1,0 +1,114 @@
+---
+sidebar_position: 4
+---
+
+# SMS Database Tables
+
+Schema source: `upgrades/2026-upgrade-to-2.40-sms.sql` (SMS tables) and
+`upgrades/2026-upgrade-to-2.40.sql` (main schema). All tables and columns
+are defined there. This page documents the semantics that aren't obvious from
+column names alone.
+
+## Entity-Relationship Diagram
+
+
+```
+┌──────────────┐       ┌──────────────────┐       ┌────────────────────────────────────┐
+│  _person     │       │  sms             │       │  smsdelivery                       │
+├──────────────┤       ├──────────────────┤       ├────────────────────────────────────┤
+│ id        PK │◄──┐   │ id            PK │──┐    │ id           PK                    │
+│ first_name   │   │   │ body             │  │    │ sms_id       FK ──────────────────┐│
+│ last_name    │   │   │ sender        FK │  └───►│ personid     FK ───┐              ││
+│ mobile_tel   │   │   │ wire_sender      │       │ remote_id          │              ││
+│ congregation │   │   │ created          │       │ raw_response       │              ││
+│ familyid  FK │   │   │ scheduled_send   │       │ body               │              ││
+└──────────────┘   │   └──────────────────┘       │ provider           │              ││
+                   │                              │ status             │              ││
+                   │                              │ delivered_at       │              ││
+                   │                              └────────────────────┘              ││
+                   │                                       │  │                       ││
+                   │                              ┌────────┘  └──────────┐            ││
+                   │                              │                      │            ││
+┌──────────────────┴─┐                    ┌──────▼──────┐       ┌───────▼────────┐   ││
+│  person_note       │                    │  sms_note   │       │ _abstract_note │   ││
+├────────────────────┤                    ├─────────────┤       ├────────────────┤   ││
+│ personid  PK,FK    │◄───────────────────│ personid    │       │ id          PK │   ││
+│ id        PK,FK ───┼───────────────────►│ id          │───┐   │ subject        │   ││
+└────────────────────┘                    │ smsdelivery │   └──►│ details        │   ││
+                                          └─────────────┘       │ status         │   ││
+                                                                 │ creator     FK │   ││
+┌──────────────────────┐                                        │ assignee    FK │   ││
+│ sms_registered_sender│                                        └────────────────┘   ││
+├──────────────────────┤                                                             ││
+│ phone   PK           │                                                             ││
+│ registered_at        │                                                             ││
+└──────────────────────┘                                                             ││
+                                                                                     ││
+┌──────────────────────┐                                                             ││
+│ sms_purchases        │                                                             ││
+├──────────────────────┤                                                             ││
+│ id       PK          │                                                             ││
+│ purchasedate         │                                                             ││
+│ quantity             │                                                             ││
+│ cost                 │                                                             ││
+└──────────────────────┘                                                             ││
+```
+
+**Key relationships** (FK columns versus diagram lines):
+
+- `sms.sender` → `_person.id` (nullable: NULL for script sends)
+- `smsdelivery.sms_id` → `sms.id`: one send produces one delivery row per recipient (CASCADE delete)
+- `smsdelivery.personid` → `_person.id` (nullable: NULL if raw mobile number)
+- `sms_note.(personid, id)` → `person_note.(personid, id)`: the note lives in the `person_note` / `_abstract_note` system
+- `sms_note.smsdelivery_id` → `smsdelivery.id`: a delivery may have zero or one linked notes (CASCADE delete)
+- `person_note.id` → `_abstract_note.id`
+- `sms_registered_sender`: standalone — read as a first-check cache before upstream API calls
+- `sms_purchases`: standalone — queried by `LocalBalanceSmsProvider` for `SMS_BALANCE = 'database'`
+
+
+All FK relationships reference `_person`, never `person` (MySQL cannot create
+foreign keys against views — see below).
+
+## Jethro Views and the `_`-prefixed Tables
+
+Jethro uses MySQL views to enforce row-level security. Every queryable entity
+has two names: the **`_`-prefixed base table** (the physical storage) and the
+**view** (the security-filtered access path). Foreign keys always reference
+the base table.
+
+| View | Base table | Filter |
+|---|---|---|
+| `person` | `_person` | Current user's congregation + group restrictions via `getCurrentUserID()` |
+| `person_group` | `_person_group` | Group restrictions via `getCurrentUserID()` |
+| `member` | `_person` + `_family` | Flattened join; visible only when the current user shares a member-sharing group with the person |
+| `abstract_note` | `_abstract_note` | Assignee is current user AND status is 'pending', OR user has permission bits 48 |
+
+The views use `getCurrentUserID()`, a MySQL stored function that returns the
+session variable `@current_user_id`. In CLI/testing contexts, set it before
+querying through views:
+
+```sql
+SET @current_user_id = 1;
+SELECT * FROM person WHERE id = 42;
+```
+
+Without this, views return empty results (the function sees NULL, and no row
+matches `NULL = …`).
+
+### Why `_person` not `person` in FKs?
+
+MySQL does not allow foreign keys to reference views — only base tables. So
+`sms.sender REFERENCES _person(id)` and `smsdelivery.personid REFERENCES
+_person(id)`. This is correct: the FK ensures referential integrity at the
+storage level; the view layer adds security on top.
+
+### Legacy SMS notes
+
+Before 2.40, each SMS send created a `person_note` + `_abstract_note` row
+(subject `'SMS Sent'`). The `2026-upgrade-to-2.40-sms.sql` migration converts
+these into `sms` + `smsdelivery` rows and removes the old note records.
+
+## See Also
+
+- [Status Codes](./status-codes)
+- [Delivery Tracking](./delivery-tracking)
