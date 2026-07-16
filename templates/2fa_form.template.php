@@ -36,7 +36,15 @@
 				echo 'Trust this device for '.$trust_days.' days</label>';
 			}
 			?>
-		</div>
+
+
+		<?php if (!empty($_SESSION['2fa']['verify_token'])): ?>
+		<!-- Datastar SSE: long-polls for cross-device link-click verification -->
+		<div data-on-load="@get('?call=2fa_wait')"
+		     data-on-signal-change__2faVerified="@get('./')"
+		     data-on-signal-change__2faExpired="location.reload()"
+		     style="display:none"></div>
+		<?php endif; ?>
 	</form>
 </body>
 </html>
