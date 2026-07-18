@@ -20,3 +20,11 @@ source "$(dirname "${BASH_SOURCE[0]}")/jethrodb.sh"
 exec "$(dirname "${BASH_SOURCE[0]}")/jethro_db_load" \
 	--dump=demodata.sql.gz \
 	"$@"
+
+echo "Truncating SMS tables from previous run..."
+runsql -sNBe "SET foreign_key_checks = 0; TRUNCATE TABLE sms_note; TRUNCATE TABLE smsdelivery; TRUNCATE TABLE sms; SET foreign_key_checks = 1;"
+echo "Loading fake SMSes: tests/functional/testdata/fakesmses.sql"
+runsql < tests/functional/testdata/fakesmses.sql
+echo "Fixing SMS collation.."
+runsql -sNBe "ALTER TABLE sms MODIFY COLUMN body TEXT COLLATE utf8mb4_unicode_ci;"  # Fix sms table
+	echo "2.40 upgrade complete"

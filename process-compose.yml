@@ -83,7 +83,9 @@ processes:
         condition: process_healthy
     command: |
       devbox.d/bin/jethro_db_demodata_load
+      DB=jethro_functest_walkthrough devbox.d/bin/jethro_db_init
       devbox.d/bin/jethro_db_init --db=jethro_functest_walkthrough
+      DB=jethro_functest_smsmockserver DB_USER=jethro_functest_smsmockserver DB_PASS=jethro_functest_smsmockserver AUTOCONFIRM=true jethro_db_init
     readiness_probe:
       exec:
         command: mariadb -u jethro -pjethro jethro_functest -sNBe "select count(*) from _person;"

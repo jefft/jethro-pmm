@@ -14,3 +14,8 @@ define('PREFILL_MEMBER_PASSWORD', 'qfntt7eYuwHs123');  # This qfntt7eYuwHs123 pa
 # Required
 define('SMS_INTERNATIONAL_PREFIX', '61');
 define('SMS_LOCAL_PREFIX', '0');
+
+define('SMS_PROVIDER', '5centsmsv5');
+define('SMS_5CENTSMS_APIKEY_ID', 'test-mock-key-id');
+define('SMS_5CENTSMS_APIKEY', 'test-mock-secret');
+define('SMS_5CENTSMS_URL', '/smsmockserver/5centsms');
