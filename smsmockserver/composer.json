@@ -1,0 +1,16 @@
+{
+    "name": "jethro/smsmockserver",
+    "description": "PHP-based mock SMS server for Playwright functional tests. Simulates Cellcast and 5CentSMS v5 APIs.",
+    "type": "project",
+    "require": {
+        "php": ">=8.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "SmsMockServer\\": "src/"
+        }
+    },
+    "scripts": {
+        "start": "php -S 127.0.0.1:${SMSMOCK_PORT} -t public public/index.php"
+    }
+}

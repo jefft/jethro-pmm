@@ -10,3 +10,8 @@ define('PREFILL_USERNAME', 'demo');
 define('PREFILL_PASSWORD', 'qfntt7eYuwHs123');   # This qfntt7eYuwHs123 is not sensitive
 define('PREFILL_MEMBER_EMAIL', 'mluther@wittenberg.edu.de');
 define('PREFILL_MEMBER_PASSWORD', 'qfntt7eYuwHs123');  # This qfntt7eYuwHs123 password is not sensitive
+
+define('SMS_PROVIDER', '5centsmsv5');
+define('SMS_5CENTSMS_APIKEY_ID', 'test-mock-key-id');
+define('SMS_5CENTSMS_APIKEY', 'test-mock-secret');
+define('SMS_5CENTSMS_URL', '/smsmockserver/5centsms');
