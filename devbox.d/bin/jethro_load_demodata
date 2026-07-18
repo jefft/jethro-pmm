@@ -13,6 +13,7 @@ system_name="${2-}"
 cd "$(dirname "$(readlink -f "$0")")/../.."  # repo root: upgrades/ and testdata/ are relative
 
 dump=tests/functional/testdata/demodata.sql.gz
+fakesmses=tests/functional/testdata/fakesmses.sql.gz
 
 # Empty database first, so a reload cannot leave tables behind that the dump and
 # the upgrade scripts no longer know about.
@@ -29,9 +30,15 @@ ls upgrades/*.sql | sort --version-sort | sed '0,/2\.38\.sql/ d' | while read -r
 	mariadb "$db" < "$sql"
 done
 
+# Align sms.body with _abstract_note.details, which the SMS code joins it against.
+mariadb "$db" -e "ALTER TABLE sms MODIFY COLUMN body TEXT COLLATE utf8mb4_unicode_ci;"
+
+echo "Loading fake SMS history: $fakesmses"
+zcat "$fakesmses" | mariadb "$db"
+
 if [[ -n "$system_name" ]]; then
 	mariadb "$db" -e "UPDATE setting SET value='${system_name//\'/\'\'}' WHERE symbol='SYSTEM_NAME' AND value='Functional Testing';"
 fi
 
-mariadb "$db" -sNBe "SELECT CONCAT('Loaded into \`$db\`: ', (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$db'), ' tables, ', (SELECT COUNT(*) FROM _person), ' people');"
+mariadb "$db" -sNBe "SELECT CONCAT('Loaded into \`$db\`: ', (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$db'), ' tables, ', (SELECT COUNT(*) FROM _person), ' people, ', (SELECT COUNT(*) FROM sms), ' SMSes');"
 echo "Connect with: devbox run mariadb $db"

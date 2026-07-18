@@ -59,6 +59,12 @@ async function assertFunctestServerIsThisCheckout() {
     );
   }
 }
+
+async function cleanSmsDelivery() {
+  const sql = "UPDATE smsdelivery SET status='cancelled' WHERE status='scheduled'";
+  execSync(`mariadb jethro_functest -e "${sql}"`);
+}
+
 /**
  * Suite-wide setup, run once before any test.
  *
@@ -88,4 +94,5 @@ async function assertFunctestServerIsThisCheckout() {
 export default async function globalSetup() {
   await assertFunctestServerIsThisCheckout();
   execFileSync("jethro_compile", [], { cwd: PROJECT_ROOT, stdio: "inherit" });
+  await cleanSmsDelivery();
 }
