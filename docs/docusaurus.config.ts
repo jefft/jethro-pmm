@@ -55,8 +55,8 @@ const config: Config = {
           ],
           versions: {
             current: {
-              label: '2.39.0-dev',
-              path: '2.39.0-dev',
+              label: '2.40.0-dev',
+              path: '2.40.0-dev',
               banner: 'unreleased',
             },
           },
