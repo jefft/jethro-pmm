@@ -1,0 +1,86 @@
+---
+sidebar_position: 2
+---
+
+# Layered Architecture
+
+The SMS module is organised into three distinct layers, each with its own namespace and responsibilities.
+
+## Layer Diagram
+
+```
+┌─────────────────────────────────────────┐
+│            Web Layer                     │
+│  calls/call_sms.class.php               │
+│  templates/single_message.template.php  │
+│  resources/js/jethro.js                 │
+└──────────────┬──────────────────────────┘
+               │ calls Jethro\Sms\
+┌──────────────▼──────────────────────────┐
+│          Bridge Layer                    │
+│  namespace Jethro\Sms                   │
+│  include/jethro_sms.php                 │
+│  ┌─────────────────────────────────┐    │
+│  │ DbLoggingSmsProvider            │    │
+│  │  ┌──────────────────────────┐   │    │
+│  │  │ ExpandingSmsProvider     │   │    │
+│  │  │  ┌───────────────────┐   │   │    │
+│  │  │  │ Raw Provider      │   │   │    │
+│  │  │  │ (v5/v4/SMSBcast)  │   │   │    │
+│  │  │  └───────────────────┘   │   │    │
+│  │  └──────────────────────────┘   │    │
+│  └─────────────────────────────────┘    │
+└──────────────┬──────────────────────────┘
+               │ uses
+┌──────────────▼──────────────────────────┐
+│           Pure Layer                     │
+│  namespace Sms\                         │
+│  jethro-sms/src/sms.php                        │
+│  SmsProvider, SmsDelivery, SmsStatus    │
+│  HttpClient, NativeHttpClient           │
+│  Concrete providers (no Jethro deps)    │
+└─────────────────────────────────────────┘
+```
+
+## Pure Layer Details
+
+The pure layer (`Sms\` namespace) knows nothing about Jethro:
+
+- **Interfaces** — `SmsProvider`, `HttpClient`
+- **Value objects** — `SmsDelivery`, `HttpRequest`, `HttpResponse`
+- **Enums** — `SmsStatus`
+- **Decorators** — `ExpandingSmsProvider`
+- **Concrete providers** — `FiveCentSmsV5Provider`, `FiveCentSmsV4Provider`, `SmsBroadcastSmsProvider`, `TemplateSmsProvider`
+- **Infrastructure** — `NativeHttpClient`, `LoggingHttpClient`, `FakeHttpClient`
+
+This layer can be tested with PHPUnit and mock HTTP clients without any database or session.
+
+## Bridge Layer Details
+
+The bridge layer (`Jethro\Sms\` namespace) connects the pure layer to Jethro:
+
+- **Factory** — `getSmsProvider()` assembles the provider chain
+- **Decorator** — `DbLoggingSmsProvider` adds database persistence
+- **Value objects** — `JethroSmsRecipient` (person ID + phone), `JethroSmsDelivery` (adds person/database IDs)
+- **Utilities** — high-level functions for the web layer
+- **UI helpers** — `printModal()`, `printBulkSmsForm()`, etc.
+
+## Web Layer Details
+
+The web layer handles HTTP and UI:
+
+- **Call handlers** — parse requests, call bridge functions, return JSON or HTML
+- **Templates** — render messages list, individual message entries, status badges
+- **JavaScript** — `JethroSMS` module for character counting, send flow, delivery polling
+
+## Why This Matters
+
+- **Test isolation** — pure layer tests don't need a database
+- **Code reuse** — CLI and web use the same code path through the bridge
+- **Provider swapping** — change one constant to switch gateways
+- **No circular dependencies** — dependencies flow down: web → bridge → pure
+
+## See Also
+
+- [Design Decisions](./design-decisions)
+- [Reference: SMS Architecture](../../reference/sms/smsarchitecture.md)

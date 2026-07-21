@@ -1,0 +1,64 @@
+---
+sidebar_position: 6
+---
+
+# Character Counting & Unicode
+
+The SMS character counter must handle two encodings and three Unicode modes.
+
+## GSM 03.38
+
+The standard SMS alphabet. 7-bit encoding, most Latin characters fit.
+
+- Single message: 160 characters
+- Concatenated (multi-part): 153 characters per segment (7 bytes used for UDH headers)
+
+## Extended GSM Characters
+
+Some characters occupy **two** character positions:
+
+```
+^ { } [ ] ~ | €
+```
+
+These are encoded using an escape sequence in the GSM alphabet, consuming two 7-bit slots.
+
+## UCS-2 (Unicode)
+
+When **any** non-GSM character appears, the entire message switches to UCS-2 (UTF-16):
+
+- Single message: 70 characters
+- Concatenated: 67 characters per segment
+
+This is a binary switch — a single emoji in a 500-character message turns all 500 characters into UCS-2 (8–9 segments instead of 4 GSM segments).
+
+## The Three Unicode Modes
+
+`SMS_UNICODE_PERMITTED` controls the tradeoff:
+
+### `0` — Disabled
+Unicode characters are **blocked**. The Send button is greyed out until all non-GSM characters are removed. Use when your provider doesn't support UCS-2 or costs are prohibitive.
+
+### `when_free`
+Unicode is allowed in **single-segment messages only**. If the message is ≤ 70 characters (one UCS-2 segment), emojis are fine. Longer messages must be pure GSM. Use when you want to allow brief emoji use but control costs on longer messages.
+
+### `1` — Enabled (default)
+Everything is allowed. If UCS-2 adds segments, a warning is shown: "Removing special characters would save X segments". The user can still send.
+
+## Cost Calculation
+
+When `SMS_SEGMENT_COST` is set:
+
+```javascript
+cost = segments × SMS_SEGMENT_COST
+```
+
+This runs client-side and is updated on every keystroke.
+
+## Balance Enforcement
+
+When `SMS_BALANCE_ENFORCED` is on, the counter fetches the account balance and blocks sending if `cost > balance`.
+
+## See Also
+
+- [Reference: Configuration](../../reference/sms/configuration.mdx)

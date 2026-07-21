@@ -1,0 +1,60 @@
+---
+sidebar_position: 5
+---
+
+# Token Expansion
+
+Token expansion personalises SMS messages with recipient-specific data like names.
+
+## How It Works
+
+`ExpandingSmsProvider` is a decorator that wraps any `SmsProvider`. Its `send()` method checks for `%` in the message:
+
+### Fast Path (no tokens)
+
+If the message doesn't contain `%`, it passes through directly to the inner provider. **No overhead** for non-personalised messages.
+
+### Slow Path (has tokens)
+
+For each recipient:
+1. The token resolver is called with the recipient
+2. Person data is fetched (cached) from the database
+3. `%firstname%` → actual first name, etc.
+4. The personalised message is sent individually
+
+## Why Per-Recipient?
+
+Alternatives considered:
+- **Gateway-side templates** — not universally supported, limits tokens to what the gateway offers
+- **Client-side expansion** — would expose person data in the browser before sending
+- **Batch pre-expansion** — would create N API calls anyway
+
+Per-recipient expansion from the server:
+- Works with any gateway
+- Keeps person data server-side
+- The `%` detection gives zero-overhead for non-personalised messages
+
+## Caching
+
+The token resolver uses a closure with captured cache array:
+
+```php
+$cache = [];
+$resolver = function (JethroSmsRecipient $r) use (&$cache) {
+    if (!isset($cache[$r->personId()])) {
+        $cache[$r->personId()] = fetchPersonData($r->personId());
+    }
+    return $cache[$r->personId()];
+};
+```
+
+One database query per unique person per request, regardless of how many messages they receive.
+
+## Fallback
+
+Non-`JethroSmsRecipient` recipients (bare phone numbers from CLI) get empty token values — `%firstname%` stays as literal text. No errors, no exceptions.
+
+## See Also
+
+- [Reference: Token Expansion](../../reference/sms/token-expansion)
+- [Send Pipeline](./send-pipeline)
