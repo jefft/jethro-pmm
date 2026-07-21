@@ -9,6 +9,38 @@
         "value": "1",
         "label": "Yes"
       }
+    ],
+    "unicode": [
+      {
+        "value": "when_free",
+        "label": "When it costs nothing extra"
+      },
+      {
+        "value": "true",
+        "label": "Permitted (may cost extra)"
+      },
+      {
+        "value": "false",
+        "label": "Not permitted"
+      }
+    ],
+    "provider": [
+      {
+        "value": "",
+        "label": "Auto-detect (based on settings)"
+      },
+      {
+        "value": "5centsmsv5",
+        "label": "5CentSMS v5"
+      },
+      {
+        "value": "cellcast",
+        "label": "Cellcast"
+      },
+      {
+        "value": "smsbroadcast",
+        "label": "SMS Broadcast"
+      }
     ]
   },
   "settings": {
@@ -907,6 +939,225 @@
       "note": "Dev-only: log intentions without sending.",
       "options": "boolean"
     },
+
+    "SMS_5CENTSMS_APIKEY": {
+      "type": "text",
+      "label": "Sms 5centsms Apikey",
+      "description": "API key secret from your 5CentSMS dashboard (required). See <a href=\"https://www.5centsms.com.au/dashboard/api\">5centsms.com.au/dashboard/api</a>.",
+      "explanation": "",
+      "default": null,
+      "note": "FiveCent SMS v5 API key secret"
+    },
+
+    "SMS_5CENTSMS_APIKEY_ID": {
+      "type": "text",
+      "label": "Sms 5centsms Apikey Id",
+      "description": "API key ID from your 5CentSMS dashboard (required). See <a href=\"https://www.5centsms.com.au/dashboard/api\">5centsms.com.au/dashboard/api</a>.",
+      "explanation": "",
+      "default": null,
+      "note": "FiveCent SMS v5 API key ID"
+    },
+
+    "SMS_5CENTSMS_URL": {
+      "type": "text",
+      "label": "Sms 5centsms Url",
+      "description": "API base URL (optional; defaults to <code>https://www.5centsms.com.au/api/v5</code>).",
+      "explanation": "",
+      "default": "https://www.5centsms.com.au/api/v5",
+      "note": ""
+    },
+
+    "SMS_BALANCE": {
+      "type": "text",
+      "label": "Sms Balance",
+      "description": "Balance override. Numeric (e.g. <code>100</code>) = hardcoded value, useful for testing or as a send cap. <code>'database'</code> = calculate from <code>sms_purchases</code> table. Unset = query upstream API.",
+      "explanation": "",
+      "default": "Upstream API",
+      "note": "",
+      "fileOnly": true
+    },
+
+    "SMS_BALANCE_ENFORCED": {
+      "type": "text",
+      "label": "Sms Balance Enforced",
+      "description": "Block sends when remaining balance &lt; recipient count. Works with all <code>SMS_BALANCE</code> modes.",
+      "explanation": "",
+      "default": "false",
+      "note": "",
+      "fileOnly": true
+    },
+
+    "SMS_BALANCE_LOW_NOTIFICANT": {
+      "type": "personSearch",
+      "label": "Sms Balance Low Notificant",
+      "description": "Person ID to notify on low balance.",
+      "explanation": "",
+      "default": 0,
+      "note": "Person ID of the staff member to notify when SMS balance is low"
+    },
+
+    "SMS_BALANCE_LOW_THRESHOLD": {
+      "type": "number",
+      "label": "Sms Balance Low Threshold",
+      "description": "Trigger a low-balance alert below this credit count. <code>0</code> disables.",
+      "explanation": "",
+      "default": 0,
+      "note": "Notify a staff member when SMS account balance drops below this amount (0 = disabled)"
+    },
+
+    "SMS_CELLCAST_APIKEY": {
+      "type": "text",
+      "label": "Sms Cellcast Apikey",
+      "description": "Bearer token from your Cellcast dashboard (required).",
+      "explanation": "",
+      "default": null,
+      "note": "Cellcast API bearer token",
+      "fileOnly": true
+    },
+
+    "SMS_CELLCAST_URL": {
+      "type": "text",
+      "label": "Sms Cellcast Url",
+      "description": "API base URL (optional; defaults to <code>https://api.cellcast.com</code>).",
+      "explanation": "",
+      "default": "https://api.cellcast.com",
+      "note": ""
+    },
+
+    "SMS_HTTP_URL_BALANCE": {
+      "type": "text",
+      "label": "Sms Http Url Balance",
+      "description": "Balance endpoint URL for the SMS gateway (optional). Used by <code>TemplateSmsProvider</code> / legacy gateway.",
+      "explanation": "",
+      "default": null,
+      "note": "",
+      "fileOnly": true
+    },
+
+    "SMS_PROVIDER": {
+      "type": "select",
+      "label": "Sms Provider",
+      "description": "Which SMS provider to use for sending. Short key or fully-qualified class name. Short keys: <code>5centsmsv5</code>, <code>cellcast</code>, <code>smsbroadcast</code>. When unset, Jethro auto-detects from whichever required provider constants are defined.",
+      "explanation": "",
+      "default": "",
+      "note": "Which SMS provider to use for sending",
+      "options": "provider"
+    },
+
+    "SMS_SAVE_TO_NOTE_BY_DEFAULT": {
+      "type": "select",
+      "label": "Sms Save To Note By Default",
+      "description": "Pre-tick the 'Save as Note' checkbox.",
+      "explanation": "",
+      "default": "0",
+      "note": "Whether to save each sent SMS as a person note by default",
+      "options": "boolean"
+    },
+
+    "SMS_SAVE_TO_NOTE_SUBJECT": {
+      "type": "text",
+      "label": "Sms Save To Note Subject",
+      "description": "Default subject for SMS-saved notes.",
+      "explanation": "",
+      "default": "SMS follow-up",
+      "note": ""
+    },
+
+    "SMS_SENDER": {
+      "type": "text",
+      "label": "Sms Sender",
+      "description": "Hardcoded sender ID or mobile number that SMSes will appear to come from. Use <code>_USER_MOBILE_</code> to use the current user's mobile number.",
+      "explanation": "",
+      "default": null,
+      "note": "Hardcoded sender ID or mobile number that SMSes will appear to come from"
+    },
+
+    "SMS_SENDER_DEFAULT": {
+      "type": "text",
+      "label": "Sms Sender Default",
+      "description": "Default selection in the sender dropdown (Sender ID or <code>_USER_MOBILE_</code>). Blank = first option in SMS_SENDER_OPTIONS.",
+      "explanation": "",
+      "default": null,
+      "note": "Default sender selected in the SMS sender dropdown."
+    },
+
+    "SMS_SENDER_OPTIONS": {
+      "type": "text",
+      "label": "Sms Sender Options",
+      "description": "Comma-separated sender options for the dropdown. Tokens <code>_SENDER_IDS_</code> (every ID the provider reports) and <code>_USER_MOBILE_</code> are supported alongside literal IDs. Defaults to <code>_SENDER_IDS_,_USER_MOBILE_</code>. Example: <code>StBarnabas,_SENDER_IDS_,_USER_MOBILE_</code>. Set to an empty string to disable all Sender ID lookup.",
+      "explanation": "",
+      "default": "_SENDER_IDS_,_USER_MOBILE_",
+      "note": "Sender options for the SMS dropdown. Tokens: _USER_MOBILE_ (user's mobile), _SENDER_IDS_ (upstream-registered IDs)."
+    },
+
+    "SMS_SEND_COOLOFF": {
+      "type": "number",
+      "label": "Sms Send Cooloff",
+      "description": "Delay in seconds applied to all immediate (non-deferred) sends. When unset, a 30-second cool-off is applied automatically — giving the user a window to cancel a mistaken send. Set to <code>0</code> to disable.",
+      "explanation": "",
+      "default": 30,
+      "note": "Delay before sending to allow cancellation"
+    },
+
+    "SMS_SHORTEN_URLS": {
+      "type": "select",
+      "label": "Sms Shorten Urls",
+      "description": "Automatically shorten URLs in SMS messages via the configured URL shortener.",
+      "explanation": "",
+      "default": "0",
+      "note": "Automatically shorten URLs in SMS messages",
+      "options": "boolean"
+    },
+
+    "SMS_SMSBROADCAST_PASSWORD": {
+      "type": "text",
+      "label": "Sms Smsbroadcast Password",
+      "description": "API password for SMS Broadcast (smsbroadcast.com.au). Required if using the SMS Broadcast provider.",
+      "explanation": "",
+      "default": null,
+      "note": "",
+      "fileOnly": true
+    },
+
+    "SMS_SMSBROADCAST_URL": {
+      "type": "text",
+      "label": "Sms Smsbroadcast Url",
+      "description": "API endpoint URL (optional; defaults to <code>https://www.smsbroadcast.com.au/api-adv.php</code>).",
+      "explanation": "",
+      "default": "https://www.smsbroadcast.com.au/api-adv.php",
+      "note": "",
+      "fileOnly": true
+    },
+
+    "SMS_SMSBROADCAST_USERNAME": {
+      "type": "text",
+      "label": "Sms Smsbroadcast Username",
+      "description": "API username for SMS Broadcast (smsbroadcast.com.au). Required if using the SMS Broadcast provider.",
+      "explanation": "",
+      "default": null,
+      "note": "",
+      "fileOnly": true
+    },
+
+    "SMS_TESTMODE": {
+      "type": "select",
+      "label": "Sms Testmode",
+      "description": "Dry-run — no messages actually sent.",
+      "explanation": "",
+      "default": "0",
+      "note": "In Test Mode no SMSes are actually sent",
+      "options": "boolean"
+    },
+
+    "SMS_VERBOSE": {
+      "type": "select",
+      "label": "Sms Verbose",
+      "description": "Log HTTP requests/responses to the PHP error log.",
+      "explanation": "",
+      "default": "0",
+      "note": "Log HTTP requests to upstream SMS provider",
+      "options": "boolean"
+    },
     "OVERRIDE_EMAIL_FROM": {
       "type": "text",
       "label": "Override Email From",
@@ -1239,6 +1490,48 @@
         "OVERRIDE_EMAIL_FROM"
       ]
     },
+
+    "sender": {
+      "heading": "Sender",
+      "intro": "Controls the \"From\" dropdown on the SMS send page.",
+      "settings": ["SMS_SENDER", "SMS_SENDER_OPTIONS", "SMS_SENDER_DEFAULT"]
+    },
+
+    "postSendBehaviour": {
+      "heading": "Post-send behaviour",
+      "intro": "Settings affecting the SMS Create Note… behaviour, and post-send 'cooloff'.",
+      "settings": ["SMS_SAVE_TO_NOTE_BY_DEFAULT", "SMS_SAVE_TO_NOTE_SUBJECT", "SMS_SEND_COOLOFF"]
+    },
+
+    "balance": {
+      "heading": "Balance",
+      "intro": "",
+      "settings": ["SMS_BALANCE", "SMS_BALANCE_ENFORCED", "SMS_BALANCE_LOW_THRESHOLD", "SMS_BALANCE_LOW_NOTIFICANT"]
+    },
+
+    "providerSelection": {
+      "heading": "Provider selection",
+      "intro": "",
+      "settings": ["SMS_PROVIDER"]
+    },
+
+    "fiveCentSms": {
+      "heading": "5CentSMS v5",
+      "intro": "",
+      "settings": ["SMS_5CENTSMS_APIKEY_ID", "SMS_5CENTSMS_APIKEY", "SMS_5CENTSMS_URL"]
+    },
+
+    "cellcast": {
+      "heading": "Cellcast",
+      "intro": "",
+      "settings": ["SMS_CELLCAST_APIKEY", "SMS_CELLCAST_URL"]
+    },
+
+    "smsbroadcast": {
+      "heading": "SMS Broadcast",
+      "intro": "Supports scheduling; does NOT support cancellation or delivery status polling.",
+      "settings": ["SMS_SMSBROADCAST_USERNAME", "SMS_SMSBROADCAST_PASSWORD", "SMS_SMSBROADCAST_URL"]
+    },
     "messageBody": {
       "heading": "Message body",
       "intro": "Limits on what the user can type.",
@@ -1348,6 +1641,13 @@
       "heading": "SMS",
       "intro": "SMS messaging configuration — message limits, gateway templates, and 2FA transport.",
       "groups": [
+        "sender",
+        "postSendBehaviour",
+        "balance",
+        "providerSelection",
+        "fiveCentSms",
+        "cellcast",
+        "smsbroadcast",
         "messageBody",
         "debugging",
         "legacyGateway",

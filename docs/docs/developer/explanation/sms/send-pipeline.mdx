@@ -1,0 +1,70 @@
+---
+sidebar_position: 3
+---
+
+# Send Pipeline
+
+A step-by-step walkthrough of what happens when a user clicks Send.
+
+## Phase 1: Client-Side Validation
+
+Before any HTTP request, the JavaScript validates:
+
+1. Message is non-empty
+2. Unicode is permitted (or the message contains only GSM characters)
+3. Balance is sufficient (if `SMS_BALANCE_ENFORCED` is on)
+4. At least one recipient is selected (bulk mode)
+
+If validation passes, the message is POSTed to `?call=sms`.
+
+## Phase 2: Server-Side Processing
+
+`Call_SMS` handles the request:
+
+1. **Parse recipients** — `getRecipientsFromRequest()` extracts `personid[]` from POST
+2. **Parse sender** — `getSenderFromRequest()` determines the sender ID
+3. **Build provider chain** — `getSmsProvider()` returns the fully wired chain
+4. **Send** — `sendSms()` delegates to the provider chain:
+
+```
+DbLoggingSmsProvider.send()
+  → ExpandingSmsProvider.send()
+    → [if no %] FiveCentSmsV5Provider.send()      ← single batch
+    → [if %]    FiveCentSmsV5Provider.send() × N   ← per recipient
+  → Insert sms row (template)
+  → Insert N smsdelivery rows (expanded messages)
+```
+
+## Phase 3: Response
+
+The server returns JSON:
+
+```json
+{
+  "sent": {
+    "count": 3,
+    "recipients": {
+      "1": { "first_name": "John", "smsdelivery_id": 101 },
+      "2": { "first_name": "Jane", "smsdelivery_id": 102 },
+      "3": { "first_name": "Bob",  "smsdelivery_id": 103 }
+    }
+  }
+}
+```
+
+## Phase 4: Client-Side Result Handling
+
+`JethroSMS.onAJAXSuccess()` processes the response:
+
+1. Marks person rows in the table with `sms-success` / `sms-failure` CSS classes
+2. Shows green/yellow/red alert with recipient count
+3. If "Save as Note" was checked, fires a second AJAX to `?call=note`
+
+## Phase 5: Save as Note
+
+`Call_Note` creates `Person_Note` rows and links them to `smsdelivery` rows via `sms_note`. This is a separate call so that SMS delivery failure doesn't prevent note creation and vice versa.
+
+## See Also
+
+- [Design Decisions](./design-decisions)
+- [Reference: SMS Architecture](../../reference/sms/smsarchitecture.md)
