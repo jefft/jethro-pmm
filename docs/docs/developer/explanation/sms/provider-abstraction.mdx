@@ -1,0 +1,57 @@
+---
+sidebar_position: 4
+---
+
+# Provider Abstraction
+
+The `SmsProvider` interface is the key abstraction that makes the SMS system flexible and testable.
+
+## The Interface
+
+```php
+interface SmsProvider {
+    public function send(SmsRecipient $recipient, string $message, ?int $sendAt): SmsDelivery;
+    public function getBalance(): ?float;
+    public function getSenderIds(): array;
+    public function updateDelivery(SmsDelivery $delivery): SmsDelivery;
+    public function cancelDelivery(SmsDelivery $delivery): SmsDelivery;
+    public function getCapabilities(): array;
+}
+```
+
+## Why an Interface?
+
+- **Gateway independence** — swap between FiveCentSms, SMS Broadcast, or custom providers without changing calling code
+- **Testability** — mock the provider in tests
+- **Capability discovery** — `getCapabilities()` tells callers what's supported before they attempt operations
+
+## The Decorator Chain
+
+The actual provider used at runtime is a chain of decorators:
+
+```
+DbLoggingSmsProvider           ← adds database logging
+  → ExpandingSmsProvider       ← adds token expansion
+    → [Concrete Provider]      ← talks to the gateway
+```
+
+Each decorator implements `SmsProvider` and delegates to the inner provider after adding its own behavior. This is the Decorator pattern — each layer adds one responsibility.
+
+## Adding a New Provider
+
+1. Implement `SmsProvider` in the `Sms\` namespace
+2. Add constructor that reads credentials from constants
+3. Add auto-detection logic to `getSmsProvider()` (optional)
+4. Set `SMS_PROVIDER` constant or provide credentials for auto-detection
+
+The rest of the system — UI, CLI, database logging, token expansion — works unchanged.
+
+## Test Mode
+
+The `FakeHttpClient` replaces the real HTTP client when `SMS_TESTMODE` is on. It returns "OK" responses without contacting any gateway. This means the full stack (validation, token expansion, database logging) can be tested without sending real messages.
+
+## See Also
+
+- [Reference: SMS Providers](../../reference/sms/providers)
+- [Layered Architecture](./layered-architecture)
+- [Design Decisions](./design-decisions)
