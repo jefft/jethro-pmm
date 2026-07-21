@@ -1,0 +1,59 @@
+---
+sidebar_position: 7
+---
+
+# Delivery Polling
+
+Delivery status polling is how Jethro tracks whether messages reached the recipient's handset.
+
+## The Problem
+
+SMS gateways are asynchronous — a message is accepted (status: Queued), dispatched (status: Sent), and eventually delivered (status: Delivered) or failed. The time between "Sent" and "Delivered" can be seconds or hours. Jethro needs to show the final status.
+
+## The Solution: Client-Side Polling
+
+Rather than a server-side cron job, Jethro uses **client-side JavaScript polling**.
+
+### Why Client-Side?
+
+- **Simplicity** — no cron setup, no background worker
+- **Lazy** — polls only when someone actually views the messages page
+- **Self-limiting** — capped at 20 lookups per page
+- **Self-cleaning** — exits when all deliveries reach final status
+
+### How It Works
+
+1. `single_message.template.php` emits `<span data-delivery-id="N">` for each non-final delivery
+2. On page load, JavaScript scans for these elements
+3. Each triggers a GET to `?call=sms_info&id=N`
+4. `Call_SMS_Info` checks the provider and returns updated status HTML
+5. If status is now final, the span updates and stops polling
+6. If still non-final, the span re-renders and remains in the polling pool
+
+## Caching
+
+`DbLoggingSmsProvider` stores the raw gateway response in `smsdelivery.raw_response`. When a final status is found (delivered or failed), subsequent polls skip the API call entirely — the cached response is returned instantly.
+
+## Cancel Links
+
+For scheduled messages, the polling response includes a Cancel link. This appears in the UI only after the first poll returns — it's not rendered in the initial page to avoid showing cancel links for messages that might have already been sent by the time the page loads.
+
+## Provider Support
+
+| Provider | Supports Polling |
+|---|---|
+| FiveCentSms v5 | ✓ via GET endpoint |
+| EJSms | ✓ (extends v5) |
+| SMS Broadcast | ✗ — no polling endpoint |
+| FiveCentSms v4 | ✗ — no polling endpoint |
+
+## Limitations
+
+- Only polls when the messages page is open (not a true background process)
+- Capped at 20 lookups per page (older messages may never update)
+- Browser must remain open for polling to continue
+
+## See Also
+
+- [Reference: Delivery Tracking](../../reference/sms/delivery-tracking)
+- [Reference: Status Codes](../../reference/sms/status-codes)

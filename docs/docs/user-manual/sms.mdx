@@ -1,0 +1,258 @@
+---
+sidebar_position: 8
+sidebar_label: SMS
+---
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import SettingRef from '@site/src/components/SettingRef';
+
+
+
+# Jethro SMS
+
+:::info[See also]{.padding--lg .text--italic}
+- [SMS Administration](../administration/config/sms) — how to initially configure SMS in Jethro.
+:::
+
+Once [configured](../administration/config/sms), Jethro lets you send SMS messages to people in your church, individually or in bulk, and view past SMSes. This page covers choosing recipients, composing, personalising, scheduling, and viewing history.
+
+
+You can create a Note associated with a SMS message to remind you to follow up. It is possible to schedule a message for later sending (up to 24h).
+
+<video autoPlay loop muted playsInline width="800" height="600"><source src="/img/sms/person_send_sms_view_messages_and_note.webm" type="video/webm" />Your browser does not support the video tag.</video>
+
+## Viewing SMS Messages
+
+### Person 'Messages' tab
+
+Past SMSes sent to a person (since Jethro 2.40.0) can be viewed in their 'Messages' tab:
+
+![Screenshot](/img/sms/person_messages_tab_with_filtering.png)
+
+
+A status line shows below each message, with format:
+
+> **Sent by** _First Last_ (#_ID_), _date time_ · _indicator_ · Associated note
+
+[//]: # (![Screenshot]&#40;/img/sms/person_messages_tab_cooloff_cancel.png&#41;)
+
+_Indicator_ shows the SMS status:
+
+| Indicator | Meaning |
+|---|---|
+| ✓✓ | **Delivered** — the recipient's handset confirmed receipt. Hover for the delivery timestamp. |
+| ✓ | **Sent** — handed off to the carrier; awaiting delivery confirmation. |
+| 🕐 _in X hours_ | **Scheduled** — queued for future delivery (shows relative time like "in 23 hours" or the absolute date). A **(Cancel)** link appears while still cancellable:  ![Screenshot](/img/sms/person_messages_tab_deferred_focused.png) |
+| ✗ failed | Permanent failure — the gateway rejected the message (e.g. invalid number, insufficient credits, blocked by carrier). |
+| ⊘ cancelled | The scheduled send was cancelled before dispatch. |
+| ⏳ _message ID_ | Still in transit — the gateway accepted the message but hasn't reported a final status yet. The page auto-refreshes. Covers **queued**, **sending**, and **in-progress** states. |
+| ⏳ test-message | Dry-run sent in <SettingRef name="SMS_TESTMODE" />; never reaches a real handset. |
+| _(blank)_ | The provider that sent this message no longer matches the currently configured gateway, or the status is **unknown**. Delivery polling is unavailable. |
+
+Status refreshes are frequent around the (scheduled) send time and taper off
+as it recedes in either direction.  A message still showing **Scheduled** more
+than an hour after its send time has passed stops refreshing altogether —
+check the gateway's own console if that happens.
+
+Bulk messages that included this person can be seen by clicking the **Multi-recipient** Filters checkbox:
+
+![Screenshot](/img/sms/person_messages_tab_with_filtering_multirecipient.png)
+
+All messages are visible to staff with [SMS - view all permission](../administration/config/sms#permissions). Staff without the permission will only see SMSes they sent (via Jethro).
+
+### Messages Overview
+
+Besides the per-person 'Messages' tab, there is also a Persons → Messages page, giving a system-wide view of sent SMS messages, filterable by sender, recipient, SMS message content or date:
+
+<video autoPlay loop muted playsInline width="800"><source src="/img/sms/smsoverview_sendhistory.webm" type="video/webm" />Your browser does not support the video tag.</video>
+
+This page is visible to those with **SMS - view all** permission
+
+
+
+# Sending SMS Messages
+
+
+Two prerequisites for sending SMSes are:
+ - Your Jethro administrator must have configured an SMS provider. See [Configuring a SMS provider](../administration/config/sms.mdx#configuring-a-sms-provider)
+ - Your account needs the `SMS - Send` permission (see [SMS permissions](../administration/config/sms#permissions)). Church members (i.e. not staff) cannot send SMSes.
+
+You'll know SMS is set up if you see SMS-related buttons and fields on person profiles.
+
+## Sending SMSes
+
+SMS can be triggered from many places in Jethro:
+
+- **To a single person** — from their details page, click their mobile number, then **SMS via Jethro**:
+
+    <img alt="SCreenshot" src="/img/sms/person_mobile_clicked_highlighting_smsviajethro.png" width="50%"/>
+  ![Screenshot](/img/sms/person_sms_dialog.png)
+
+   There is also a 'Send SMS' link on the Messages tab.
+
+- **To multiple people** — _Persons_ → _List All_, tick checkboxes, click _Choose Action_ → _Send SMS_:
+
+![Screenshot](/img/sms/personlist_3selected_sms.png)
+
+- **From a report** — _Persons_ → _Reports_, view a report, pick _With selected persons: Send SMS_:
+
+    ![Screenshot](/img/sms/personreport_sms_dialog.png)
+
+- **Family members** — select family members and click _With selected persons: Send SMS_:
+
+    <img alt="Screenshot" src="/img/sms/family_sms_dialog.png" width="70%"/>
+
+- **Group members** — from the group page, select members and click _SMS members_:
+
+    <img alt="Screenshot" src="/img/sms/group_sms_dialog.png" width="70%"/>
+
+- **Roster assignees** — from a roster, click _SMS all assignees_ or the week's _SMS All_ link:
+
+    <img alt="Screenshot" src="/img/sms/roster_sms.png" width="70%"/>
+
+## The SMS Compose form
+
+The individual SMS dialog (pop-up) looks like this:
+
+<img alt="Screenshot" src="/img/sms/person_sms_dialog_zoom.png" width="70%"/>
+
+The bulk SMS form has a few more options:
+
+<img alt="Screenshot" src="/img/sms/group_sms_dialog_zoom.png" width="70%"/>
+
+We'll describe the bulk SMS form, of which the single-person SMS form is a subset.
+
+###  SMS recipients (**To:** field)
+
+The **To:** field has two options:
+
+<img alt="Screenshot" src="/img/sms/group_sms_dialog_to_options.png" width="70%"/>
+
+ - **the selected persons** — actually only selected people _with mobile numbers set_ will be messaged. E.g. in the screenshot above, the cost counter says '3 recipients' because only 3 or the 8 selected people have mobile numbers.
+ - **the adults in the selected persons' families** — note that this is not "the adults in my selection". For example, say _only_ 'Martin Luther' was selected from the family: _2_ people would be messaged, because there are 2 adults in Martin Luther's family.
+
+The **Message Preview** is useful to see exactly who will receive a SMS:
+    ![Screenshot](/img/sms/group_sms_dialog_zoom_one_adult_picked.png)
+
+
+### SMS Sender
+
+**Sender:** will be, by default, a drop-down with your mobile number (if set), and Sender IDs your SMS provider knows about (if any):
+
+    <img alt="Screenshot" src="/img/sms/sms_sender_showing_mobile_and_senderid.png"/>
+
+However depending on your [SMS sender configuration](../administration/config/sms.mdx#sms-sender), **Sender:** might be hardcoded list, or just one hardcoded value:
+
+    <img alt="Screenshot" src="/img/sms/sms_sender_showing_hardcoded_senderid.png"/>
+
+#### Validating your own mobile number
+
+If you wish to send from _your_ mobile number via Jethro, you will need to validate that you own it. Jethro will show "your mobile number needs verifying to send — <u>verify now</u>".
+
+![Screenshot](/img/sms/person_sms_dialog_mobile_requiring_verification.png)
+
+Clicking <u>verify now</u> will, in the case of Cellcast, send you an OTP code to fill in:
+
+![Screenshot](/img/sms/person_sms_dialog_mobile_requiring_verification_clicked.png)
+
+or in the case of 5CentSms, send your mobile a link via SMS to click (and display _Sender ID created_).
+
+Trying to send from an unverified mobile number will result in a provider-specific error (in this case, from Cellcast):
+
+![Screenshot](/img/sms/person_sms_dialog_unverified_mobile_error.png)
+
+### Message text
+
+The `Message:` field is where you compose your SMS. SMSes cost about 5c per recipient, and is billed per 160 normal characters (a 'segment') - meaning a 161 character message costs 10c instead of 5c. ✨Emojis✨ in text more than double the cost - 5c per 70 characters rather than 160.
+
+Jethro defaults to limiting input to 160 characters, or 70 if emojis are present. The length limit and emojis are configurable in the [administration section](../administration/config/sms#message-body).
+
+As you type, you will see a character count below the textarea, which will update as you type. Sending will be blocked if you exceed the limit:
+
+<video autoPlay loop muted playsInline width="640"><source src="/img/sms/person_sms_dialog_showing_charcount_with_unicode_and_overrun.webm" type="video/webm" />Your browser does not support the video tag.</video>
+
+### Message Preview
+
+For **bulk** messages, there are further features:
+ - `%firstname%`, `%lastname%` and `%fullname%` tokens in the message will be expanded per-recipient
+ - URLs will be shortened (if [configured](../administration/config/sms.mdx#message-body), and if the shortened URL would be actually shorter)
+ - a **Message Preview** is available, showing the recipients and what they will individually receive:
+
+    ![Screenshot](/img/sms/group_sms_dialog_messagepreview.png)
+
+
+### Create Note
+
+Sometimes you need to schedule a "follow-up" on a message. Below the Message field you will see a **Create Note** checkbox. If ticked, this will create a Person Note linked to the sent SMS.
+
+![Screenshot](/img/sms/person_sms_dialog_createnote.png)
+
+You do not need to create a Note merely for archival purposes, as (since 2.40) Jethro records all notes in a separate Messages tab:
+
+<video autoPlay loop muted playsInline width="640"><source src="/img/sms/person_messages_tab.webm" type="video/webm" />Your browser does not support the video tag.</video>
+
+### Schedule Send
+
+A bulk SMS can be delayed / scheduled to send, for up to 24h in the case of 5CentSMS and 365 days for Cellcast.
+
+![Screenshot](/img/sms/person_sms_dialog_scheduled.png)
+
+
+#### Send Cool-off
+
+By default, Jethro applies a **30-second cool-off delay** to all messages (except 2FA). This gives you a brief window to cancel a mistaken send. The delay is invisible — the message queues immediately but won't be dispatched until the cool-off expires. An administrator can change or disable this via <SettingRef name="SMS_SEND_COOLOFF" />.
+
+### Saving as a Note
+
+Check **Save as Note** to record the message in each recipient's pastoral history. This creates a linked note under each person. The subject defaults to _SMS follow-up_ (customisable via <SettingRef name="SMS_SAVE_TO_NOTE_SUBJECT" />).
+
+{/* screenshot: save_as_note.png */}
+
+## After Sending
+
+After sending an individual SMS, you will be redirected to the Messages tab, with the new message highlighted.
+
+
+
+
+After sending a **bulk** SMS, a 'Message successfully sent' confirmation message appears, also noting who didn't get messaged and why.
+
+![Screenshot](/img/sms/group_sms_sent.png)
+
+Viewers with the **SMS - view all** permission will see a <u>SMS History Log</u> link:
+
+![Screenshot](/img/sms/group_sms_sent_confirmation.png)
+
+Clicking <u>SMS History Log</u> takes one to [Persons → Messages](#messages-overview).
+
+[//]: # (![Screenshot]&#40;/img/sms/smsoverview_sendhistory.png&#41;)
+
+
+
+## Cancelling bulk sends
+
+
+
+Scheduled bulk SMSes will have a 'Cancel all' link, which lets you cancel the send. In fact by default, all bulk SMS sends are cancellable for up to 30 seconds (the <SettingRef name="SMS_SEND_COOLOFF" /> delay).
+<video autoPlay loop muted playsInline width="800"><source src="/img/sms/smsoverview_cancel.webm" type="video/webm" />Your browser does not support the video tag.</video>
+
+
+
+To cancel a scheduled message before it's sent:
+
+1. Go to the person's **Messages** tab
+2. Find the scheduled message (shows "Scheduled" badge)
+3. Click **Cancel** → confirm
+
+{/* screenshot: cancel_scheduled.png */}
+
+Provider support: **5CentSMS v5** ✓, **Cellcast** ✓, **SMS Broadcast** ✗, **Legacy v4** ✗. Cancel early — once the gateway dispatches, it can't be recalled.
+
+The result message reports the outcome per recipient, e.g.
+**"Cancelled 2 deliveries, 1 failed (message not found)."** — the reason in
+parentheses comes straight from the gateway.  Recipients the gateway refused
+to cancel keep their previous status (typically because the message was
+already dispatched, or the gateway no longer recognises it); they are never
+shown as cancelled unless the gateway confirmed the cancellation.
+
+

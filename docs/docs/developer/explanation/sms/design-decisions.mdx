@@ -1,0 +1,53 @@
+---
+sidebar_position: 1
+---
+
+# SMS Design Decisions
+
+The SMS module was designed with several key architectural decisions.
+
+## Why Three PHP Layers?
+
+The SMS code is split into three layers by namespace:
+
+1. **`Sms\` (pure)** — No Jethro dependencies. Defines interfaces, value objects, and concrete providers. This layer can be tested with mock HTTP clients and has no knowledge of the database, session, or user system.
+2. **`Jethro\Sms\` (bridge)** — Wires pure providers to Jethro's database and session. The `DbLoggingSmsProvider` decorator adds persistence without the pure layer knowing about it.
+3. **Web layer** — AJAX handlers and templates that call into the bridge layer.
+
+This separation means:
+- **Testability** — providers can be unit-tested with fake HTTP clients
+- **Reusability** — CLI scripts and web handlers use the same code path
+- **Evolvability** — gateway changes only touch the pure layer
+
+## Why Decorator Pattern?
+
+`ExpandingSmsProvider`, `DbLoggingSmsProvider`, and `LoggingHttpClient` are all decorators. This is intentional:
+
+- Each concern (token expansion, DB logging, HTTP logging) is a separate class
+- Decorators compose cleanly: `DbLoggingSmsProvider(ExpandingSmsProvider(FiveCentSmsV5Provider))` 
+- Adding a new concern means adding one class, not modifying existing ones
+
+## Why Per-Recipient Sends for Tokens?
+
+When `%firstname%` is used, each recipient gets a separate API call. Alternatives considered:
+
+- **Send template to gateway** — not supported by many gateways
+- **Batch template expansion** — limits flexibility (custom fields would need gateway support)
+- **Pre-expand and batch** — defeats the purpose of personalised messages
+
+The current approach trades API call count for flexibility and gateway compatibility.
+
+## Why JavaScript Polling for Delivery?
+
+Delivery status polling uses client-side JavaScript rather than a server-side cron job:
+
+- Simpler deployment — no cron setup needed
+- Polls only when someone views the messages page (lazy)
+- Capped at 20 lookups per page to prevent abuse
+- Provider responses are cached in `smsdelivery.raw_response`
+
+## See Also
+
+- [Reference: SMS Architecture](../../reference/sms/smsarchitecture.md)
+- [Layered Architecture](./layered-architecture)
+- [Send Pipeline](./send-pipeline)

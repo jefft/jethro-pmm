@@ -8,11 +8,12 @@ const config: Config = {
 
   future: { v4: true },
 
-  url: 'https://github.com/tbar0970/jethro-pmm',
-  baseUrl: '/',
+  url: 'https://jefft.github.io',
+  baseUrl: '/jethro-pmm/',
 
-  organizationName: 'jethro-pmm',
-  projectName: 'jethro',
+  organizationName: 'jefft',
+  projectName: 'jethro-pmm',
+  trailingSlash: 'false',
 
   onBrokenLinks: 'throw',
 
@@ -39,8 +40,8 @@ const config: Config = {
           exclude: ['**/jethrosettings.json'],
           versions: {
             current: {
-              label: '2.39.0-dev',
-              path: '2.39.0-dev',
+              label: '2.40.0-dev',
+              path: '2.40.0-dev',
               banner: 'unreleased',
             },
           },

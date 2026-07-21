@@ -76,7 +76,7 @@ export default function Home(): ReactNode {
                 <div className={styles.card}>
                   <Heading as="h3">💡 Explanation</Heading>
                   <p>Background and design rationale. Why things work the way they do.</p>
-                  <Link to="/docs/developer/explanation/philosophy">Browse explanation →</Link>
+                  <Link to={`${docsPath}/developer/reference/sms/design-decisions`}>Browse explanation →</Link>
                 </div>
               </div>
             </div>
