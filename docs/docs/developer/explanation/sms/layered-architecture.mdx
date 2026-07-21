@@ -1,0 +1,102 @@
+---
+sidebar_position: 2
+---
+
+# Layered Architecture
+
+The SMS module is organised into three layers. Dependencies only point downwards: web → bridge → pure.
+
+## Layer Diagram
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Web layer                                                │
+│  calls/call_sms*.class.php, call_2fa_*.class.php,        │
+│  call_admin_*sms*.class.php                              │
+│  views/view_3_persons__5_messages.class.php              │
+│  templates/*message*.template.php                        │
+│  resources/js/jethro-sms.js + Datastar (SSE statusline)  │
+└───────────────────────────┬──────────────────────────────┘
+                            │ calls Jethro\Sms\ functions
+┌───────────────────────────▼──────────────────────────────┐
+│ Bridge layer — namespace Jethro\Sms                      │
+│  include/jethro_sms.php, include/Jethro/Sms/             │
+│                                                          │
+│  getSmsProvider() builds this chain (outermost first):   │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │ LocalBalanceSmsProvider   (only if SMS_BALANCE)     │  │
+│  │ ┌────────────────────────────────────────────────┐ │  │
+│  │ │ OverridingSmsProvider       (pure layer)       │ │  │
+│  │ │ ┌────────────────────────────────────────────┐ │ │  │
+│  │ │ │ DbLoggingSmsProvider  (only if logToDb)    │ │ │  │
+│  │ │ │ ┌────────────────────────────────────────┐ │ │ │  │
+│  │ │ │ │ TokenExpandingSmsProvider (pure layer) │ │ │ │  │
+│  │ │ │ │ ┌────────────────────────────────────┐ │ │ │ │  │
+│  │ │ │ │ │ Raw provider + SessionSmsCache     │ │ │ │ │  │
+│  │ │ │ │ │ 5CentSMS v5 / Cellcast /           │ │ │ │ │  │
+│  │ │ │ │ │ SMS Broadcast / 5CentSMS v4 /      │ │ │ │ │  │
+│  │ │ │ │ │ Template                           │ │ │ │ │  │
+│  │ │ │ │ └────────────────────────────────────┘ │ │ │ │  │
+│  │ │ │ └────────────────────────────────────────┘ │ │ │  │
+│  │ │ └────────────────────────────────────────────┘ │ │  │
+│  │ └────────────────────────────────────────────────┘ │  │
+│  └────────────────────────────────────────────────────┘  │
+└───────────────────────────┬──────────────────────────────┘
+                            │ uses
+┌───────────────────────────▼──────────────────────────────┐
+│ Pure layer — namespace Sms\ (jethro-sms/ package)        │
+│  jethro-sms/src/ (entry point: load.php)                 │
+│  SmsProvider, DecoratingSmsProvider, SmsDelivery,        │
+│  SmsStatus, HttpClient, concrete providers,              │
+│  Templater, statusline maths — no Jethro dependencies    │
+└──────────────────────────────────────────────────────────┘
+```
+
+## Pure Layer Details
+
+The pure layer is the standalone `jethro-sms/` package (`Sms\` namespace). It knows nothing about Jethro, and also ships the `bin/jethro-sms` CLI.
+
+- **Interfaces** — `SmsProvider`, `HttpClient`, `SmsCache`
+- **Value objects** — `SmsDelivery`, `PhoneNumber`, `SendSummary`, `RegistrationStep`, `HttpRequest`, `HttpResponse`
+- **Enums** — `SmsStatus`, `SmsCapability`
+- **Concrete providers** — `FiveCentSmsV5Provider`, `CellcastSmsProvider`, `SmsBroadcastSmsProvider`, `TemplateSmsProvider`, and `FiveCentSmsV4Provider` (a `TemplateSmsProvider` subclass, deprecated). `factory.php` picks one from `SMS_PROVIDER` or auto-detects it from the configured constants.
+- **Decorators** (all extend `DecoratingSmsProvider`)
+  - `TokenExpandingSmsProvider` — per-recipient `%token%` / `%(fn …)%` expansion via `Templater`, plus URL shortening
+  - `OverridingSmsProvider` — sender resolution and the `SMS_SENDER_OPTIONS` allowlist, and turns the send cool-off into a deferred send
+- **Statusline** — `sms_statusline.php`: character/segment/cost maths and preview rendering, as pure functions
+- **Infrastructure** — `NativeHttpClient`, `LoggingHttpClient` (`SMS_VERBOSE`; credentials are redacted), and fake HTTP clients for each provider
+
+Its tests (`jethro-sms/tests/`) run as part of `php tests/unit/run.php` using fake HTTP clients, with no database or session.
+
+## Bridge Layer Details
+
+The bridge layer (`Jethro\Sms\` namespace) connects the pure layer to Jethro:
+
+- **Factory** — `getSmsProvider()` assembles the chain above. Order matters: `OverridingSmsProvider` sits outside `DbLoggingSmsProvider` so the logged send time includes the cool-off delay. `logToDb: false` drops DB logging and the cool-off; it is used for 2FA codes and by Synchronize History, which writes its own rows.
+- **Decorators** — `DbLoggingSmsProvider` (writes `sms` / `smsdelivery` rows and persists polled statuses), `LocalBalanceSmsProvider` (reports a per-instance balance from `SMS_BALANCE` when the upstream account is shared between tenants)
+- **Cache** — `SessionSmsCache`: per-session cache of sender IDs and balance, keyed by a fingerprint of the provider settings
+- **Value objects** — `JethroSmsRecipient` (person ID + phone), `JethroSmsDelivery`, `JethroSmsDeliveryBatch`, `SmsRequestRecipients`
+- **Operations** — `sendSms()`, `synchronizeHistory()` / `checkSynchronized()` (import and diff provider history)
+- **UI helpers** — `printSmsModal()`, `printBulkSmsForm()`, `printSenderDropdown()`, `renderSmsDeliveryStatusIcon()`, etc.
+
+## Web Layer Details
+
+The web layer handles HTTP and UI:
+
+- **Call handlers** — `call_sms` (send), `call_sms_cancel`, `call_sms_info` (delivery polling), `call_sms_sendernum`, `call_sms_balance`, `call_sms_statusline` (Datastar SSE endpoint for the live statusline/preview), `call_2fa_verify` / `call_2fa_wait`, and the admin status-panel operations, including Synchronize History
+- **Views and templates** — Persons → Messages (`view_3_persons__5_messages`), the person Messages tab (`list_messages`, `single_message`), and the bulk-action and note templates
+- **JavaScript** — `resources/js/jethro-sms.js` (dialog and send flow) and Datastar, which renders the server-side statusline
+
+`scripts/sms.php` is the CLI equivalent of the web layer: it calls the same bridge functions.
+
+## Why This Matters
+
+- **Test isolation** — pure-layer tests don't need a database
+- **Code reuse** — CLI and web use the same code path through the bridge
+- **Provider swapping** — change one constant to switch gateways
+- **No circular dependencies** — dependencies flow down: web → bridge → pure
+
+## See Also
+
+- [Design Decisions](./design-decisions)
+- [Reference: SMS Architecture](../../reference/sms/smsarchitecture.md)

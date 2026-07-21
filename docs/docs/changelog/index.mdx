@@ -2,9 +2,84 @@
 sidebar_position: 1
 ---
 
+import PersonSendSmsVideo from '@site/static/img/sms/person_send_sms_view_messages_and_note.webm';
+import SmsOverviewVideo from '@site/static/img/sms/smsoverview_sendhistory.webm';
+
 # What's New
 
 This page tracks notable changes to Jethro.
+
+
+## 2.40.0 — SMS Modernisation (unreleased)
+
+This release modernises Jethro's SMS subsystem with per-person and system-wide message history, customisable SMS senders, SMS preview, token expansion and URL shortening, SMS scheduling (with cancel), opt-out, full 5CentSMS v5 API support, and support for https://www.cellcast.com/au.
+
+:::warning[Requires PHP 8.2, with curl and mbstring]
+Jethro 2.40 requires **PHP 8.2 or newer** (previously 8.1). The new SMS code uses PHP 8.2 language features, so on PHP 8.1 Jethro will fail with a parse error. Check your version with `php -v` (and your PHP-FPM version) before upgrading; [`status.php`](../reference/status-php.mdx#php_incompatible_version) reports `php_incompatible_version: true` if it is too old. Ubuntu 22.04 ships PHP 8.1, so upgrade to Ubuntu 24.04 or install PHP 8.2+ from another source.
+
+The **curl** and **mbstring** PHP extensions are now always required (previously curl was only needed for Mailchimp/api.bible). `status.php` lists missing extensions under [`php_extensions_installed`](../reference/status-php.mdx#php_extensions_installed).
+:::
+
+<video autoPlay loop muted playsInline width="800" height="600"><source src={PersonSendSmsVideo} type="video/webm" />Your browser does not support the video tag.</video>
+
+
+### New Message History ("Messages" tab)
+
+Every person now has a **Messages** tab showing all SMSes sent to them via Jethro, personally or in bulk.
+
+At upgrade time, Jethro automatically migrates most 'SMS Sent' notes — historically the only way to record an SMS send — to the 'Messages' tab.
+
+<details>
+    <summary>
+        "SMS Sent" migration details
+    </summary>
+    Historically, the only way to keep a record of a SMS was to create a Note (default subject 'SMS Sent'). Many churches find the Notes tab has become cluttered with 'SMS Sent' notes, obscuring the actual pastoral notes. Now we have a proper place for SMS records, we can clear up the fake notes, with one-off cleanup performed on upgrade.
+
+    Every 'SMS Sent' note gets a corresponding entry in Messages. The importer infers when a set of 'SMS Sent' notes was created all at once by a bulk SMS send (same sender and text, all within an hour), and records them as a single bulk send in Persons → Messages.
+
+    Notes from those bulk sends that nobody interacted with (never edited, assigned, or had their status changed) are then deleted from Notes. All other 'SMS Sent' notes — single-recipient sends, and any note someone *did* interact with — remain in Notes, with a link to the corresponding entry in Messages, so you can still navigate from a pastoral interaction back to the original SMS.
+
+    The "SMS Sent" migration is done via `upgrades/2026-upgrade-to-2.40-sms.sql` file that must be sourced at upgrade time.
+</details>
+
+### New Persons → Messages page
+
+In addition to the per-person 'Messages' tab, a new [Persons → Messages](../user-manual/sms.mdx#messages-overview) SMS Overview page is added, showing a system-wide view of sent messages.
+
+<video autoPlay loop muted playsInline width="800"><source src={SmsOverviewVideo} type="video/webm" />Your browser does not support the video tag.</video>
+
+The SMS Overview lists every send with sender, recipients (with per-recipient delivery badges), body, and date. It can be filtered in real time by sender name, recipient name, body text, date range, and single-recipient sends only, and has an optional 'Cost' column with a running total. Sends with deliveries still pending — scheduled, or within the [send cool-off](../user-manual/sms.mdx#send-cool-off) window — have a Cancel (or 'Cancel all') link.
+
+Provider configuration, balance, sender IDs and registered numbers are shown in the SMS Gateway status panel in Admin → System Configuration.
+
+The legacy `SMS_SEND_LOGFILE` log file is **not** imported. Recent sends that were never recorded as notes (e.g. roster reminders sent by cron) can be pulled from your SMS provider with the new **Synchronize History** action in Admin → System Configuration → SMS Gateway (5CentSMS v5 and Cellcast only). See [Recovering history from your SMS provider](../administration/config/sms.mdx#recovering-history-from-your-sms-provider).
+
+### 5CentSMS v5 Support
+
+Jethro now supports the **5CentSMS v5 JSON API** natively. Key capabilities unlocked with v5:
+
+- Per-message delivery status polling (Queued → Sent → Delivered/Failed)
+- Deferred (scheduled) sends with cancellation
+- Sender ID and sender number registration
+- Balance checks
+
+**Existing 5CentSMS users on v4 should upgrade.** See [Upgrading 5CentSMS from v4 to v5](../administration/config/sms.mdx#upgrading-5centsms-from-v4-to-v5) for step-by-step instructions. The v4 provider remains available but is deprecated: it is only auto-detected when `SMS_HTTP_URL` is the 5CentSMS v4 endpoint, and the v5 provider is preferred when both are configured.
+
+### New Permission: PERM_VIEWSMS
+
+A new `PERM_VIEWSMS` permission (bitmask 524288) controls access to the Persons → Messages page and to the full send history. Without it, users with `PERM_SENDSMS` can still send SMS and see delivery status — but only for messages they personally sent.
+
+New installations include `PERM_VIEWSMS` in `DEFAULT_PERMISSIONS`.
+
+On upgrade, SMS history was previously only visible as notes, so to avoid exposing it more widely `PERM_VIEWSMS` is granted only to staff who hold both `PERM_SENDSMS` and `PERM_VIEWNOTE` (**Notes - view all**), and removed from everyone else apart from SysAdmins. The same rule is applied to `DEFAULT_PERMISSIONS`.
+
+After upgrading, you can grant `PERM_VIEWSMS` to other users individually or add it to `DEFAULT_PERMISSIONS`. See [Upgrading from an earlier Jethro version](../administration/config/sms.mdx#upgrading-from-an-earlier-jethro-version).
+
+### Legacy Log File Removed
+
+The `SMS_SEND_LOGFILE` setting and its associated `logToFile()` function have been removed, and the setting is deleted from the database during the upgrade. After upgrading, Jethro no longer writes a JSON log file (`sms.log`) for sent messages — all send history is now stored in the `sms` and `smsdelivery` database tables and visible on the **Person → Messages** tab and **Persons → Messages** page.
+
+The existing log file is not imported or deleted. **Synchronize History** can recover everything your SMS provider still holds (roughly the last 12 months for 5CentSMS), so keep or archive the file if you need older history. See [SMS send log file](../administration/config/sms.mdx#sms-send-log-file).
 
 ## Version 2.39 (unreleased)
 
