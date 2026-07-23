@@ -78,7 +78,7 @@ HTTP `200 OK` with a JSON body.
 | `destination` | string | Recipient phone number; matches an entry in the `to` field of the request |
 | `status` | integer | Numeric status code — see [Status Codes](#status-codes) below |
 | `status_text` | string | Human-readable status label returned by the API |
-| `id` | string | Provider-assigned message ID; use with [GET /sms/{id}](GET.md) and [DELETE /sms/{id}](DELETE.md) |
+| `id` | string | Provider-assigned message ID; use with [GET /sms/\{id\}](GET.md) and [DELETE /sms/\{id\}](DELETE.md) |
 | `credits` | integer | Credits consumed for this recipient |
 
 ### Error

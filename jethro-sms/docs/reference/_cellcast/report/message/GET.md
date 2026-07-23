@@ -120,7 +120,7 @@ No request body.
 
 ## Status values
 
-The `status` field on each item uses the same values as the single-message lookup. See [`GET /api/v2/report/message/{messageId}`]({id}/GET.md#status-values) for the mapping.
+The `status` field on each item uses the same values as the single-message lookup. See [`GET /api/v2/report/message/{messageId}`](\{id\}/GET.md#status-values) for the mapping.
 
 ---
 

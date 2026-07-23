@@ -1,4 +1,4 @@
-# GET /api/v2/report/message/{messageId}
+# GET /api/v2/report/message/\{messageId\}
 
 Fetches the current delivery status of a single previously-sent message.
 

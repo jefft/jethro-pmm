@@ -1,4 +1,7 @@
-import { getData } from '../settingsData';
+import data from '../../docs/jethrosettings.json';
+import { getData, initData } from '../settingsData';
+
+initData(data);
 
 
 function stripHtml(html) {

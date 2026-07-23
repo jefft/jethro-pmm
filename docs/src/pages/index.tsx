@@ -8,10 +8,6 @@ import Heading from '@theme/Heading';
 
 import styles from './index.module.css';
 
-function useCurrentDocsPath(): string {
-  const ver = useLatestVersion('default');
-  return ver.path;
-}
 
 function HomepageHeader({docsPath}: {docsPath: string}) {
   const {siteConfig} = useDocusaurusContext();
@@ -41,7 +37,7 @@ function HomepageHeader({docsPath}: {docsPath: string}) {
 }
 
 export default function Home(): ReactNode {
-  const docsPath = useCurrentDocsPath();
+  const docsPath = useLatestVersion('default').path;
   return (
     <Layout
       title="Jethro PMM Documentation"

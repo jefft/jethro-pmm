@@ -1,4 +1,4 @@
-# GET /sms/{id} — Delivery Status
+# GET /sms/\{id\} — Delivery Status
 
 Poll the 5CentSMS v5 API for the current delivery status of a previously sent message.
 

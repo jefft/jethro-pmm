@@ -192,14 +192,13 @@ function SettingDescription({ id }) {
 function HelpBox({ id, fileOnly }) {
   const help = setting_help[id];
   if (!help) return null;
-  const def = help.default !== '\u2014' ? ' Default: <code>' + help.default + '</code>.' : '';
-  const expl = help.explanation ? '<p>' + help.explanation + '</p>' : '';
-  const fo = fileOnly ? '<p><em>This setting can only be set on the server in <code>conf.php</code>.</em></p>' : '';
-  const html = '<p>' + help.description + '</p>' + expl + fo + def;
-  if (!html) return null;
   return (
-    <div className="alert alert-info" style={{marginTop: '4px', padding: '6px 10px', fontSize: '0.9em'}}
-         dangerouslySetInnerHTML={{ __html: html }} />
+    <div className="alert alert-info" style={{marginTop: '4px', padding: '6px 10px', fontSize: '0.9em'}}>
+      <div>{help.description}</div>
+      {help.explanation && <div>{help.explanation}</div>}
+      {fileOnly && <div><em>This setting can only be set on the server in <code>conf.php</code>.</em></div>}
+      {help.default !== '\u2014' && <> Default: <code>{help.default}</code>.</>}
+    </div>
   );
 }
 

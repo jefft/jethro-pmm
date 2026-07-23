@@ -1,4 +1,4 @@
-# DELETE /api/v5/sms/{id} — Cancel Scheduled SMS
+# DELETE /api/v5/sms/\{id\} — Cancel Scheduled SMS
 
 ---
 

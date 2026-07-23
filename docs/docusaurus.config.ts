@@ -38,6 +38,9 @@ const config: Config = {
           editUrl: 'https://github.com/jethro-pmm/jethro/edit/main/docs/',
           lastVersion: 'current',
           exclude: ['**/jethrosettings.json'],
+          rehypePlugins: [
+            [require('./plugins/fix-root-relative-paths'), { baseUrl: '/jethro-pmm/' }],
+          ],
           versions: {
             current: {
               label: '2.40.0-dev',

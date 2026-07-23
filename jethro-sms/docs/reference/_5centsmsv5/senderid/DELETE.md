@@ -1,4 +1,4 @@
-# DELETE /senderid/{id} — Delete Sender ID
+# DELETE /senderid/\{id\} — Delete Sender ID
 
 > **VERIFIED** — request and response shapes confirmed from the 5CentSMS Postman collection (schema version 2.1).
 

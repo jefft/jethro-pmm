@@ -139,7 +139,7 @@ A non-empty `error` string indicates failure. The `messages` array is absent or 
 
 | Field                | Type    | Description                                                                               |
 |----------------------|---------|-------------------------------------------------------------------------------------------|
-| `id`                 | string  | Unique provider-assigned message ID. Use with [GET /sms/{id}]({id}/GET.md) and [DELETE /sms/{id}](DELETE.md). |
+| `id`                 | string  | Unique provider-assigned message ID. Use with [GET /sms/\{id\}](\{id\}/GET.md) and [DELETE /sms/\{id\}](DELETE.md). |
 | `destination`        | string  | Recipient phone number as submitted.                                                      |
 | `status`             | integer | Numeric delivery status code — see [Status Codes](#status-codes) below.                  |
 | `status_text`        | string  | Human-readable status label returned by the API.                                          |
@@ -200,7 +200,7 @@ may change on subsequent fetches. **Final statuses** (`DELIVERED`, `FAILED`, `CA
 
 | Endpoint | File | Description |
 |---|---|---|
-| `GET /sms/{id}` | [`{id}/GET.md`]({id}/GET.md) | Fetch delivery status for a single message by ID |
+| `GET /sms/{id}` | [`{id}/GET.md`](\{id\}/GET.md) | Fetch delivery status for a single message by ID |
 | `POST /sms` | [`POST.md`](POST.md) | Send one or more messages |
 | `DELETE /sms/{id}` | [`DELETE.md`](DELETE.md) | Cancel a scheduled message |
 | `GET /balance` | [`../balance/GET.md`](../balance/GET.md) | Check remaining credit balance |
