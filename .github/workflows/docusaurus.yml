@@ -2,9 +2,9 @@
 name: Deploy static content to Pages
 
 on:
-  # Runs on pushes targeting the default branch
+  # Runs on pushes to the default branch, and to push-sms so the SMS docs are published while that PR is open
   push:
-    branches: ["master"]
+    branches: ["master", "push-sms"]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   # Single deploy job since we're just deploying
-  deploy:
+  deploypages:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
