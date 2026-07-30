@@ -8,8 +8,8 @@ const config: Config = {
 
   future: { v4: true },
 
-  url: 'https://jethro-chms.github.io',
-  baseUrl: '/docs/',
+  url: 'https://jefft.github.io',
+  baseUrl: '/jethro-pmm/',
 
   organizationName: 'jethro-chms',
   projectName: 'jethro',
