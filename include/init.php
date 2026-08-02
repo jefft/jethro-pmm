@@ -1,8 +1,10 @@
 <?php
-if (file_exists(dirname(__FILE__).'/version.txt')) {
-	define('JETHRO_VERSION', trim(file_get_contents(dirname(__FILE__).'/version.txt')));
-} else {
-	define('JETHRO_VERSION', 'DEV');
+if (!defined('JETHRO_VERSION')) {  // Allow overriding in conf.php
+	if (file_exists(dirname(__FILE__).'/version.txt')) {
+		define('JETHRO_VERSION', trim(file_get_contents(dirname(__FILE__).'/version.txt')));
+	} else {
+		define('JETHRO_VERSION', 'DEV');
+	}
 }
 
 $path_sep = defined('PATH_SEPARATOR') ? PATH_SEPARATOR : ((FALSE === strpos($_ENV['OS'], 'Win')) ? ';' : ':');
@@ -48,6 +50,16 @@ if (defined('SESSION_TIMEOUT_MINS')) {
 
 // Infer BASE_URL from the request, if it hasn't been set manually.
 if (!defined('BASE_URL')) define('BASE_URL', baseurl_relative());
+
+// Infer the absolute base URL (scheme://host[/path]) from the request.
+// If BASE_URL is already absolute (e.g. set in conf.php), use it directly.
+if (!defined('BASE_URL_ABSOLUTE')) {
+	if (defined('BASE_URL') && str_starts_with(BASE_URL, 'http')) {
+		define('BASE_URL_ABSOLUTE', rtrim(BASE_URL, '/'));
+	} else {
+		define('BASE_URL_ABSOLUTE', baseurl_absolute());
+	}
+}
 
 if (session_id() == '') {
   	// If max length is set, set the cookie timeout - this will allow sessions to outlast browser invocations
