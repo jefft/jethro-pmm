@@ -1,0 +1,24 @@
+#!/usr/bin/env php
+<?php
+# SYNOPSIS: Run a SQL command via PHP connected as the current account, $ATL_TENANT. Useful for debugging.
+#
+define('JETHRO_ROOT', $_SERVER["ATL_APPDIR"]."/app");
+$_SERVER['HTTP_HOST']=$_SERVER["ATL_FQDN"];
+set_include_path(get_include_path().PATH_SEPARATOR.JETHRO_ROOT);
+require_once JETHRO_ROOT.'/conf.php';
+#define('DB_MODE', 'PRIVATE');
+require_once JETHRO_ROOT.'/include/init.php';
+require_once JETHRO_ROOT.'/include/user_system.class.php';
+require_once JETHRO_ROOT.'/include/system_controller.class.php';
+$GLOBALS['user_system'] = new User_System();
+$GLOBALS['user_system']->setCLIScript();
+$GLOBALS['system'] = System_Controller::get();
+
+if (count($argv) != 2 ) {
+	fwrite(STDERR, "Usage: ".$argv[0]." sql".PHP_EOL);
+	exit(1);
+}
+
+$sql=$argv[1];
+$res = $GLOBALS['db']->queryAll($sql);
+print json_encode($res);
