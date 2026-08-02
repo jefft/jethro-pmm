@@ -253,7 +253,7 @@ _b.AutoSuggest.prototype.createList = function(arr)
 		a.appendChild(tr);
 		a.appendChild(span);
 		a.name = i+1;
-		a.onclick = function () { pointer.setHighlightedValue(); return false; };
+		a.onclick = function () { pointer.setHighlight(this.name); pointer.setHighlightedValue(); return false; };
 		a.onmouseover = function () { pointer.setHighlight(this.name); };
 		var li = _b.DOM.cE(  "li", {}, a  );
 		ul.appendChild( li );
@@ -340,7 +340,7 @@ _b.AutoSuggest.prototype.clearHighlight = function()
 };
 _b.AutoSuggest.prototype.setHighlightedValue = function ()
 {
-	if (this.iHigh)
+	if (this.iHigh && this.aSug[this.iHigh-1])
 	{
 		this.sInp = this.fld.value = this.aSug[ this.iHigh-1 ].value;
 		// move cursor to end of input (safari)
