@@ -1,0 +1,3 @@
+#!/bin/bash
+
+$DEVBOX_PACKAGES_DIR/bin/mysqldump "$@"
