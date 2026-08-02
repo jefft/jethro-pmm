@@ -236,7 +236,7 @@ class Staff_Member extends Person
 		<div class="form-horizontal control-group">
 			<label class="control-label"><b>Your current password</b></label>
 			<div class="controls">
-				<input type="password" name="my_current_password" required="required" /><br />
+				<input type="password" name="my_current_password" class="compulsory" /><br />
 				<p class="help-inline">For security, you must enter the <b>current</b> password for user <b><?php echo ents($GLOBALS['user_system']->getCurrentUser('username')); ?></b> before saving these account details</p>
 			</div>
 		</div>
