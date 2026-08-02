@@ -38,6 +38,12 @@ require_once __DIR__ . '/../include/general.php';
  */
 abstract class Call_Admin_Statuspanel extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_SYSADMIN;
+	}
+
     /**
      * Feature flag name for the Enabled/Disabled line.
      *

@@ -5,6 +5,12 @@
  */
 class call_service_comp_help_runsheet_format extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWSERVICE;
+	}
+
 	protected function getField()
 	{
 		return 'Run sheet format';

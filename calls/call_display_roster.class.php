@@ -9,6 +9,12 @@
  */
 class Call_Display_Roster extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWROSTER;
+	}
+
 	/**
 	 * Execute this call
 	 *

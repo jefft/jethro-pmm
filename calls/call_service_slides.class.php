@@ -2,6 +2,12 @@
 
 class Call_Service_slides extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWSERVICE;
+	}
+
 	function run()
 	{
 		//get service data from database

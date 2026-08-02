@@ -1,6 +1,11 @@
 <?php
 class Call_document_merge_help extends Call
 {
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWDOC;
+	}
+
 	function run()
 	{
 		?>

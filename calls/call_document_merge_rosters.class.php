@@ -1,6 +1,12 @@
 <?php
 class Call_Document_merge_rosters extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWDOC;
+	}
+
 	function run()
 	{
 		$roster_id = (int)array_get($_REQUEST, 'roster_view');
