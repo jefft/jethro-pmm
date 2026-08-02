@@ -37,6 +37,24 @@ function array_remove_empties($ar)
 	return $res;
 }
 
+/**
+ * Print the shared "Add Note" modal dialog (templates/note_modal.template.php)
+ * once per page.
+ *
+ * Call from any view or template that renders an "Add Note" modal trigger
+ * (a[data-toggle="note-modal"]), ideally at a point after any enclosing
+ * table/form has closed. The modal has a single fixed id, so it may only
+ * appear once per request; the static guard makes further calls no-ops.
+ * See docs/docs/developer/reference/note-modal.mdx.
+ */
+function print_note_modal_once()
+{
+	static $printed = FALSE;
+	if ($printed) return;
+	$printed = TRUE;
+	include JETHRO_ROOT.'/templates/note_modal.template.php';
+}
+
 function stripslashes_array(&$array, $strip_keys=false) {
 	if(is_string($array)) return stripslashes($array);
 	$keys_to_replace = Array();
@@ -234,7 +252,7 @@ function print_widget($name, $params, $value)
 			break;
 		case 'bibleref':
 			require_once 'bible_ref.class.php';
-			$br = new bible_ref($value);
+			$br = new Bible_Ref($value);
 			$value = $br->toShortString();
 			$params['class'] = 'bible-ref';
 			// fall through
@@ -643,7 +661,7 @@ function process_widget($name, $params, $index=NULL, $preserveEmpties=FALSE)
 		case 'bibleref':
 			if (!empty($rawVal)) {
 				require_once 'bible_ref.class.php';
-				$br = new bible_ref($rawVal);
+				$br = new Bible_Ref($rawVal);
 				if ($br->toString()) $value = $br->toCode();
 			}
 			break;
@@ -720,7 +738,7 @@ function format_value($value, $params)
 			break;
 		case 'bibleref':
 			require_once 'bible_ref.class.php';
-			$br = new bible_ref($value);
+			$br = new Bible_Ref($value);
 			return $br->toShortString();
 			break;
 		case 'phone':
@@ -817,21 +835,258 @@ function get_url_pathprefix()
 }
 
 /**
+ * The scheme + host of the current request, e.g. "https://church.org".
+ *
+ * Security (finding A5): X-Forwarded-Proto/X-Forwarded-Host are CLIENT-CONTROLLED.
+ * Trusting them lets a crafted request make Jethro build absolute URLs (member
+ * activation/reset links, 2FA verify links) pointing at an attacker's host, which
+ * leaks reset hashes / verify tokens. They are therefore ignored unless the
+ * TRUST_X_FORWARDED_HEADERS config constant is defined.
+ *
+ * When the ALLOWED_HOSTS config constant is defined (pipe-separated hostnames),
+ * the request Host header must be on the list; anything else falls back to
+ * SERVER_NAME. Deployments should set ALLOWED_HOSTS so poisoned Host headers
+ * cannot redirect system-generated links to attacker hosts.
+ *
+ * @return string e.g. "https://church.org" — no trailing slash, no path.
+ */
+function request_scheme_and_host(): string
+{
+    $trust_forwarded = defined('TRUST_X_FORWARDED_HEADERS') && TRUST_X_FORWARDED_HEADERS;
+
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
+        || ($trust_forwarded && isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+    $scheme = $https ? 'https' : 'http';
+
+    $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '';
+    if ($trust_forwarded && !empty($_SERVER['HTTP_X_FORWARDED_HOST'])) {
+        $host = $_SERVER['HTTP_X_FORWARDED_HOST'];
+    }
+    if (defined('ALLOWED_HOSTS') && strlen(ALLOWED_HOSTS)) {
+        $allowed = array_map('strtolower', array_map('trim', explode('|', ALLOWED_HOSTS)));
+        if (!in_array(strtolower((string)$host), $allowed, true)) {
+            $host = $_SERVER['SERVER_NAME'] ?? '';
+        }
+    }
+    return $scheme . '://' . $host;
+}
+
+/**
  * Infer Jethro's absolute base URL from the request (scheme + host + path).
  * Returns e.g. "https://church.org/jethro" — no trailing slash.
- * Proxy-aware: respects X-Forwarded-Proto and X-Forwarded-Host.
+ * The scheme/host rules are documented on request_scheme_and_host().
  */
 function baseurl_absolute()
 {
-    $https = (
-        (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
-        (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443) ||
-        (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
-    );
-    $scheme = $https ? 'https' : 'http';
-    $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'];
     $scriptDir = baseurl_relative();
-    return $scheme . '://' . $host . ($scriptDir !== '' ? $scriptDir : '');
+    return request_scheme_and_host() . ($scriptDir !== '' ? $scriptDir : '');
+}
+
+/**
+ * The provenance reported by the browser's Fetch Metadata `Sec-Fetch-Site`
+ * header, lower-cased. Page script cannot set this header; browsers do.
+ *
+ * Returns one of 'same-origin', 'same-site', 'cross-site', 'none', or NULL
+ * when the header is absent (older browsers, non-browser clients, or engines
+ * that only send Fetch Metadata over HTTPS).
+ *
+ * @see docs/docs/developer/reference/request-origin-protection.mdx
+ * @return string|null
+ */
+function request_sec_fetch_site(): ?string
+{
+    $value = $_SERVER['HTTP_SEC_FETCH_SITE'] ?? NULL;
+    if (!is_string($value) || $value === '') return NULL;
+    return strtolower($value);
+}
+
+/**
+ * Normalise a URL or Origin header value to a scheme://host[:port] origin.
+ *
+ * Default ports are omitted, so https://example.org and https://example.org:443
+ * compare equal. Returns NULL for values that are not an http(s) origin,
+ * including the opaque "null" origin.
+ *
+ * @see docs/docs/developer/reference/request-origin-protection.mdx
+ * @return string|null
+ */
+function url_origin(string $url): ?string
+{
+    $parts = parse_url(trim($url));
+    if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return NULL;
+    $scheme = strtolower($parts['scheme']);
+    if ($scheme !== 'http' && $scheme !== 'https') return NULL;
+    $host = strtolower($parts['host']);
+    $port = isset($parts['port']) ? (int)$parts['port'] : NULL;
+    if (($scheme === 'http' && $port === 80) || ($scheme === 'https' && $port === 443)) {
+        $port = NULL;
+    }
+    return $scheme.'://'.$host.($port === NULL ? '' : ':'.$port);
+}
+
+/**
+ * Whether two URLs/Origin values refer to the same origin (scheme, host, port).
+ *
+ * @see docs/docs/developer/reference/request-origin-protection.mdx
+ * @return bool
+ */
+function urls_have_same_origin(string $a, string $b): bool
+{
+    $origin_a = url_origin($a);
+    $origin_b = url_origin($b);
+    return $origin_a !== NULL && $origin_b !== NULL && $origin_a === $origin_b;
+}
+
+/**
+ * Decide whether the provenance of an unsafe request is acceptable.
+ *
+ * TRUE  - same-origin, per Sec-Fetch-Site, or a matching Origin/Referer fallback.
+ * FALSE - explicitly same-site, cross-site, none, or a mismatched fallback.
+ * NULL  - no provenance signal; callers should preserve legacy behaviour
+ *         (rely on the session cookie's SameSite=Lax).
+ *
+ * Sec-Fetch-Site is authoritative when present. 'same-site' is rejected because
+ * Jethro tenants can share a registrable domain, so a sibling subdomain is not
+ * a trusted origin.
+ *
+ * @see docs/docs/developer/reference/request-origin-protection.mdx
+ * @param string|null $sec_fetch_site Value from request_sec_fetch_site()
+ * @param string $origin Value of the HTTP Origin header, if any
+ * @param string $referer Value of the HTTP Referer header, if any
+ * @param string $expected_origin The current request's scheme://host[:port]
+ * @return bool|null
+ */
+function request_origin_verdict(?string $sec_fetch_site, string $origin, string $referer, string $expected_origin): ?bool
+{
+    if ($sec_fetch_site !== NULL) {
+        return $sec_fetch_site === 'same-origin';
+    }
+    if ($origin !== '') {
+        return urls_have_same_origin($origin, $expected_origin);
+    }
+    if ($referer !== '') {
+        return urls_have_same_origin($referer, $expected_origin);
+    }
+    return NULL;
+}
+
+/**
+ * request_origin_verdict() for the current request, using Origin then Referer
+ * as the fallback when Sec-Fetch-Site is unavailable.
+ *
+ * @see docs/docs/developer/reference/request-origin-protection.mdx
+ * @return bool|null
+ */
+function request_origin_verdict_current(): ?bool
+{
+    return request_origin_verdict(
+        request_sec_fetch_site(),
+        request_server_string('HTTP_ORIGIN'),
+        request_server_string('HTTP_REFERER'),
+        request_scheme_and_host()
+    );
+}
+
+/**
+ * Whether the browser positively vouches that a request is same-origin.
+ *
+ * Stricter than request_origin_verdict(): TRUE only for
+ * `Sec-Fetch-Site: same-origin`, or, when that header is absent, a matching
+ * Origin header. Referer is not accepted (clients forge same-host Referers), and
+ * a request with no signal is FALSE. Current browsers send Sec-Fetch-Site or
+ * Origin on every form POST; scanners and scripts usually send neither.
+ *
+ * Used to gate login POSTs so they reach the password check only when sent by a
+ * browser from a Jethro page.
+ *
+ * @see docs/docs/developer/reference/request-origin-protection.mdx
+ * @param string|null $sec_fetch_site Value from request_sec_fetch_site()
+ * @param string $origin Value of the HTTP Origin header, if any
+ * @param string $expected_origin The current request's scheme://host[:port]
+ * @return bool
+ */
+function request_origin_is_proven(?string $sec_fetch_site, string $origin, string $expected_origin): bool
+{
+    if ($sec_fetch_site !== NULL) {
+        return $sec_fetch_site === 'same-origin';
+    }
+    return $origin !== '' && urls_have_same_origin($origin, $expected_origin);
+}
+
+/**
+ * request_origin_is_proven() for the current request.
+ *
+ * @see docs/docs/developer/reference/request-origin-protection.mdx
+ * @return bool
+ */
+function request_origin_is_proven_current(): bool
+{
+    return request_origin_is_proven(
+        request_sec_fetch_site(),
+        request_server_string('HTTP_ORIGIN'),
+        request_scheme_and_host()
+    );
+}
+
+/**
+ * A $_SERVER entry as a string, '' when absent or not a string. Used for
+ * request headers (e.g. 'HTTP_ORIGIN') and for request metadata such as
+ * 'REQUEST_URI'.
+ *
+ * @param string $key $_SERVER key
+ * @return string
+ */
+function request_server_string(string $key): string
+{
+    $value = $_SERVER[$key] ?? '';
+    return is_string($value) ? $value : '';
+}
+
+/**
+ * Log a login POST refused by request_origin_is_proven_current().
+ *
+ * @param string $area 'staff' or 'members'
+ * @return void
+ */
+function log_unproven_login_origin(string $area): void
+{
+    error_log('Refused '.$area.' login: browser did not confirm a same-origin request (Sec-Fetch-Site='
+        .(request_sec_fetch_site() ?? 'absent').', Origin='.str_replace(["\r", "\n"], '', request_server_string('HTTP_ORIGIN') ?: 'absent').')');
+}
+
+/**
+ * Reject state-changing requests that the browser reports as cross-origin.
+ *
+ * Called from include/init.php for every web request, before the database and
+ * session are set up. Safe methods are ignored. Requests with no provenance
+ * signal are allowed, preserving compatibility with CLI/curl clients and older
+ * browsers; those rely on the session cookie's SameSite=Lax.
+ *
+ * A rejection is a plain 403 and an error_log line. It is not an application
+ * error, so it must not produce a stacktrace, a 500 response, or an email.
+ *
+ * @see docs/docs/developer/reference/request-origin-protection.mdx
+ * @return void
+ */
+function enforce_request_origin(): void
+{
+    if (PHP_SAPI === 'cli' || empty($_SERVER['REQUEST_METHOD'])) return;
+
+    $method = strtoupper((string)$_SERVER['REQUEST_METHOD']);
+    if (!in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], TRUE)) return;
+
+    if (request_origin_verdict_current() !== FALSE) return;
+
+    $site = request_sec_fetch_site() ?? 'absent';
+    $uri = request_server_string('REQUEST_URI');
+    $uri = str_replace(["\r", "\n"], '', $uri);
+    error_log('Blocked '.$method.' '.$uri.': request came from another origin (Sec-Fetch-Site='.$site.')');
+
+    http_response_code(403);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "Forbidden: cross-origin requests are not accepted.\n";
+    exit;
 }
 
 function speed_log($bam=FALSE)

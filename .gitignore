@@ -4,13 +4,22 @@ devbox.d/bin/devbox
 # devbox.d/bin/devbox is a symlink to real devbox binary added to PATH by devbox. See DEVELOPMENT.md
 devbox.d/nginx/nginx*.conf
 # devbox.d/nginx/nginx*.conf is regenerated from devbox.d/nginx/nginx.template
+devbox.d/web/index.html
+# devbox.d/web/index.html because devbox's nginx plugin keeps recreating this!
 docs/docs/build
 docs/docs/.docusaurus
 /files/
 .idea/
+include/version.txt
+# include/version.txt is populated from JETHRO_VERSION in devbox.json on each './devbox run compile' or './devbox run functests'. 
+/jethro-*.zip
+/jethro-*.zip.sha256
 /nbproject/
 .php-cs-fixer.cache
 pnpm-lock.yaml
-resources/css/jethro-*-DEV.css
-resources/js/jethro-*-DEV.js
+resources/css/jethro-*.css
+# resources/css/jethro-*.css: only resources/less/ files should be in git
+resources/js/jethro-*.js
+# resources/js/jethro-*.js: only resources/js/jethro.js should be in git
 tests/functional/test-results
+/vendor/

@@ -14,6 +14,7 @@ class View_Admin__System_Configuration extends View {
 	{
 		$saved = FALSE;
 		foreach (Config_Manager::getSettings() as $symbol => $details) {
+			if (Config_Manager::isFileOnlySetting($symbol)) continue;
 			switch ($symbol) {
 				case 'DEFAULT_PERMISSIONS':
 					if (isset($_REQUEST['permissions'])) {
@@ -101,7 +102,20 @@ class View_Admin__System_Configuration extends View {
 					</label>
 					<div class="controls">
 						<?php
-						if (defined($symbol.'_IN_CONFIG_FILE')) {
+						if (Config_Manager::isFileOnlySetting($symbol)) {
+							if (defined($symbol.'_IN_CONFIG_FILE')) {
+								if (constant($symbol) && Config_Manager::isCredentialSetting($symbol)) {
+									// Don't show the value here - sensitive
+									print_message('This setting has been set in the system config file and cannot be changed here.', 'warning');
+								} else {
+									$this->printValue($symbol, $details);
+									print_message('This setting has been set in the system config file and cannot be changed here.', 'warning');
+								}
+							} else {
+								print_message('This setting can only be set in the system config file (conf.php).', 'warning');
+							}
+							if ($details['note']) echo '<p class="smallprint">'.ents($details['note']).'</p>';
+						} elseif (defined($symbol.'_IN_CONFIG_FILE')) {
 							if (Config_Manager::allowSettingInFile($symbol) && constant($symbol) && Config_Manager::isCredentialSetting($symbol)) {
 								// Don't show the value here - sensitive
 								print_message('This setting has been set in the system config file', 'warning');
@@ -811,7 +825,7 @@ class View_Admin__System_Configuration extends View {
 			foreach ($to_delete as $id) {
 				// The interface should have prevented attempts to delete an in-use status.
 				// So we'll just rely on the foriegn key to catch anything dodgy here.
-				$s = new Person_status($id);
+				$s = new Person_Status($id);
 				if (!$got_an_archived && ($s->getValue('is_archived'))) {
 					add_message("The person status '".$s->getValue('label')."' was not deleted, because you must have at least one status for archived persons", "error");
 					continue;

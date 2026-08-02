@@ -82,3 +82,39 @@ WHERE
 	AND ((NOT selfs.is_archived) OR (mp.id = self.id))
 	/* archived persons can only see themselves, not any family members */
 ;
+
+SET @rank = (SELECT `rank` FROM setting WHERE symbol = 'MEMBER_LOGIN_ENABLED');
+
+INSERT IGNORE INTO setting
+(`rank`, symbol, type, value, note)
+VALUES (@rank+1, 'MEMBER_SWAP_ENABLED', 'bool', "0", "Should church members be able to swap roster assignments themselves?");
+
+-- Idempotent column/FK additions via information_schema + PREPARE:
+-- Unfortunately MySQL 8.0 lacks support for: ADD CONSTRAINT `rra_pending_personid` FOREIGN KEY IF NOT EXISTS (pending_personid)
+SET @sql = IF(
+	(SELECT COUNT(*) FROM information_schema.COLUMNS
+	 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'roster_role_assignment' AND COLUMN_NAME = 'pending_personid') = 0,
+	'ALTER TABLE roster_role_assignment ADD COLUMN pending_personid INT(11) DEFAULT NULL',
+	'DO 0');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = IF(
+	(SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+	 WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'roster_role_assignment' AND CONSTRAINT_NAME = 'rra_pending_personid') = 0,
+	'ALTER TABLE roster_role_assignment ADD CONSTRAINT `rra_pending_personid` FOREIGN KEY (pending_personid) REFERENCES _person(id) ON DELETE SET NULL',
+	'DO 0');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Expose the sendmail transport alternative on the System Configuration page.
+-- Synced with include/installer.class.php and include/config_manager.class.php
+-- (isFileOnlySetting). Idempotent.
+INSERT IGNORE INTO setting (`rank`, heading, symbol, note, type, value)
+SELECT `rank` + 1, '', 'SENDMAIL_COMMAND',
+    'Send mail via this sendmail-compatible command instead of SMTP_SERVER. Include -bs to speak SMTP over the pipe.',
+    'text', ''
+FROM setting
+WHERE symbol = 'SMTP_SERVER';

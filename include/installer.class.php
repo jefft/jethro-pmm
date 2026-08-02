@@ -136,13 +136,14 @@ class Installer
 	function validateCharset()
 	{
 		$current = $GLOBALS['db']->queryRow(
-			"SELECT DEFAULT_CHARACTER_SET_NAME AS charset, DEFAULT_COLLATION_NAME AS collation
+			"SELECT DATABASE() AS dbname, DEFAULT_CHARACTER_SET_NAME AS charset, DEFAULT_COLLATION_NAME AS collation
 			 FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = DATABASE()"
 		);
 		if ($current && $current['charset'] == 'utf8mb4' && $current['collation'] == 'utf8mb4_unicode_ci') {
 			return TRUE;
 		} else {
-			$dbname = ifdef('DB_DATABASE', 'jethro');
+			// Ask the server: DB_DATABASE is undefined when conf.php sets DB_DSN instead.
+			$dbname = ($current && strlen($current['dbname'])) ? $current['dbname'] : ifdef('DB_DATABASE', 'jethro');
 			$dbuser = ifdef('DB_USERNAME', 'jethro');
 			$current_collation = $current ? $current['charset'].'/'.$current['collation'] : 'unknown';
 			print_message(
@@ -328,6 +329,7 @@ class Installer
 			(@rank:=@rank+5, '',                         'MOBILE_TEL_FORMATS','Valid formats for mobile phone; use X for a digit','multitext_nl','XXXX-XXX-XXX'),
 
 			(@rank:=@rank+5, 'Member area',              'MEMBER_LOGIN_ENABLED','Should church members be able to log in at <system_url>members ?','bool','0'),
+			(@rank:=@rank+5, '',                         'MEMBER_SWAP_ENABLED','Should church members be able to swap roster assignments themselves?','bool','0'),
 			(@rank:=@rank+5, '',                         'MEMBER_REGO_EMAIL_FROM_NAME','Sender name for member rego emails','text',''),
 			(@rank:=@rank+5, '',                         'MEMBER_REGO_EMAIL_FROM_ADDRESS','Sender address for member rego emails','text',''),
 			(@rank:=@rank+5, '',                         'MEMBER_REGO_EMAIL_SUBJECT','Subject for member rego emails','text','Setting up your account'),
@@ -363,6 +365,7 @@ class Installer
 			(@rank:=@rank+5, 'Mailchimp Sync',           'MAILCHIMP_API_KEY', 'API Key for Mailchimp integration. NB the mailchimp sync script must also be called regularly by cron.', 'text', ''),
 
 			(@rank:=@rank+5, 'SMTP Email Server',        'SMTP_SERVER','SMTP server for sending emails','text',''),
+			(@rank:=@rank+5, '',                         'SENDMAIL_COMMAND','Send mail via this sendmail-compatible command instead of SMTP_SERVER. Include -bs to speak SMTP over the pipe.','text',''),
 			(@rank:=@rank+5, '',                         'SMTP_ENCRYPTION','Encryption method for SMTP server','select{\"ssl\":\"SSL\",\"tls\":\"TLS\",\"\":\"(None)\"}',''),
 			(@rank:=@rank+5, '',                         'SMTP_USERNAME','Username for SMTP server','text',''),
 			(@rank:=@rank+5, '',                         'SMTP_PASSWORD','Password for SMTP server','text',''),

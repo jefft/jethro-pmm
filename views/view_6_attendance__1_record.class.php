@@ -73,7 +73,7 @@ class View_Attendance__Record extends View
 		}
 
 		foreach ($this->_cohortids as $id) {
-			$this->_record_sets[$id] = new Attendance_Record_set($this->_attendance_date, $id, $this->_age_brackets, $this->_statuses, $this->_order);
+			$this->_record_sets[$id] = new Attendance_Record_Set($this->_attendance_date, $id, $this->_age_brackets, $this->_statuses, $this->_order);
 			if ($this->_show_photos) $this->_record_sets[$id]->show_photos = TRUE;
 		}
 
@@ -101,8 +101,31 @@ class View_Attendance__Record extends View
 		}
 
 		if (!empty($_REQUEST['attendances_submitted'])) {
-			// Process step 2
-			if ($_SESSION['enter_attendance_token'] == $_REQUEST['enter_attendance_token']) {
+			// Process step 2.
+			//
+			// The token is a one-time duplicate-submit guard, not a CSRF control:
+			// enforce_request_origin() has already rejected cross-origin posts.
+			// A session with no token key means a login regenerated the session
+			// while this form was open, so process it - but only for a same-origin
+			// POST. This view reads $_REQUEST, so a GET or a cross-origin request
+			// would otherwise reach the save loop, which deletes the cohort's
+			// records for the date before inserting nothing.
+			// A token that was consumed (NULL) or does not match means this
+			// request is a duplicate.
+			// See docs/docs/developer/reference/request-origin-protection.mdx
+			$has_session_token = array_key_exists('enter_attendance_token', $_SESSION);
+			$session_token = $has_session_token ? $_SESSION['enter_attendance_token'] : NULL;
+			$request_token = array_get($_REQUEST, 'enter_attendance_token', '');
+			$token_matches = is_string($session_token) && is_string($request_token) && $request_token !== ''
+				&& hash_equals($session_token, $request_token);
+			$stale_but_same_origin = !$has_session_token
+				&& ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+				&& request_origin_verdict_current() === TRUE;
+
+			if ($token_matches || $stale_but_same_origin) {
+				if ($stale_but_same_origin) {
+					error_log('Attendance form accepted without a session token: same-origin POST after a session change');
+				}
 
 				// Clear the token from the session on disk
 				$_SESSION['enter_attendance_token'] = NULL;
@@ -245,7 +268,7 @@ class View_Attendance__Record extends View
 		// STEP 2 - enter attendances
 		ob_start();
 		?>
-		<form method="post" class="attendance warn-unsaved" data-lock-length="<?php echo db_object::getLockLength() ?>" action="?view=attendance__record">
+		<form method="post" class="attendance warn-unsaved" data-lock-length="<?php echo DB_Object::getLockLength() ?>" action="?view=attendance__record">
 			<input type="hidden" name="attendance_date" value="<?php echo $this->_attendance_date; ?>" />
 			<input type="hidden" name="show_photos" value="<?php echo $this->_show_photos; ?>" />
 			<input type="hidden" name="parallel_mode" value="<?php echo $this->_parallel_mode; ?>" />
@@ -270,6 +293,9 @@ class View_Attendance__Record extends View
 			?>
 		</form>
 		<?php
+		if ($GLOBALS['user_system']->havePerm(PERM_EDITNOTE)) {
+			print_note_modal_once();
+		}
 		if (ini_get('max_input_vars') && ($totalPrinted > ini_get('max_input_vars'))) {
 			ob_end_clean();
 			print_message(_("The parameters you have selected will list more persons ")
@@ -338,7 +364,7 @@ class View_Attendance__Record extends View
 			<?php
 			foreach ($totalPersons as $personid => $detail) {
 				?>
-				<tr>
+				<tr data-personid="<?php echo (int)$personid; ?>">
 				<?php
 				if (SizeDetector::isWide()) {
 					?>
@@ -376,7 +402,7 @@ class View_Attendance__Record extends View
 					<td class="action-cell narrow">
 						<a class="med-popup" tabindex="-1" href="?view=persons&personid=<?php echo $personid; ?>"><i class="icon-user"></i><?php echo _('View');?></a> &nbsp;
 						<a class="med-popup" tabindex="-1" href="?view=_edit_person&personid=<?php echo $personid; ?>"><i class="icon-wrench"></i><?php echo _('Edit');?></a> &nbsp;
-						<a class="med-popup" tabindex="-1" href="?view=_add_note_to_person&personid=<?php echo $personid; ?>"><i class="icon-pencil"></i><?php echo _('Add Note');?></a>
+						<a class="note-link" tabindex="-1" href="?view=_add_note_to_person&personid=<?php echo $personid; ?>" data-toggle="note-modal" data-personid="<?php echo $personid; ?>" data-name="<?php echo ents($detail['first_name'].' '.$detail['last_name']); ?>"><i class="icon-pencil"></i><?php echo _('Add Note');?></a>
 					</td>
 					<?php
 				}

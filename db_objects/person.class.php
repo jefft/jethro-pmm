@@ -298,10 +298,10 @@ class Person extends DB_Object
 				if (SMS_Sender::canSend()) {
 					$msg = _('SMS via Jethro');
 					$links[] = '<a href="#send-sms-modal" data-toggle="sms-modal" data-personid="' . $this->id . '" data-name="' . $person_name . '"><i class="icon-envelope"></i> '.$msg.'</a>';
-					static $printedModal = FALSE;
-					if (!$printedModal) {
+					static $printedSmsModal = FALSE;
+					if (!$printedSmsModal) {
 						SMS_Sender::printModal();
-						$printedModal = TRUE;
+						$printedSmsModal = TRUE;
 					}
 				}
 				if (FALSE !== strpos(array_get($_SERVER, 'HTTP_USER_AGENT', ''), 'Macintosh')) {
@@ -1026,10 +1026,6 @@ class Person extends DB_Object
 
 		if (!$this->id) unset($this->fields['familyid']);
 
-		// Extra CSRF protection because mobile number is sensitive.
-		$_SESSION['person_form_token'][$this->id] = generate_random_string();
-		print_hidden_field($prefix.'token', $_SESSION['person_form_token'][$this->id]);
-
 		parent::printForm($prefix, $fields);
 
 		unset($this->fields['photo']);
@@ -1089,12 +1085,6 @@ class Person extends DB_Object
 
 	function processForm($prefix='', $fields=NULL)
 	{
-		// Extra CSRF protection because mobile number is sensitive.
-		if (($this->id) && (array_get($_REQUEST, $prefix.'token') != $_SESSION['person_form_token'][$this->id])) {
-			throw new \RuntimeException("Synchroniser token mismatch - person could not be saved");
-			return FALSE;
-		}
-
 		$res = parent::processForm($prefix, $fields);
 
 		$GLOBALS['system']->setFriendlyErrors(TRUE);
