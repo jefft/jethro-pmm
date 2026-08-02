@@ -1,0 +1,3 @@
+#!/bin/bash
+
+./tests/regression/jethro_regression_tests.nu --credentials="${ATL_DATADIR}/credentials.json" --test        all
