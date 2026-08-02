@@ -32,7 +32,7 @@ const CONGREGATIONS = ["4pm", "4pm Kids", "6pm", "None", "External Supporters"];
 // The wizard only appears against an empty database, and the previous run of
 // this spec fills it, so re-empty it before each test. devbox.d/bin is on PATH
 // in the devbox shell, which is how the suite is run: `devbox run functests`.
-const RESET_WALKTHROUGH_DB = "mariadb_recreate_db --charset=utf8mb4 --collation=utf8mb4_unicode_ci jethro_functest_walkthrough";
+const RESET_WALKTHROUGH_DB = "mariadb_recreate_db --charset=latin1 --collation=latin1_swedish_ci jethro_functest_walkthrough";
 
 test.describe("Setup wizard", () => {
   test.beforeEach(() => {

@@ -10,7 +10,7 @@
     "php85Extensions.gettext@latest",
     "php85Extensions.curl@latest",
     "php85Extensions.exif@latest",
-    "mariadb@latest",
+    "mysql84@latest",
     "nginx@latest",
     "bun@latest"
   ],
