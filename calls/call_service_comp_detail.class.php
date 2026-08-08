@@ -5,6 +5,12 @@
  */
 class Call_Service_Comp_Detail extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWSERVICE;
+	}
+
 	function run()
 	{
 		$GLOBALS['system']->includeDBClass('service_component');

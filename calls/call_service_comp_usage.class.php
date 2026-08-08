@@ -1,6 +1,12 @@
 <?php
 class Call_Service_Comp_Usage extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWSERVICE;
+	}
+
 	function run()
 	{
 		$GLOBALS['system']->initErrorHandler();

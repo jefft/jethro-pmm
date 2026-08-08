@@ -1,6 +1,12 @@
 <?php
 class Call_Documents extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWDOC;
+	}
+
 	function run()
 	{
 		$GLOBALS['system']->initErrorHandler();

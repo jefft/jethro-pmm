@@ -1,6 +1,11 @@
 <?php
 class View__Delete_Planned_Absence extends View
 {
+	static function getMenuPermissionLevel()
+	{
+		return PERM_EDITATTENDANCE;
+	}
+
 	function processView()
 	{
 		$absence = new Planned_Absence((int)$_REQUEST['id']);

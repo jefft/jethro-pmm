@@ -40,3 +40,8 @@ $PERM_LEVELS = Array(
 // room for some more here...
 2147483647 => Array('SYSADMIN',			'SysAdmin - manage user accounts, congregations etc', ''),
 );
+
+// "Permission" level meaning any authenticated user (see User_System::havePerm()).
+// Deliberately NOT part of $PERM_LEVELS: it is not grantable and must not appear
+// in the permissions-editing UI. Used by the ?call= permission registry.
+if (!defined('PERM_NONE')) define('PERM_NONE', 0);

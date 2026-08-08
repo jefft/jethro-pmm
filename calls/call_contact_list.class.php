@@ -1,6 +1,12 @@
 <?php
 class Call_Contact_List extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_RUNREPORT;
+	}
+
 	function run()
 	{
 		$GLOBALS['system']->initErrorHandler();

@@ -1,6 +1,13 @@
 <?php
-class Call_email extends Call
+class Call_Email extends Call
 {
+	// PERM_NONE = any authenticated staff (Jethro has no PERM_VIEWPERSON).
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_NONE;
+	}
+
 	function run()
 	{
 		if (!empty($_REQUEST['print_popup'])) {

@@ -27,6 +27,11 @@ require_once __DIR__ . '/../include/general.php';
  */
 abstract class Call_Admin_Statuspanel_Operation extends Call
 {
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_SYSADMIN;
+	}
+
     /**
      * Check the sysadmin permission.
      *

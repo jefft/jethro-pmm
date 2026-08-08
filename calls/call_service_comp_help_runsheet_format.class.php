@@ -3,8 +3,14 @@
 /**
  * Help page for the 'Run sheet format' field when editing a Service Component.
  */
-class call_service_comp_help_runsheet_format extends Call
+class Call_Service_Comp_Help_Runsheet_Format extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_VIEWSERVICE;
+	}
+
 	protected function getField()
 	{
 		return 'Run sheet format';

@@ -1,6 +1,11 @@
 <?php
 class View__Execute_Plans extends View
 {
+	static function getMenuPermissionLevel()
+	{
+		return PERM_EDITNOTE;
+	}
+
 	function processView()
 	{
 		if (empty($_REQUEST['planid'])) {

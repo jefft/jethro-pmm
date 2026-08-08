@@ -1,7 +1,14 @@
 <?php
 require_once 'include/odf_tools.class.php';
-class Call_csv extends Call
+class Call_CSV extends Call
 {
+ 	// 0 = any authenticated staff (Jethro has no PERM_VIEWPERSON).
+ 
+ 	public static function getRequiredPermissionLevel()
+ 	{
+		return PERM_NONE;
+ 	}
+ 
 	function run()
 	{
 		if (empty($_REQUEST['personid'])) {

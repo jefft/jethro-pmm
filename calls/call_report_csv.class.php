@@ -1,6 +1,12 @@
 <?php
 class Call_Report_CSV extends Call
 {
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_RUNREPORT;
+	}
+
 	function run()
 	{
 		if (!empty($_REQUEST['queryid'])) {

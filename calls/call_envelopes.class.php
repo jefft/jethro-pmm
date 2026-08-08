@@ -1,6 +1,13 @@
 <?php
 class Call_Envelopes extends Call
 {
+	// PERM_NONE = any authenticated staff (Jethro has no PERM_VIEWPERSON).
+
+	public static function getRequiredPermissionLevel()
+	{
+		return PERM_NONE;
+	}
+
 	function run()
 	{
 
@@ -62,7 +69,7 @@ class Call_Envelopes extends Call
 					trigger_error('Person #'.(int)$_REQUEST['personid'].' not found', E_USER_WARNING);
 					return;
 				}
-				$family = $GLOBALS['system']->getDBObject('family', $person->getValue('familyid'));
+				$family = $person->getFamily();
 				$env->addAddress($person->toString()."\n".$family->getPostalAddress());
 			}
 		}
