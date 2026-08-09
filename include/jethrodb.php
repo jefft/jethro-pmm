@@ -80,13 +80,13 @@ class JethroDB extends PDO
 		$options[PDO::ATTR_DEFAULT_FETCH_MODE] = PDO::FETCH_ASSOC;
 		$options[PDO::ATTR_ERRMODE] = PDO::ERRMODE_EXCEPTION;
 		try {
-			$result = parent::__construct($dsn, $username, $password, $options);
+			parent::__construct($dsn, $username, $password, $options);
 		} catch (PDOException $e) {
 			error_log((string)$e);
-			throw new \RuntimeException('Could not connect to database - please check for mistakes in your Database configuration in conf.php, and check in MySQL that the database exists and the specified user has been granted access.');
-			exit();
+			throw new \RuntimeException( 'Could not connect to the database. Please check the database
+				configuration in conf.php, verify that the database exists, and ensure that the
+				specified user has access.', $e->getCode(), $e);
 		}
-		return $result;
 	}
 
 	/**
