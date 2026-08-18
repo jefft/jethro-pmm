@@ -1,0 +1,146 @@
+#!/bin/bash -eu
+# Usage: jethro_fly COMMAND [ARGS…]
+#
+# Operations on the Jethro app deployed to Fly.io: the one app configured in
+# docker/fly.toml (see docs/docs/developer/reference/FLYIO.md).
+#
+# The Machine's MariaDB listens only on a unix socket — there is no TCP
+# listener, so `fly proxy` cannot reach it — and the image has no /bin/sh. So
+# every command runs *inside* the Machine via `fly ssh console -C`, with SQL
+# streamed over ssh.
+#
+# Commands:
+#   mysql [MARIADB-ARGS…]
+#       MariaDB client inside the Machine. Interactive when stdin is a TTY
+#       (a shell gets a pty), otherwise it reads SQL from stdin, so both work:
+#           devbox.d/bin/jethro_fly mysql                    # a live terminal
+#           devbox.d/bin/jethro_fly mysql jethro < dump.sql  # pipe a dump in
+#           echo 'select * from _person' | devbox.d/bin/jethro_fly mysql jethro
+#       Defaults to root over the unix socket (no password); pass e.g.
+#       `-u jethro -pjethro` to override.
+#
+#   demodata [SYSTEM_NAME]
+#       (Re)load the demo/functional-test dataset into the 'jethro' database —
+#       the Fly counterpart of `devbox run demodata` (devbox :8081) and
+#       devbox.d/bin/jethro_docker_demodata (local Docker). Runs the same steps
+#       as devbox.d/bin/jethro_load_demodata, issuing every statement through
+#       the `mysql` command above.
+#
+#   status [FLYCTL-ARGS…]
+#       `flyctl status` for the app, run from docker/ (e.g. shows the hostname
+#       even while the app is suspended).
+#
+#   redeploy [FLYCTL-DEPLOY-ARGS…]
+#       Deploy the local jethro-pmm:latest image with docker/fly.toml (build
+#       it first with `devbox.d/bin/jethro_docker build`).
+#
+# Options:
+#   -h, --help      Show this help
+#
+# $FLY overrides the flyctl command (default: fly), e.g. to run with a token:
+#   FLY='sudo -n env FLY_API_TOKEN=… /path/to/fly' devbox.d/bin/jethro_fly mysql
+
+set -o pipefail
+
+self=$(readlink -f "$0")
+bindir=$(dirname "$self")
+repo=$(cd "$bindir/../.." && pwd)
+FLY="${FLY:-fly}"
+config="$repo/docker/fly.toml"
+
+# Socket path baked into docker/entrypoint.sh; absolute binary path because the
+# image has no /bin/sh. Root authenticates over the socket without a password.
+sock=/run/jethro/mariadb/mysql.sock
+remote_db="/sbin/mariadb --socket=$sock -u root --skip-password"
+
+usage() { sed -n '2,/^[^#]/s/^# \?//p' "$self"; }
+die() { echo >&2 "jethro_fly: $*"; exit 1; }
+
+# ── Commands ────────────────────────────────────────────────────────────────
+
+# Run the MariaDB client in the Machine. Args are shell-quoted across the ssh
+# boundary (the remote side parses one command string, so a spaced `-e '…'`
+# would otherwise be split into separate args).
+cmd_mysql() {
+	local quoting pty=()
+	quoting=$(printf '%q ' "$@")
+	[[ -t 0 ]] && pty=(--pty)
+	$FLY ssh console -a "$app" -C "$remote_db $quoting" "${pty[@]}"
+}
+
+# Reload the demo dataset, one `mysql` invocation per statement stream — the
+# same steps as devbox.d/bin/jethro_load_demodata.
+cmd_demodata() {
+	local system_name="${1-}"
+	local dump=tests/functional/testdata/demodata.sql.gz
+	local fakesmses=tests/functional/testdata/fakesmses.sql.gz
+
+	# >&2 so progress doesn't mix with piped SQL on stdout.
+	db_exec() { FLY="$FLY" "$self" mysql "$@"; }
+
+	echo >&2 "Recreating database 'jethro' on $app…"
+	db_exec --skip-show-warnings <<'SQL'
+DROP DATABASE IF EXISTS `jethro`;
+CREATE DATABASE `jethro` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+GRANT ALL PRIVILEGES ON `jethro`.* TO 'jethro'@'localhost';
+SQL
+
+	echo >&2 "Loading $dump into 'jethro'…"
+	zcat "$dump" | php "$bindir/mariadb_rename" --database jethro | db_exec jethro
+
+	echo >&2 "Applying upgrade scripts released after 2.38…"
+	ls "$repo"/upgrades/*.sql | sort --version-sort | sed '0,/2\.38\.sql/ d' | while read -r sql; do
+		echo >&2 "  ${sql#"$repo"/}"
+		db_exec jethro < "$sql"
+	done
+
+	# Align sms.body with _abstract_note.details, which the SMS code joins it against.
+	echo "ALTER TABLE sms MODIFY COLUMN body TEXT COLLATE utf8mb4_unicode_ci;" | db_exec jethro
+
+	echo >&2 "Loading fake SMS history: $fakesmses"
+	zcat "$fakesmses" | db_exec jethro
+
+	if [[ -n $system_name ]]; then
+		printf '%s\n' "UPDATE setting SET value='${system_name//\'/\'\'}' WHERE symbol='SYSTEM_NAME';" | db_exec jethro
+	fi
+
+	printf '%s\n' "SELECT CONCAT('Loaded into \`jethro\`: ', (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='jethro'), ' tables, ', (SELECT COUNT(*) FROM _person), ' people, ', (SELECT COUNT(*) FROM sms), ' SMSes');" | db_exec jethro -sN
+}
+
+# flyctl status, run from docker/ so flyctl finds the app's fly.toml.
+cmd_status() {
+	cd "$repo/docker"
+	$FLY status -a "$app" "$@"
+}
+
+# Deploy the locally loaded image. --local-only is required with --image, else
+# flyctl looks the image up in a registry and fails.
+cmd_redeploy() {
+	docker image inspect jethro-pmm:latest >/dev/null 2>&1 \
+		|| die "no local jethro-pmm:latest image; run devbox.d/bin/jethro_docker build"
+	echo >&2 "Deploying jethro-pmm:latest to $app (docker/fly.toml)…"
+	$FLY deploy -c "$config" --local-only --image jethro-pmm:latest --ha=false "$@"
+}
+
+# ── Argument parsing ────────────────────────────────────────────────────────
+
+case "${1:-}" in
+	-h|--help) usage; exit 0 ;;
+esac
+
+command="${1:-}"
+[[ $# -gt 0 ]] && shift
+
+app=$(sed -n 's/^app[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$config" | head -n1)
+[[ -n $app ]] || die "no app = \"…\" in docker/fly.toml"
+
+cd "$repo"   # demodata uses repo-relative tests/ and upgrades/ paths
+
+case "$command" in
+	mysql)    cmd_mysql "$@" ;;
+	demodata) cmd_demodata "$@" ;;
+	status)   cmd_status "$@" ;;
+	redeploy) cmd_redeploy "$@" ;;
+	"")       usage >&2; exit 2 ;;
+	*)        die "unknown command: $command (try --help)" ;;
+esac

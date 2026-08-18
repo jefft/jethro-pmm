@@ -1,0 +1,56 @@
+# Fly.io deployment for Jethro PMM. flyctl only auto-discovers ./fly.toml, so
+# pass this file explicitly. Build and deploy from the repo root:
+#   devbox run -- devbox.d/bin/jethro_compile --use <version>
+#   nix-build docker -A dockerImage && ./result | docker load
+#   rm include/version.txt   # keep local devbox in DEV mode
+#   fly deploy -c docker/fly.toml --local-only --image jethro-pmm:latest --ha=false
+# See docs/docs/developer/reference/FLYIO.md.
+app = "jethro-sms-demo"
+primary_region = "syd"
+
+[env]
+  NGINX_WEB_PORT = "8081"
+  NGINX_WEB_SERVER_NAME = "jethro-sms-demo.fly.dev"
+  # A Machine can mount only one volume, so JETHRO_HOME, the MariaDB datadir
+  # and PHP sessions are sibling directories on it (never nested).
+  JETHRO_HOME = "/data/jethro"
+  MYSQL_DATADIR = "/data/mariadb"
+  # PHP sessions must sit on the volume: the root filesystem is reset whenever
+  # the Machine stops (idle autostop, restart, redeploy), which would otherwise
+  # log every user out. devbox.d/php/php.ini puts sessions in
+  # ${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/php/sessions.
+  DEVBOX_PROJECT_ROOT = "/data/php-sessions"
+
+  JETHRO_CONF_PREFILL_USERNAME = "demo"
+  JETHRO_CONF_PREFILL_PASSWORD = "qfntt7eYuwHs123"
+  JETHRO_CONF_PREFILL_MEMBER_EMAIL = "mluther@wittenberg.edu.de"
+  JETHRO_CONF_PREFILL_MEMBER_PASSWORD = "qfntt7eYuwHs123"
+  JETHRO_CONF_SMS_SEND_COOLOFF = "0"
+  JETHRO_CONF_SMS_PROVIDER = "5centsmsv5"
+  JETHRO_CONF_SMS_5CENTSMS_APIKEY_ID = "mock-key-id"
+  JETHRO_CONF_SMS_5CENTSMS_APIKEY = "mock-key-secret"
+  JETHRO_CONF_SMS_5CENTSMS_URL = "http://127.0.0.1:8081/smsmockserver/5centsms"
+  JETHRO_CONF_URLSHORTENER_API_KEY = "cus_79209ca34e654bb9a704efdc8b864ce5"
+
+[mounts]
+  source = "jethro_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8081
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "60s"
+    interval = "15s"
+    timeout = "3s"
+    method = "GET"
+    path = "/status.php"
+
+[[vm]]
+  cpu_kind = "shared"
+  memory = "1gb"
+  cpus = 1
