@@ -1,0 +1,54 @@
+# Fly.io deployment for the mock-SMS Jethro DEMO instance (org 'easy-jethro').
+# Same image as docker/fly.toml (the coastec deployment); the only difference is
+# configuration: [env] below points Jethro at the in-image mock SMS server.
+#
+# flyctl only auto-discovers ./fly.toml, so pass this file explicitly:
+#   nix-build docker -A dockerImage && ./result | docker load
+#   fly deploy -c docker/fly.demo.toml --local-only --image jethro-pmm:latest --ha=false
+#
+# Scales to zero: with auto_stop="stop" + min_machines_running=0 the Machine
+# stops when idle and boots on the next request (~1s of it is our own startup —
+# see DOCKER_PLAN.md "Startup timing").
+# See docs/docs/developer/reference/FLYIO.md.
+app = "mychurch-jethro"
+primary_region = "syd"
+
+[env]
+  NGINX_WEB_PORT = "8081"
+  NGINX_WEB_SERVER_NAME = "mychurch-jethro.fly.dev"
+  # A Machine can mount only one volume, so JETHRO_HOME and the MariaDB
+  # datadir are sibling directories on it (never nested).
+  JETHRO_HOME = "/data/jethro"
+  MYSQL_DATADIR = "/data/mariadb"
+  # Point Jethro at the mock SMS server that ships in the image (served by the
+  # same nginx/php-fpm at /smsmockserver/5centsms). These become conf.php
+  # constants via the JETHRO_CONF_* hook in docker/conf.php; php-fpm.conf sets
+  # clear_env = no so they reach PHP.
+  JETHRO_CONF_SMS_PROVIDER = "5centsmsv5"
+  JETHRO_CONF_SMS_5CENTSMS_APIKEY_ID = "mock-key-id"
+  JETHRO_CONF_SMS_5CENTSMS_APIKEY = "mock-key-secret"
+  JETHRO_CONF_SMS_5CENTSMS_URL = "http://127.0.0.1:8081/smsmockserver/5centsms"
+  # Demo convenience: no send cool-off (default is 30s).
+  JETHRO_CONF_SMS_SEND_COOLOFF = "0"
+
+[mounts]
+  source = "jethro_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8081
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "120s"
+    interval = "15s"
+    timeout = "3s"
+    method = "GET"
+    path = "/status.php"
+
+[[vm]]
+  memory = "1gb"
+  cpus = 1

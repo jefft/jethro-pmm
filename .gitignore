@@ -21,5 +21,7 @@ resources/css/jethro-*.css
 # resources/css/jethro-*.css: only resources/less/ files should be in git
 resources/js/jethro-*.js
 # resources/js/jethro-*.js: only resources/js/jethro.js should be in git
+/result
+# /result is the Nix build output symlink (nix-build docker -A dockerImage)
 tests/functional/test-results
 /vendor/

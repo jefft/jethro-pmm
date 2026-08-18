@@ -1,0 +1,55 @@
+# docker/compose.yml
+#
+# Runs the Jethro PMM image locally: docker compose -f docker/compose.yml up
+# Host port 8082 avoids the devbox dev instance on 8081.
+#
+# Build the image first: devbox.d/bin/jethro_docker build
+# (or: nix-build docker -A dockerImage && ./result | docker load)
+
+services:
+  jethro:
+    image: jethro-pmm:latest
+    # Or use 'build: .' to build from the Dockerfile instead of a pre-built image.
+    ports:
+      - "8082:8081"          # Nginx → Jethro UI
+    volumes:
+      # Named volumes: persist across `docker compose down` and avoid
+      # root-owned files being written into the repo checkout.
+      - jethro-home:/var/lib/jethro        # JETHRO_HOME: static files (docs/)
+      - jethro-db:/var/lib/mariadb         # MYSQL_DATADIR
+      - jethro-sessions:/var/lib/php-sessions  # DEVBOX_PROJECT_ROOT (PHP sessions)
+    environment:
+      NGINX_WEB_PORT: "8081"
+      # JETHRO_HOME: /var/lib/jethro       # override if needed
+      # MYSQL_DATADIR: /var/lib/mariadb
+      # NGINX_WEB_SERVER_NAME: example.com
+      # Point Jethro at the mock SMS server that ships in the image and is
+      # served by the same nginx/php-fpm at /smsmockserver/5centsms (see
+      # smsmockserver/README.md). These become conf.php constants via the
+      # JETHRO_CONF_* hook; php-fpm.conf sets clear_env = no so they reach PHP.
+      JETHRO_CONF_SMS_PROVIDER: "5centsmsv5"
+      JETHRO_CONF_SMS_5CENTSMS_APIKEY_ID: "mock-key-id"
+      JETHRO_CONF_SMS_5CENTSMS_APIKEY: "mock-key-secret"
+      JETHRO_CONF_SMS_5CENTSMS_URL: "http://127.0.0.1:8081/smsmockserver/5centsms"
+      # Demo convenience: no send cool-off (default is 30s).
+      JETHRO_CONF_SMS_SEND_COOLOFF: "0"
+      # Offer a literal Sender ID rather than only the (unverified) acting
+      # user's mobile: senderNotVerifiedError() blocks sends as your own
+      # mobile until it is registered with the provider, and the mock reports
+      # no registered numbers. The mock accepts any sender on send.
+      JETHRO_CONF_SMS_SENDER_OPTIONS: "Jethro"
+    restart: unless-stopped
+    # healthcheck matches the HEALTHCHECK baked into the Nix image
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8081/status.php"]
+      interval: 10s
+      timeout: 3s
+      start_period: 60s
+      retries: 3
+
+# Named volumes (auto-created on first `docker compose up`).
+# Start fresh with: docker volume rm jethro-home jethro-db jethro-sessions
+volumes:
+  jethro-home:
+  jethro-db:
+  jethro-sessions:

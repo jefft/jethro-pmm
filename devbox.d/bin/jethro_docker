@@ -1,0 +1,63 @@
+#!/bin/bash -eu
+# Usage: jethro_docker COMMAND [ARGS…]
+#
+# Operations on the Jethro PMM Docker image (docker/default.nix; see
+# docs/docs/developer/reference/DOCKER_PLAN.md).
+#
+# Commands:
+#   build
+#       Build the image with Nix (nix-build docker -A dockerImage,
+#       nixpkgs.dockerTools.streamLayeredImage) and load it into the local
+#       Docker daemon as jethro-pmm:latest. Deploy it to Fly.io with
+#       `devbox.d/bin/jethro_fly redeploy`.
+#
+#       Prerequisite: compiled assets and include/version.txt
+#       (devbox run -- devbox.d/bin/jethro_compile --use <version>); the build
+#       stops with instructions if they are missing.
+#
+# Options:
+#   -h, --help      Show this help
+
+set -o pipefail
+
+self=$(readlink -f "$0")
+repo=$(cd "$(dirname "$self")/../.." && pwd)
+
+usage() { sed -n '2,/^[^#]/s/^# \?//p' "$self"; }
+die() { echo >&2 "jethro_docker: $*"; exit 1; }
+
+# ── Commands ────────────────────────────────────────────────────────────────
+
+cmd_build() {
+	[[ $# -eq 0 ]] || die "build takes no arguments"
+	command -v nix-build >/dev/null || die "nix-build not found on PATH"
+	command -v docker >/dev/null || die "docker not found on PATH"
+
+	# Materialise the gitignored devbox sub-flakes (no-op if already present).
+	./devbox install
+
+	echo "Building jethro-pmm:latest (nix-build docker -A dockerImage)…"
+	nix-build docker -A dockerImage
+
+	echo "Loading image into Docker…"
+	./result | docker load
+
+	echo "Done: jethro-pmm:latest is available to Docker."
+}
+
+# ── Argument parsing ────────────────────────────────────────────────────────
+
+case "${1:-}" in
+	-h|--help) usage; exit 0 ;;
+esac
+
+command="${1:-}"
+[[ $# -gt 0 ]] && shift
+
+cd "$repo"
+
+case "$command" in
+	build) cmd_build "$@" ;;
+	"")    usage >&2; exit 2 ;;
+	*)     die "unknown command: $command (try --help)" ;;
+esac

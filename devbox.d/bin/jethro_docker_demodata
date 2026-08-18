@@ -1,0 +1,62 @@
+#!/bin/bash -eu
+# Usage: jethro_docker_demodata [CONTAINER] [SYSTEM_NAME]
+# Load the demo/functional-test dataset into a *running* dockerized Jethro
+# (docker/compose.yml) — the docker equivalent of `devbox run demodata` for the
+# devbox :8081 instance.
+#
+# The container's MariaDB listens only on its unix socket, so the host cannot
+# connect to it directly. Rather than duplicate the loading logic, this runs the
+# *same* loader (devbox.d/bin/jethro_load_demodata) with its DB commands shadowed
+# by `docker exec` wrappers that speak to the container's socket:
+#   mariadb         -> docker exec … mariadb -u jethro -pjethro --socket …
+#   mariadb_as_root -> docker exec … mariadb -u root --skip-password --socket …
+#   mariadb_check   -> always succeeds (the devbox guard rejects non-devbox dirs)
+#
+# CONTAINER defaults to the Compose service 'jethro'. SYSTEM_NAME optionally
+# overrides the loaded data's SYSTEM_NAME setting.
+#
+# See docs/docs/developer/reference/DOCKER_PLAN.md.
+
+set -o pipefail
+cd "$(dirname "$(readlink -f "$0")")/../.."  # repo root
+
+bindir=$(dirname "$(readlink -f "$0")")
+container="${1:-}"
+system_name="${2-}"
+
+if [[ -z $container ]]; then
+	container=$(docker ps --filter 'label=com.docker.compose.service=jethro' --format '{{.Names}}' | head -n1)
+fi
+if [[ -z $container ]]; then
+	echo >&2 "ERROR: no running Jethro container found; start one with"
+	echo >&2 "       docker compose -f docker/compose.yml up -d"
+	exit 1
+fi
+
+# Socket path baked into docker/entrypoint.sh.
+sock=/run/jethro/mariadb/mysql.sock
+
+shim=$(mktemp -d)
+trap 'rm -rf "$shim"' EXIT
+
+cat > "$shim/mariadb" <<EOF
+#!/bin/bash
+exec docker exec -i "$container" mariadb --socket=$sock -u jethro -pjethro "\$@"
+EOF
+
+cat > "$shim/mariadb_as_root" <<EOF
+#!/bin/bash
+exec docker exec -i "$container" mariadb --socket=$sock -u root --skip-password "\$@"
+EOF
+
+# The devbox guard (devbox.d/bin/mariadb_check) rejects any datadir outside
+# .devbox/virtenv/*/data/; the container's datadir is /var/lib/mariadb.
+cat > "$shim/mariadb_check" <<'EOF'
+#!/bin/bash
+exit 0
+EOF
+
+chmod +x "$shim"/*
+
+echo "Loading demo data into container '$container' (socket $sock)…"
+PATH="$shim:$bindir:$PATH" "$bindir/jethro_load_demodata" jethro "$system_name"
