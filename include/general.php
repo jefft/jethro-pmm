@@ -1091,6 +1091,21 @@ function jethro_password_verify($password, $hash)
 }
 
 /**
+/**
+ * Escape a text value for an RFC 5545 iCal TEXT property: backslash, semicolon
+ * and comma are backslash-escaped, and CR/LF are folded into the literal \\n
+ * sequence so a crafted value cannot inject new iCal lines (finding X8).
+ * @param mixed $value
+ * @return string
+ */
+function ical_escape_text($value)
+{
+	$value = str_replace(array('\\', ';', ','), array('\\\\', '\\;', '\\,'), (string)$value);
+	$value = str_replace(array("\r\n", "\r", "\n"), '\\n', $value);
+	return $value;
+}
+
+/**
  * Writes a CSV file.  Unlike php's native fputcsv, it encloses every non-empty cell with the enclosure
  * - not just the ones it thinks need it.
  * @param array $rows	data to put in the CSV
