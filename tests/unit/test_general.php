@@ -741,3 +741,23 @@ test('request_origin_is_proven: only same-origin or a matching Origin counts', f
     assert_false(request_origin_is_proven(null, '', $expected),
         'no signal is not proof, unlike request_origin_verdict()');
 });
+
+// ===========================================================================
+// ical_escape_text — RFC 5545 TEXT escaping (finding X8)
+// ===========================================================================
+
+test('ical_escape_text: escapes backslash, semicolon, comma', function () {
+    assert_eq(ical_escape_text('a\\b;c,d'), 'a\\\\b\\;c\\,d',
+        'RFC 5545 specials must be backslash-escaped');
+});
+
+test('ical_escape_text: newlines become literal \\n (no line injection)', function () {
+    $payload = "Meeting\nBEGIN:VEVENT\nSUMMARY:Hacked";
+    $out = ical_escape_text($payload);
+    assert_not_contains($out, "\n", 'output must not contain a real newline');
+    assert_contains($out, '\\nBEGIN:VEVENT', 'the injected line must be folded into the text');
+});
+
+test('ical_escape_text: plain text passes through unchanged', function () {
+    assert_eq(ical_escape_text('Usher 9am'), 'Usher 9am');
+});
