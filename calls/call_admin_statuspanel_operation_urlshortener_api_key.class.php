@@ -424,15 +424,13 @@ class Call_Admin_Statuspanel_Operation_Urlshortener_Api_Key extends Call_Admin_S
      */
     private function getCallbackUrl(): string
     {
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-            ? 'https' : 'http';
-        $host = $_SERVER['HTTP_X_FORWARDED_HOST']
-            ?? $_SERVER['HTTP_HOST']
-            ?? $_SERVER['SERVER_NAME'];
+        // NB: request_scheme_and_host() applies the A5 X-Forwarded/ALLOWED_HOSTS
+        // rules — this URL is registered with the URL-shortener service as an
+        // OAuth callback, so a poisoned host would redirect that flow.
         $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         $query = 'call=' . $this->callName() . '&operation=register';
 
-        return "{$scheme}://{$host}{$path}?{$query}";
+        return request_scheme_and_host()."{$path}?{$query}";
     }
 
     /**
