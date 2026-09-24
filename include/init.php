@@ -59,7 +59,7 @@ if (!defined('BASE_URL_ABSOLUTE')) {
 	}
 }
 
-if (session_id() == '') {
+if ((php_sapi_name() != 'cli') && (session_id() == '')) {
   	// If max length is set, set the cookie timeout - this will allow sessions to outlast browser invocations
   	$expiryTime = defined('SESSION_MAXLENGTH_MINS') ? SESSION_MAXLENGTH_MINS * 60 : NULL;
   	session_set_cookie_params([
