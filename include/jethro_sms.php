@@ -696,7 +696,7 @@ function senderNotVerifiedError(\Sms\SmsSender $sender): ?string
     }
     $verified = $provider->verifySenderNumber($own);
     if ($verified->isSuccess() && $verified->getValue() === false) {
-        return 'Your mobile number ' . $own->value . ' isn\'t verified as a sender for you: verify it from the sender list first.';
+        return 'Your mobile number ' . $own->value . ' isn\'t verified as a sender for you: use "verify now" next to the sender, then click the verification link (or enter the code) the provider texts to your mobile.';
     }
     return null;
 }

@@ -74,8 +74,9 @@ test.describe("SMS sender number registration", () => {
         await expect(registerStatus).toContainText(/created|verified|success|already exist/i, { timeout: to(5000) });
         break;
       case "5centsmsv5":
-        // 5CentSMS verifies out of band: it texts the number a link to click.
-        await expect(registerStatus).toContainText("Verification link sent to the number", { timeout: to(5000) });
+        // 5CentSMS verifies out of band: it texts the number a link to click
+        // (bandleader's mobile, 0491571175).
+        await expect(registerStatus).toContainText(/Verification link sent to (0|61)?491571175\./, { timeout: to(5000) });
         break;
       case "mobilemessage":
         // So does MobileMessage, naming the number it texted (rostersetter's).

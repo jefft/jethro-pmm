@@ -165,6 +165,10 @@ class Call_SMS_SenderNum extends Call
 		if ($step->message !== '') {
 			$html .= '<p><em>' . ents($step->message) . '</em></p>';
 		}
+		if ($step->instructions !== '') {
+			// Provider-authored; may carry inline markup (mirrors renderRegistrationStepHtml()).
+			$html .= '<p>' . $step->instructions . '</p>';
+		}
 
 		// Already registered — no further action needed
 		if ($step->registered && $step->isComplete()) {

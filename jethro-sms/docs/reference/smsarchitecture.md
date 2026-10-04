@@ -216,7 +216,7 @@ A number already claimed by someone else is never treated as verified for you, w
 
 At send time, `senderNotVerifiedError()` (called by `Call_SMS`) refuses to send as your own mobile on a `REGISTER_SENDER_NUMBER` provider unless that number is verified for you. `Call_SMS_Sendernum` only lets you verify your own mobile.
 
-5CentSMS v5 verifies by an SMS link rather than an OTP, so its registration step returns `registered: false`. Once the number shows as approved upstream, `verifySenderNumber()` → `getSenderNumbers()` picks it up and DbLogging claims it.
+5CentSMS v5 verifies by an SMS link rather than an OTP, so its registration step returns `registered: false`. Its number-registration steps never surface the raw upstream message (a generic "Sender ID created"): Phase 1 returns "Verification link sent to <number>." plus instructions to click it on the handset; an "already exists" upstream error is reported as "already registered … waiting for verification" (guidance, not a failure); Phase 2 reports the handset follow-up instead of claiming success. Once the number shows as approved upstream, `verifySenderNumber()` → `getSenderNumbers()` picks it up and DbLogging claims it.
 
 ## Send flow (web)
 

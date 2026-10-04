@@ -517,22 +517,43 @@ class FiveCentSmsV5Provider implements SmsProvider
                 return \Result::failure($result->getError());
             }
             $data = $result->getValue();
-            $errorMsg = \is_array($data) && !empty($data['error']) ? $data['error'] : '';
+            $errorMsg = \is_array($data) && !empty($data['error']) ? (string) $data['error'] : '';
             if ($errorMsg !== '') {
+                // "Already exists" means the number is on the account but
+                // still awaiting verification — the "click the link" state,
+                // not a failure.  Surface the follow-up instead of the raw
+                // upstream error.  (The upstream message for a successful
+                // create is a generic "Sender ID created", which says nothing
+                // about the link, so it is never surfaced for numbers.)
+                if (stripos($errorMsg, 'already exist') !== false) {
+                    $this->cache?->delete('sms_senderids');
+                    return \Result::success(new RegistrationStep(
+                        registered: false,
+                        message: $number . ' is already registered with 5CentSMS and is waiting for verification.',
+                        instructions: 'The verification link 5CentSMS texted to the number must be clicked on the handset. Once the number shows as approved it can be used as a sender.',
+                        number: $number,
+                        fields: [],
+                    ));
+                }
                 return \Result::failure($errorMsg);
             }
             $this->cache?->delete('sms_senderids');
             return \Result::success(new RegistrationStep(
                 registered: false,
-                message: \is_array($data) && isset($data['message']) ? (string)$data['message'] : 'Verification link sent to the number',
+                message: 'Verification link sent to ' . $number . '.',
+                instructions: 'The owner must click the verification link on the handset. Once the number shows as approved it can be used as a sender.',
+                number: $number,
                 fields: [],
             ));
         }
 
-        // Phase 2: v5 verification is out-of-band (link sent via SMS)
+        // Phase 2: v5 verification is out-of-band (link sent via SMS) and
+        // there is no API to complete or poll it — report the follow-up
+        // instead of claiming success.
         return \Result::success(new RegistrationStep(
-            registered: true,
-            message: 'Verification complete — your number is now registered.',
+            registered: false,
+            message: 'Verification happens on the handset: click the verification link 5CentSMS texted to the number. It can be used as a sender once it shows as approved.',
+            fields: [],
         ));
     }
 
