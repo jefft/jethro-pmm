@@ -44,6 +44,8 @@ final class Cellcast implements ProviderInterface
                 $this->handleVerifyCustomNumber($ctx);
             case $method === 'POST' && $path === '/api/v1/business/add':
                 $this->handleBusinessAdd($ctx);
+            case $method === 'GET' && $path === '/api/v1/business':
+                $this->handleGetBusiness($ctx);
             case $method === 'GET' && preg_match('#^/api/v2/report/message/([^/]+)$#', $path, $m):
                 $this->handleReportMessage($ctx, $m[1]);
             case $method === 'GET' && $path === '/api/v2/report/message':
@@ -244,7 +246,6 @@ final class Cellcast implements ProviderInterface
 
         // Dynamic mode: defaults + the profile's pre-registered numbers + approved registrations
         $defaults = [
-            ['number' => 'StJohnsWPH', 'name' => 'St Johns WPH'],
             ['number' => '614915701588', 'name' => 'Church Main'],
             ['number' => '61402000002', 'name' => 'Youth Group'],
             ...($cp?->preRegistered ?? []),
@@ -259,6 +260,7 @@ final class Cellcast implements ProviderInterface
 
         $rows = $ctx->store->listRegistrationsForScope($ctx->profileName, 'cellcast');
         foreach ($rows as $row) {
+            if ($row['kind'] !== 'number') continue;	// business names are listed by GET /api/v1/business
             $approval = $ctx->state->deriveApproval($row, $ctx->now);
             if ($approval !== State::APPROVAL_APPROVED) continue;
 
@@ -383,11 +385,99 @@ final class Cellcast implements ProviderInterface
         Util::json(200, ['status' => true, 'message' => 'Number verified successfully (test mode)']);
     }
 
-    // ── Business Add (stub) ────────────────────────────────────────────
+    // ── Business names (Alpha Sender IDs) ──────────────────────────────
 
+    /** Store kind for business-name registrations (cf. 'number' for custom numbers). */
+    private const KIND_BUSINESS = 'businessname';
+
+    /**
+     * POST /api/v1/business/add — records a registration that then appears in
+     * GET /api/v1/business: REQUESTED while pending (the profile's approval
+     * delay, or forced pending), ACTIVE once approved. A name the account
+     * already has is refused, as real Cellcast does.
+     */
     private function handleBusinessAdd(Ctx $ctx): void
     {
-        Util::json(200, ['status' => true, 'message' => 'Business added successfully']);
+        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $name = trim((string) ($body['businessname'] ?? ''));
+        if ($name === '') {
+            Util::json(200, ['status' => false, 'message' => 'Business Name is required!']);
+        }
+
+        $known = array_column($this->businessNames($ctx), 'businessname');
+        if (\in_array($name, $known, true)) {
+            Util::json(200, ['status' => false, 'message' => 'businessname is already registered']);
+        }
+
+        $pending = new PendingRegistration();
+        $pending->provider = 'cellcast';
+        $pending->kind = self::KIND_BUSINESS;
+        $pending->value = $name;
+        $pending->displayName = $name;
+        $pending->rawBody = json_encode($body);
+
+        if ($ctx->profileHooks?->onRegisterHook !== null) {
+            ($ctx->profileHooks->onRegisterHook)($pending);
+        }
+
+        $record = fn(array $state) => $ctx->store->upsertRegistration(
+            $ctx->profileName, 'cellcast', self::KIND_BUSINESS, $name, $name,
+            ...$state + ['rawRequest' => json_encode($body), 'createdAt' => $ctx->now],
+        );
+        switch ($pending->action()) {
+            case PendingRegistration::ACTION_REJECT:
+                Util::json(200, ['status' => false, 'message' => $pending->rejectReason()]);
+            case PendingRegistration::ACTION_APPROVE:
+                $record(['approvedAt' => $ctx->now]);
+                break;
+            case PendingRegistration::ACTION_PENDING_INDEFINITE:
+                $record(['forcedState' => State::APPROVAL_PENDING]);
+                break;
+            default: // ACTION_AUTO, ACTION_APPROVE_AFTER: approval delay applies
+                $record([]);
+        }
+        Util::json(200, [
+            'status' => true,
+            'message' => 'Request added successfully for business name!',
+            'data' => ['businessname' => $name, 'status' => 'REQUESTED', 'isDeleted' => false],
+            'error' => [],
+        ]);
+    }
+
+    /**
+     * GET /api/v1/business — undocumented by Cellcast; shape per
+     * jethro-sms/docs/reference/_cellcast/business/GET.md (trimmed to the
+     * fields Jethro reads).
+     */
+    private function handleGetBusiness(Ctx $ctx): void
+    {
+        Util::json(200, ['status' => true, 'message' => 'Business listed succesfully', 'data' => $this->businessNames($ctx), 'error' => []]);
+    }
+
+    /**
+     * The account's business names: the profile's list (default StJohnsWPH)
+     * plus names registered via POST /api/v1/business/add, with Cellcast
+     * statuses derived from the registration's approval state.
+     *
+     * @return list<array{businessname:string,status:string,acmaStatus:string,isDeleted:bool}>
+     */
+    private function businessNames(Ctx $ctx): array
+    {
+        $out = CellcastProfile::get($ctx->profileName)?->businessNames
+            ?? [['businessname' => 'StJohnsWPH', 'status' => 'ACTIVE', 'acmaStatus' => 'ACMA_APPROVED', 'isDeleted' => false]];
+        $seen = array_flip(array_column($out, 'businessname'));
+
+        foreach ($ctx->store->listRegistrationsForScope($ctx->profileName, 'cellcast') as $row) {
+            if ($row['kind'] !== self::KIND_BUSINESS || isset($seen[$row['value']])) continue;
+            $seen[$row['value']] = true;
+            [$status, $acma] = match ($ctx->state->deriveApproval($row, $ctx->now)) {
+                State::APPROVAL_APPROVED => ['ACTIVE', 'ACMA_APPROVED'],
+                State::APPROVAL_REJECTED => ['REJECTED', 'ACMA_REJECTED'],	// not observed on the real API
+                default                  => ['REQUESTED', 'PENDING_CELLCAST_REVIEW'],
+            };
+            $out[] = ['businessname' => $row['value'], 'status' => $status, 'acmaStatus' => $acma, 'isDeleted' => false];
+        }
+        return $out;
     }
 
     // ── Report Message ─────────────────────────────────────────────────

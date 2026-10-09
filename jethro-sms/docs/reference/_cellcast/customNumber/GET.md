@@ -1,8 +1,15 @@
 # GET /api/v1/customNumber
 
-**Status: VERIFIED** — responses confirmed against the real Cellcast API (see `logs/easyjethro.log`).
+**Status: VERIFIED 2026-10-09** against two live Cellcast accounts
 
-Returns all registered senders for the authenticated account. A single endpoint serves two distinct sender types: **phone numbers** and **alphanumeric sender IDs**. The caller routes entries based on whether `number` is all-digits or not.
+Lists the account's **sender phone numbers** (custom numbers). Read by
+`CellcastSmsProvider::getSenderNumbers()`.
+
+It does **not** list alphanumeric Sender IDs (business names / Alpha IDs): an
+account with an approved, active business name returned only its phone number
+here. Those come from [`GET /api/v1/business`](../business/GET.md), read by
+`getSenderIds()`. (Earlier versions of this doc and of `getSenderIds()` assumed
+alphanumeric entries appeared here; they don't.)
 
 ---
 
@@ -21,132 +28,53 @@ No request body. No query parameters.
 
 ```json
 {
+  "status": true,
   "data": [
-    { "number": "StJohnsWPH",    "name": "St Johns WPH" },
-    { "number": "614915701588",  "name": "Church Main"  },
-    { "number": "61402000002",   "name": "Youth Group"  }
+    {
+      "_id": "…",
+      "number": "614xxxxxxxx",
+      "name": "Church Main",
+      "status": "active",
+      "isDefault": false,
+      "deleted": false,
+      "allocatedUsers": [],
+      "user": "…",
+      "approvedAt": "…",
+      "createdBy": "…",
+      "createdAt": "…",
+      "updatedAt": "…",
+      "__v": 0
+    }
   ]
 }
 ```
 
-### Fields
+### Fields Jethro reads
 
 | Field | Type | Description |
 |---|---|---|
-| `data` | array | List of registered sender entries. Empty array `[]` if none registered. |
-| `data[].number` | string | The sender identity. All-digit strings are phone numbers; mixed/alpha strings are sender IDs. |
-| `data[].name` | string | Human-readable label assigned in the Cellcast dashboard. Not used programmatically. |
+| `data` | array | Sender numbers. `[]` if none. |
+| `data[].number` | string | The phone number (digits, optionally `+`). Entries that aren't all digits are skipped. |
 
 ### Error response (auth failure / server error)
 
-When authentication fails or a server error occurs, Cellcast returns a top-level `code`/`message` object **without** a `data` key:
+Cellcast returns a top-level `code`/`message` object **without** a `data` key:
 
 ```json
-{ "code": 401, "message": "Unauthorized" }
+{ "code": 401, "message": "Token expired", "stack": "APIError: Token expired ...." }
 ```
 
-`getSenderNumbers()` detects this by checking `isset($data['code']) && !isset($data['data'])` and returns a `Result::failure`.
+`fetchCachedList()` treats `isset($data['code']) && !isset($data['data'])` as a
+failure rather than "no numbers".
 
 ---
 
-## Routing: phone numbers vs. sender IDs
+## Caching
 
-This single endpoint is the source for two provider methods. The split is done by `number` format:
+Session-cached for 30 minutes under `sms_sendernumbers`.
 
-| Condition on `number` | Matches regex | Goes to | Returns |
-|---|---|---|---|
-| All digits, optional leading `+` | `/^\+?\d+$/` | `getSenderNumbers()` | `PhoneNumber[]` |
-| Contains letters or non-digit chars | does **not** match | `getSenderIds()` | `SenderID[]` |
+## Mock server
 
-Both methods call `GET /api/v1/customNumber` independently. Each silently skips the entries it doesn't own — `getSenderNumbers()` skips alphanumeric entries, `getSenderIds()` skips numeric ones.
-
----
-
-## Source references
-
-### `getSenderNumbers()` — phone number entries only
-
-**`jethro-sms/src/sms_cellcast.php`, lines 632–661**
-
-```php
-public function getSenderNumbers(): \Result
-{
-    $result = $this->request('GET', '/api/v1/customNumber');
-    // ...
-    foreach ($items as $item) {
-        $number = $item['number'];
-        // Skip alphanumeric sender IDs — getSenderIds() handles those
-        if (!preg_match('/^\+?\d+$/', $number)) continue;
-        $numbers[] = new PhoneNumber($number);
-    }
-    return \Result::success($numbers);
-}
-```
-
-### `getSenderIds()` — alphanumeric entries only
-
-**`jethro-sms/src/sms_cellcast.php`, lines 427–451**
-
-```php
-public function getSenderIds(bool $getAll = false): \Result
-{
-    // Cellcast returns both phone numbers and alphanumeric sender IDs
-    // from the same /api/v1/customNumber endpoint. Phone numbers go
-    // through getSenderNumbers(); alphanumeric entries are sender IDs.
-    $result = $this->request('GET', '/api/v1/customNumber');
-    // ...
-    foreach ($items as $item) {
-        $number = (string) $item['number'];
-        // Skip entries that are valid phone numbers —
-        // those are sender numbers, not alphanumeric sender IDs.
-        if (preg_match('/^\+?\d+$/', $number)) continue;
-        $ids[] = new \Sms\SenderID($number);
-    }
-    return \Result::success($ids);
-}
-```
-
----
-
-## Test fixtures
-
-### `tests/sms-mock-overrides-cellcast-stjohns.json` — mixed (phone numbers + sender ID)
-
-This variant exercises the alphanumeric split. `StJohnsWPH` is routed to `getSenderIds()`; the two numeric entries are routed to `getSenderNumbers()`.
-
-```json
-"GET /customNumber": {
-    "data": [
-        {"number": "StJohnsWPH",   "name": "St Johns WPH"},
-        {"number": "614915701588", "name": "Church Main"},
-        {"number": "61402000002",  "name": "Youth Group"}
-    ]
-}
-```
-
-### `tests/sms-mock-overrides-cellcast.json` — phone numbers only
-
-```json
-"GET /customNumber": {
-    "data": [
-        {"number": "614915701588", "name": "Church Main"},
-        {"number": "61402000002",  "name": "Youth Group"}
-    ]
-}
-```
-
----
-
-## Real API response (from logs)
-
-Recorded in `logs/easyjethro.log`. The live API returns the same mixed shape as the `stjohns` fixture:
-
-```json
-{"data":[{"number":"StJohnsWPH","name":"St Johns WPH"},{"number":"614915701588","name":"Church Main"},{"number":"61402000002","name":"Youth Group"}]}
-```
-
----
-
-## Error Response Structure
-
-Unknown — not yet documented.
+`smsmockserver` (`Provider/Cellcast.php`, `handleGetCustomNumber()`): a
+profile's `setSenders()` list, else two default numbers plus approved number
+registrations.

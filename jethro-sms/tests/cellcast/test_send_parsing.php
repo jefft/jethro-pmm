@@ -636,3 +636,48 @@ test('getSenderNumbers: requests /api/v1/customNumber via GET', function () {
     assert_eq($spy->lastRequest->method, 'GET');
     assert_contains($spy->lastRequest->url, '/api/v1/customNumber');
 });
+
+// ---------------------------------------------------------------------------
+// getSenderIds() — business names from GET /api/v1/business
+// ---------------------------------------------------------------------------
+
+test('getSenderIds: reads business names from /api/v1/business, not /api/v1/customNumber', function () {
+    // Approved Alpha IDs (e.g. "ConnectCC") only appear at /api/v1/business;
+    // /api/v1/customNumber lists sender phone numbers.
+    $spy = new SpyHttpClient(successResponse(json_encode(['data' => []])));
+    $provider = makeProvider($spy);
+
+    $provider->getSenderIds(getAll: true);
+
+    assert_eq($spy->lastRequest->method, 'GET');
+    assert_contains($spy->lastRequest->url, '/api/v1/business');
+    assert_not_contains($spy->lastRequest->url, 'customNumber');
+});
+
+test('getSenderIds: approval from acmaStatus/status; deleted and nameless entries skipped', function () {
+    $response = ['status' => true, 'data' => [
+        ['businessname' => 'ConnectCC', 'status' => 'ACTIVE', 'acmaStatus' => 'ACMA_APPROVED', 'isDeleted' => false],
+        ['businessname' => 'Pending',   'status' => 'REQUESTED', 'acmaStatus' => 'PENDING_ACMA_APPROVAL', 'isDeleted' => false],
+        ['businessname' => 'Rejected',  'status' => 'REJECTED', 'acmaStatus' => 'ACMA_REJECTED', 'isDeleted' => false],
+        ['businessname' => 'Gone',      'status' => 'ACTIVE', 'acmaStatus' => 'ACMA_APPROVED', 'isDeleted' => true],
+        ['status' => 'ACTIVE'],
+    ]];
+    $provider = makeProvider(new FakeHttpClient(successResponse(json_encode($response))));
+
+    $all = $provider->getSenderIds(getAll: true)->getValue();
+    assert_eq(array_map(fn($s) => [$s->value, $s->acmaApproved], $all),
+        [['ConnectCC', true], ['Pending', false], ['Rejected', false]]);
+
+    $usable = $provider->getSenderIds()->getValue();
+    assert_eq(array_map(fn($s) => $s->value, $usable), ['ConnectCC'], 'Unapproved names are hidden by default');
+});
+
+test('getSenderIds: Cellcast auth error propagates as failure', function () {
+    $response = ['code' => 401, 'message' => 'Token expired', 'stack' => 'APIError: Token expired'];
+    $provider = makeProvider(new FakeHttpClient(successResponse(json_encode($response))));
+
+    $result = $provider->getSenderIds();
+
+    assert_true($result->isFailure());
+    assert_contains($result->getError(), '401');
+});
