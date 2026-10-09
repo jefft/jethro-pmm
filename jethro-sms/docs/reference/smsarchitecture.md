@@ -529,6 +529,7 @@ Auth: `key-id` + `key-secret` in JSON body on every request (including GETs — 
 | `send()` | `POST /api/v1/gateway` |
 | `getBalance()` | `GET /api/v1/apiClient/account` (different envelope) |
 | `getSenderNumbers()` | `GET /api/v1/customNumber` |
+| `getSenderIds()` | `GET /api/v1/business` (undocumented; business names / Alpha IDs) |
 | `updateDelivery()` | `GET /api/v2/report/message/{id}` |
 | `listRecentDeliveries()` | `GET /api/v2/report/message?campType=sms&fromDate=…` (paginated) |
 | `cancel()` (per delivery) | `POST /api/v1/gateway/cancelScheduleQuickMessage` |

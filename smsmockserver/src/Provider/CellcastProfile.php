@@ -22,12 +22,14 @@ final class CellcastProfile
     /** @param Profile $profile The underlying framework profile */
     private function __construct(
         public readonly Profile $profile,
-        /** @var list<array{number:string,name:string}> */
+        /** @var list<array{number:string,name:string}> Sender phone numbers (GET /api/v1/customNumber) */
         public array $senders = [],
         /** @var list<array{number:string,first_name:string,last_name:string,full_name:string}> */
         public array $optOuts = [],
         /** @var list<array{number:string,name:string}> Sender numbers already registered on the account, in dynamic mode */
         public array $preRegistered = [],
+        /** @var list<array{businessname:string,status:string,acmaStatus:string,isDeleted:bool}>|null Business names (GET /api/v1/business); null = defaults */
+        public ?array $businessNames = null,
     ) {}
 
     /**
@@ -64,6 +66,24 @@ final class CellcastProfile
     public function setSenders(array $senders): void
     {
         $this->senders = $senders;
+    }
+
+    /**
+     * Business names (Alpha Sender IDs) the account lists at GET /api/v1/business.
+     * A string is an approved, active name; an array overrides fields, e.g.
+     * ['businessname' => 'Pending', 'status' => 'REQUESTED', 'acmaStatus' => 'PENDING_ACMA_APPROVAL'].
+     *
+     * @param list<string|array<string,mixed>> $names
+     */
+    public function setBusinessNames(array $names): void
+    {
+        $this->businessNames = array_map(
+            static fn(string|array $n) => array_merge(
+                ['status' => 'ACTIVE', 'acmaStatus' => 'ACMA_APPROVED', 'isDeleted' => false],
+                \is_string($n) ? ['businessname' => $n] : $n,
+            ),
+            $names,
+        );
     }
 
     /** @param list<array{number:string,first_name:string,last_name:string,full_name:string}> $items */

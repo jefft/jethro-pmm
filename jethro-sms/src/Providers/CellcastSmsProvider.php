@@ -407,21 +407,30 @@ class CellcastSmsProvider implements SmsProvider
 	}
 
 	/**
-	 * Fetch the raw /api/v1/customNumber response items, with session caching.
-	 *
-	 * Both {@see getSenderIds()} and {@see getSenderNumbers()} hit the same
-	 * upstream endpoint, so they share a single cache key ('sms_senderids').
+	 * Fetch the raw /api/v1/customNumber response items (sender phone
+	 * numbers), with session caching.
 	 *
 	 * @return \Result<array<array{number: string, name: string}>, string>
 	 */
 	private function fetchSenderItems(): \Result
 	{
-		$cached = $this->cache?->get('sms_senderids');
+		return $this->fetchCachedList('/api/v1/customNumber', 'sms_sendernumbers');
+	}
+
+	/**
+	 * GET a Cellcast list endpoint's `data` array, cached for the session
+	 * under $cacheKey.
+	 *
+	 * @return \Result<array<int, array<string, mixed>>, string>
+	 */
+	private function fetchCachedList(string $path, string $cacheKey): \Result
+	{
+		$cached = $this->cache?->get($cacheKey);
 		if ($cached !== null && \is_array($cached)) {
 			return \Result::success($cached);
 		}
 
-		$result = $this->request('GET', '/api/v1/customNumber');
+		$result = $this->request('GET', $path);
 		if ($result->isFailure()) {
 			return $result;
 		}
@@ -437,27 +446,37 @@ class CellcastSmsProvider implements SmsProvider
 
 		$items = isset($data['data']) && \is_array($data['data']) ? $data['data'] : [];
 
-		$this->cache?->set('sms_senderids', $items, 1800);
+		$this->cache?->set($cacheKey, $items, 1800);
 
 		return \Result::success($items);
 	}
 
+	/**
+	 * Alphanumeric Sender IDs ("business names" / Alpha IDs) from
+	 * GET /api/v1/business — not /api/v1/customNumber, which lists only
+	 * sender phone numbers. The endpoint is undocumented; its shape is in
+	 * jethro-sms/docs/reference/_cellcast/business/GET.md.
+	 *
+	 * Deleted entries are skipped. An ID is approved when Cellcast reports
+	 * acmaStatus ACMA_APPROVED or status ACTIVE; anything else (requested,
+	 * pending Cellcast or ACMA review, rejected) is not yet usable, so it is
+	 * marked unapproved and {@see \Sms\excludeUnapprovedSenderIds()} hides it
+	 * from senders unless $getAll.
+	 *
+	 * @return \Result<\Sms\SenderID[], string>
+	 */
 	public function getSenderIds(bool $getAll = false): \Result
 	{
-		// Cellcast returns both phone numbers and alphanumeric sender IDs
-		// from the same /api/v1/customNumber endpoint. Phone numbers go
-		// through getSenderNumbers(); alphanumeric entries are sender IDs.
-		return $this->fetchSenderItems()->map(function (array $items) {
+		return $this->fetchCachedList('/api/v1/business', 'sms_senderids')->map(function (array $items) use ($getAll) {
 			$ids = [];
 			foreach ($items as $item) {
-				$number = isset($item['number']) ? (string) $item['number'] : '';
-				if ($number === '') continue;
-				// Skip entries that are valid phone numbers — those are
-				// sender numbers, not alphanumeric sender IDs.
-				if (preg_match('/^\+?\d+$/', $number)) continue;
-				$ids[] = new \Sms\SenderID($number);
+				$name = isset($item['businessname']) ? trim((string) $item['businessname']) : '';
+				if ($name === '' || !empty($item['isDeleted'])) continue;
+				$approved = ($item['acmaStatus'] ?? null) === 'ACMA_APPROVED'
+					|| ($item['status'] ?? null) === 'ACTIVE';
+				$ids[] = new \Sms\SenderID($name, acmaApproved: $approved);
 			}
-			return $ids;
+			return $getAll ? $ids : \Sms\excludeUnapprovedSenderIds($ids);
 		});
 	}
 
@@ -648,8 +667,9 @@ class CellcastSmsProvider implements SmsProvider
 	/**
 	 * Get all registered sender phone numbers from Cellcast.
 	 *
-	 * Shares {@see fetchSenderItems()} (session-cached under 'sms_senderids')
-	 * with {@see getSenderIds()} — both read from the same upstream endpoint.
+	 * Reads {@see fetchSenderItems()} (GET /api/v1/customNumber, session-cached
+	 * under 'sms_sendernumbers'). Sender IDs come from a different endpoint
+	 * ({@see getSenderIds()}).
 	 *
 	 * @return \Result<PhoneNumber[], string>
 	 */
@@ -801,6 +821,7 @@ class CellcastSmsProvider implements SmsProvider
 	{
 		return \in_array($cap, [
 			SmsCapability::GET_BALANCE,
+			SmsCapability::GET_SENDER_IDS,	// business names from GET /api/v1/business; see getSenderIds()
 			SmsCapability::DEFERRED_SEND,
 			SmsCapability::DEFERRED_SEND_CANCEL,
 			SmsCapability::REGISTER_SENDER_NUMBER,

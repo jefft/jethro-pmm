@@ -62,6 +62,7 @@ Auth: `Authorization: Bearer <SMS_CELLCAST_APIKEY>` header.
 | `/api/v1/customNumber/verifyCustomNumber` | POST | `customNumber/verifyCustomNumber/POST.md` | MOCK ONLY |
 | `/api/v1/apiClient/account` | GET | `account/GET.md` | VERIFIED |
 | `/api/v1/business/add` | POST | `business/add/POST.md` | MOCK ONLY |
+| `/api/v1/business` | GET | `business/GET.md` | VERIFIED (undocumented by Cellcast) |
 | `/api/v2/report/message/{id}` | GET | `report/message/GET.md` | MOCK ONLY |
 
 ### 5CentSMS v5
