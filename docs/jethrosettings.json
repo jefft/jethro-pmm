@@ -1073,7 +1073,7 @@
     "SMS_SEND_COOLOFF": {
       "type": "number",
       "label": "Sms Send Cooloff",
-      "description": "Delay in seconds applied to user-initiated immediate (non-deferred) sends. When unset, a 30-second cool-off is applied automatically — giving the user a window to cancel a mistaken send. Set to <code>0</code> to disable. Only takes effect with providers that support both scheduled send and cancellation (5CentSMS v5, Cellcast); with 5CentSMS v4 or HTTP-template gateways messages are sent immediately.",
+      "description": "Delay in seconds applied to user-initiated immediate (non-deferred) sends. When unset, a 30-second cool-off is applied automatically — giving the user a window to cancel a mistaken send. Set to <code>0</code> to disable. Only takes effect with providers that support both scheduled send and cancellation (5CentSMS v5, Cellcast); with other providers (5CentSMS v4, SMS Broadcast, HTTP-template gateways), and for automatic messages (2FA codes, reminders), messages are sent immediately.",
       "explanation": "",
       "default": 30,
       "note": "Delay before sending to allow cancellation"
