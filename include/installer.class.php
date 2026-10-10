@@ -242,10 +242,12 @@ class Installer
 				CONSTRAINT sms_note_sd_fk FOREIGN KEY (smsdelivery_id) REFERENCES _smsdelivery (id) ON DELETE CASCADE
 			) ENGINE=InnoDB;",
 
-			"-- Synced with upgrades/2026-upgrade-to-2.40.sql:95-98 — persisting sender number registrations
+			"-- Synced with upgrades/2026-upgrade-to-2.40.sql — persisting sender number registrations; personid = the person it's verified for (first person wins)
 			CREATE TABLE IF NOT EXISTS sms_registered_sender (
 				phone VARCHAR(20) PRIMARY KEY,
-				registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+				personid INT NULL DEFAULT NULL,
+				registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				CONSTRAINT sms_registered_sender_person FOREIGN KEY (personid) REFERENCES _person (id) ON DELETE CASCADE
 			) ENGINE=InnoDB;",
 
 

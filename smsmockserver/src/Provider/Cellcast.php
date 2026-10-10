@@ -239,11 +239,12 @@ final class Cellcast implements ProviderInterface
             Util::json(200, ['data' => $cp->senders]);
         }
 
-        // Dynamic mode: defaults + approved registrations
+        // Dynamic mode: defaults + the profile's pre-registered numbers + approved registrations
         $defaults = [
             ['number' => 'StJohnsWPH', 'name' => 'St Johns WPH'],
             ['number' => '614915701588', 'name' => 'Church Main'],
             ['number' => '61402000002', 'name' => 'Youth Group'],
+            ...($cp?->preRegistered ?? []),
         ];
 
         $out = [];

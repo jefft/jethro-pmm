@@ -55,7 +55,7 @@ column names alone.
 - `sms_note.(personid, id)` → `person_note.(personid, id)`: the note lives in the `person_note` / `_abstract_note` system
 - `sms_note.smsdelivery_id` → `_smsdelivery.id`: a delivery may have zero or one linked notes (CASCADE delete)
 - `person_note.id` → `_abstract_note.id`
-- `sms_registered_sender`: standalone — read as a first-check cache before upstream API calls
+- `sms_registered_sender.personid` → `_person.id`: the person a sender number is verified for. A number belongs to the first person verified for it; `DbLoggingSmsProvider::verifySenderNumber()` reads it before asking the provider, and claims an unowned number when the provider reports it verified
 
 
 All FK relationships reference `_person`, never `person` (MySQL cannot create

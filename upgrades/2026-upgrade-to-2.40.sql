@@ -104,9 +104,14 @@ CREATE OR REPLACE VIEW `smsdelivery` AS
 
 -- Table for persisting sender number registrations (e.g. Cellcast).
 -- DbLoggingSmsProvider reads/writes here so registration survives sessions.
+-- personid: the person the number is verified for. A number belongs to the
+-- first person verified for it, so a user who sets their own mobile to
+-- someone else's verified number can't send as them (NULL: not yet claimed).
 CREATE TABLE IF NOT EXISTS sms_registered_sender (
     phone VARCHAR(20) PRIMARY KEY,
-    registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    personid INT NULL DEFAULT NULL COMMENT 'Person the number is verified for (first person wins)',
+    registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT sms_registered_sender_person FOREIGN KEY (personid) REFERENCES _person (id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 

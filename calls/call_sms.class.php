@@ -107,6 +107,12 @@ class Call_SMS extends Call
                     echo json_encode($ajax);
                     return;
                 }
+                $senderError = \Jethro\Sms\senderNotVerifiedError($sender);
+                if ($senderError !== null) {
+                    $ajax['error'] = $senderError;
+                    echo json_encode($ajax);
+                    return;
+                }
                 $sendAtRaw = !empty($_POST['send_at']) ? $_POST['send_at'] : null;
                 $sendAt = ($sendAtRaw !== null) ? strtotime($sendAtRaw) : null;
                 $sendAt = ($sendAt !== false && $sendAt > 0) ? $sendAt : null;

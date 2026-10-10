@@ -281,23 +281,40 @@ final class DbLoggingSmsProvider extends \Sms\DecoratingSmsProvider
 		return \Result::success($cancelledBatch);
 	}
 
+	/**
+	 * Whether $number is verified as a sender for the current user.
+	 *
+	 * A number belongs to the first person verified for it
+	 * (sms_registered_sender.personid), so a user who sets their own mobile to
+	 * someone else's verified number can't send as them (SMS review Q9):
+	 *  - owned by the current user → verified;
+	 *  - owned by someone else → not verified, whatever the provider says;
+	 *  - recorded without an owner (before ownership existed) → claimed;
+	 *  - not recorded → the provider decides (session cache or upstream), and
+	 *    if it says verified, the current user claims the number.
+	 */
 	public function verifySenderNumber(\Sms\PhoneNumber $number): \Result
 	{
-		// 1. DB check — persists across sessions
 		$db = $GLOBALS['db'];
+		$me = self::currentPersonId();
 		try {
-			$exists = (bool) $db->queryOne(
-				'SELECT 1 FROM sms_registered_sender WHERE phone = ' . $db->quote($number->value)
-			);
-			if ($exists) {
-				return \Result::success(true);
-			}
+			$owner = $db->queryOne('SELECT COALESCE(personid, 0) FROM sms_registered_sender WHERE phone = ' . $db->quote($number->value));
 		} catch (\PDOException $e) {
-			// Table doesn't exist yet — fall through to inner
+			return $this->inner->verifySenderNumber($number);	// table doesn't exist yet
 		}
 
-		// 2. Delegate to inner provider (session cache or upstream)
-		return $this->inner->verifySenderNumber($number);
+		if ($owner !== false && $owner !== null) {
+			if ((int) $owner === 0 && $me > 0) {
+				return \Result::success($this->claim($number->value, $me));
+			}
+			return \Result::success((int) $owner === $me && $me > 0);
+		}
+
+		$result = $this->inner->verifySenderNumber($number);
+		if ($result->isSuccess() && $result->getValue() === true && $me > 0) {
+			return \Result::success($this->claim($number->value, $me));
+		}
+		return $result;
 	}
 
 	public function registerSenderNumber(?\Sms\ContactPhoneNumber $contact = null, ?array $validationParams = null): \Result
@@ -305,19 +322,36 @@ final class DbLoggingSmsProvider extends \Sms\DecoratingSmsProvider
 		$result = $this->inner->registerSenderNumber($contact, $validationParams);
 		if ($result->isSuccess()) {
 			$step = $result->getValue();
-			// Persist to DB when registration is complete (Phase 2 or immediate)
-			if ($step instanceof \Sms\RegistrationStep && $step->registered && $step->number !== null) {
-				$db = $GLOBALS['db'];
+			// Record the current user as the number's owner once registration is
+			// complete (Phase 2 or immediate) — unless someone else owns it.
+			$phone = $contact?->phoneNumber->value ?? $step->number ?? null;
+			$me = self::currentPersonId();
+			if ($step instanceof \Sms\RegistrationStep && $step->registered && $phone !== null && $me > 0) {
 				try {
-					$db->exec(
-						'INSERT IGNORE INTO sms_registered_sender (phone) VALUES ('
-						. $db->quote($step->number) . ')'
-					);
+					$this->claim($phone, $me);
 				} catch (\PDOException $e) {
 					// Table doesn't exist — session cache still applies
 				}
 			}
 		}
 		return $result;
+	}
+
+	/**
+	 * Record $personId as the owner of $phone unless another person owns it
+	 * (first person wins). Returns whether $personId owns it afterwards.
+	 */
+	private function claim(string $phone, int $personId): bool
+	{
+		$db = $GLOBALS['db'];
+		$db->exec('INSERT IGNORE INTO sms_registered_sender (phone, personid) VALUES (' . $db->quote($phone) . ', ' . $personId . ')');
+		$db->exec('UPDATE sms_registered_sender SET personid = ' . $personId . ' WHERE phone = ' . $db->quote($phone) . ' AND personid IS NULL');
+		return (int) $db->queryOne('SELECT COALESCE(personid, 0) FROM sms_registered_sender WHERE phone = ' . $db->quote($phone)) === $personId;
+	}
+
+	/** The logged-in user's person ID, or 0 (CLI, cron, not logged in). */
+	private static function currentPersonId(): int
+	{
+		return isset($GLOBALS['user_system']) ? (int) ($GLOBALS['user_system']->getCurrentUser('id') ?? 0) : 0;
 	}
 }
