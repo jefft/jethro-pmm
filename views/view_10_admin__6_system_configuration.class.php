@@ -14,6 +14,10 @@ class View_Admin__System_Configuration extends View {
 	{
 		$saved = FALSE;
 		foreach (Config_Manager::getSettings() as $symbol => $details) {
+			// Set in conf.php: shown read-only and ignored from the database, so
+			// never save it — a stale form or crafted POST would store a value
+			// that silently takes effect if conf.php stops setting it.
+			if (defined($symbol.'_IN_CONFIG_FILE')) continue;
 			switch ($symbol) {
 				case 'DEFAULT_PERMISSIONS':
 					if (isset($_REQUEST['permissions'])) {
