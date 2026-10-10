@@ -33,6 +33,9 @@ enum SmsStatus: string
     /** Test mode message (FiveCent dry-run) — terminal, not a real send. */
     case TEST_MESSAGE = 'test-message';
 
+    /** Not sent: the number is on the provider's opt-out list (OptOutSmsProvider). Terminal; in-memory only — DbLoggingSmsProvider never records these deliveries, so the smsdelivery.status ENUM has no such value. */
+    case OPTED_OUT = 'opted-out';
+
     /** Status unknown — used when smsdelivery.status is empty (pre-upgrade data or bug). */
     case UNKNOWN = 'unknown';
 
@@ -66,7 +69,8 @@ enum SmsStatus: string
 
     public function isOk(): bool
     {
-        return $this !== self::FAILED && $this !== self::CANCELLED && $this !== self::UNKNOWN;
+        return $this !== self::FAILED && $this !== self::CANCELLED && $this !== self::UNKNOWN
+            && $this !== self::OPTED_OUT;
     }
 
     /** Status labels where the gateway accepted the message for delivery.
@@ -83,7 +87,7 @@ enum SmsStatus: string
     ];
 
     /** Whether this status is final (the message won't transition further).
-     * Terminal states: DELIVERED, FAILED, CANCELLED, TEST_MESSAGE. */
+     * Terminal states: DELIVERED, FAILED, CANCELLED, TEST_MESSAGE, OPTED_OUT. */
     public function isFinal(): bool
     {
         return !($this === self::QUEUED

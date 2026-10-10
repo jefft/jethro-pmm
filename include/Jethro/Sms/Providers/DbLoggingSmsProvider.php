@@ -96,13 +96,27 @@ final class DbLoggingSmsProvider extends \Sms\DecoratingSmsProvider
 			return \Result::success(new \Sms\SmsDeliveryBatch(null, $wrapped));
 		}
 
+		// Opted-out recipients (OptOutSmsProvider) were never sent to: they
+		// stay in the returned batch for reporting but are not recorded —
+		// and when nobody was sent to, there is no sms row at all.
+		$logDeliveries = [];
+		$logRecipients = [];
+		foreach ($deliveries as $i => $d) {
+			if ($d->status() !== \Sms\SmsStatus::OPTED_OUT) {
+				$logDeliveries[] = $d;
+				if (isset($allRecipients[$i])) {
+					$logRecipients[] = $allRecipients[$i];
+				}
+			}
+		}
+
 		// One sms row for the entire batch.
 		$senderId = $GLOBALS['user_system']->getCurrentUser()['id'] ?? null;
-		$insertResult = insertSms(
+		$insertResult = $logDeliveries === [] ? ['smsId' => 0, 'deliveries' => []] : insertSms(
 			$entries[0]['template'] ?? $entries[0]['message'] ?? '',
 			$senderId,
-			$deliveries,
-			$allRecipients,
+			$logDeliveries,
+			$logRecipients,
 			$sendAt,
 			$this->getKey(),
 			(string) $sender,

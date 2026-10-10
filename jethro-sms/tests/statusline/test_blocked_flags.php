@@ -21,7 +21,7 @@ require_once __DIR__ . '/../../src/load.php';
 
 function _prow(int $pid, string $msg): array
 {
-    return ['key' => (string) $pid, 'name' => "P$pid", 'message' => $msg, 'status' => 0];
+    return ['key' => (string) $pid, 'name' => "P$pid", 'message' => $msg, 'status' => 'queued'];
 }
 
 test('unicode-disabled message -> blocked=true with a reason', function () {

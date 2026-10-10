@@ -23,8 +23,8 @@ test('empty deliveries -> empty string', function () {
 
 test('one row per delivery', function () {
     $deliveries = [
-        ['key' => '1', 'name' => 'Alice', 'message' => 'Hi Alice', 'status' => 0],
-        ['key' => '2', 'name' => 'Bob', 'message' => 'Hi Bob', 'status' => 0],
+        ['key' => '1', 'name' => 'Alice', 'message' => 'Hi Alice', 'status' => 'queued'],
+        ['key' => '2', 'name' => 'Bob', 'message' => 'Hi Bob', 'status' => 'queued'],
     ];
     $html = renderPreviewPanel($deliveries, []);
     assert_eq(substr_count($html, 'class="sms-preview-msg"'), 2);
@@ -34,7 +34,7 @@ test('one row per delivery', function () {
 
 test('names and messages are HTML-escaped', function () {
     $deliveries = [
-        ['key' => '1', 'name' => '<b>Eve</b>', 'message' => 'a & b <script>', 'status' => 0],
+        ['key' => '1', 'name' => '<b>Eve</b>', 'message' => 'a & b <script>', 'status' => 'queued'],
     ];
     $html = renderPreviewPanel($deliveries, []);
     assert_contains($html, '&lt;b&gt;Eve&lt;/b&gt;');
@@ -44,7 +44,7 @@ test('names and messages are HTML-escaped', function () {
 
 test('overridden row is highlighted (#fff3cd) and shows the override text', function () {
     $deliveries = [
-        ['key' => '7', 'name' => 'Carol', 'message' => 'original', 'status' => 0],
+        ['key' => '7', 'name' => 'Carol', 'message' => 'original', 'status' => 'queued'],
     ];
     // PHP parses message_overrides[7] into int key 7; the row key is the string '7'.
     $html = renderPreviewPanel($deliveries, [7 => 'EDITED TEXT']);
@@ -55,7 +55,7 @@ test('overridden row is highlighted (#fff3cd) and shows the override text', func
 
 test('non-overridden row has no highlight', function () {
     $deliveries = [
-        ['key' => '7', 'name' => 'Carol', 'message' => 'original', 'status' => 0],
+        ['key' => '7', 'name' => 'Carol', 'message' => 'original', 'status' => 'queued'],
     ];
     $html = renderPreviewPanel($deliveries, []);
     assert_not_contains($html, '#fff3cd');
@@ -64,7 +64,7 @@ test('non-overridden row has no highlight', function () {
 
 test('a shared-mobile row (key 1_2) posts its override as message_overrides[1_2], highlights by that key, and lists one name per line', function () {
     $deliveries = [
-        ['key' => '1_2', 'name' => "Alice\nBob", 'message' => 'Hi Alice & Bob', 'status' => 0],
+        ['key' => '1_2', 'name' => "Alice\nBob", 'message' => 'Hi Alice & Bob', 'status' => 'queued'],
     ];
     $html = renderPreviewPanel($deliveries, ['1_2' => 'EDITED']);
     assert_contains($html, "'message_overrides[1_2]'", 'the send path expands this key to both people');
@@ -75,7 +75,7 @@ test('a shared-mobile row (key 1_2) posts its override as message_overrides[1_2]
 
 test('row keys are reduced to word characters before landing in Datastar expressions', function () {
     $deliveries = [
-        ['key' => "1');alert(1);('", 'name' => 'X', 'message' => 'm', 'status' => 0],
+        ['key' => "1');alert(1);('", 'name' => 'X', 'message' => 'm', 'status' => 'queued'],
     ];
     $html = renderPreviewPanel($deliveries, []);
     assert_not_contains($html, 'alert(1)');
@@ -84,7 +84,7 @@ test('row keys are reduced to word characters before landing in Datastar express
 
 test('empty message renders as (empty) placeholder', function () {
     $deliveries = [
-        ['key' => '1', 'name' => 'Alice', 'message' => '', 'status' => 0],
+        ['key' => '1', 'name' => 'Alice', 'message' => '', 'status' => 'queued'],
     ];
     $html = renderPreviewPanel($deliveries, []);
     assert_contains($html, '(empty)');
@@ -92,8 +92,20 @@ test('empty message renders as (empty) placeholder', function () {
 
 test('missing name falls back to #key', function () {
     $deliveries = [
-        ['key' => '42', 'name' => '', 'message' => 'hello', 'status' => 0],
+        ['key' => '42', 'name' => '', 'message' => 'hello', 'status' => 'queued'],
     ];
     $html = renderPreviewPanel($deliveries, []);
     assert_contains($html, '#42');
+});
+
+test('an opted-out row is shown greyed, says it will not be sent, and has no edit control', function () {
+    $deliveries = [
+        ['key' => '9', 'name' => 'Jamison Williamson', 'message' => 'Hi Jamison', 'status' => 'opted-out'],
+    ];
+    $html = renderPreviewPanel($deliveries, []);
+    assert_contains($html, 'sms-preview-optedout');
+    assert_contains($html, 'Opted out of SMS');
+    assert_contains($html, 'Jamison Williamson');
+    assert_not_contains($html, 'sms-preview-edit');
+    assert_not_contains($html, 'Hi Jamison');
 });

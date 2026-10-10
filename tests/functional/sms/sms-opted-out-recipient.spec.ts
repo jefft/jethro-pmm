@@ -34,7 +34,7 @@ test.describe("SMS to family with opted-out member", () => {
     await messageBox.fill(testMessage);
 
     // 4. Wait for statusline to populate (debounced AJAX call)
-    // After opt-out filtering, should show 1 recipient (Bridget only)
+    // Jamison is opted out: not counted, so 1 recipient (Bridget only)
     const statuslinePostPromise = page.waitForResponse(
       (resp) =>
         resp.url().includes("call=sms_statusline") && resp.status() === 200
@@ -45,6 +45,15 @@ test.describe("SMS to family with opted-out member", () => {
     const statusLine = page.locator("#sms-statusline-bulk");
     await expect(statusLine).toBeVisible({ timeout: to(5000) });
     await expect(statusLine).toContainText("1 recipient");
+
+    // 4b. The preview lists Jamison, greyed as opted out with no edit pencil;
+    //     Bridget's row is normal
+    await smsForm.locator(".sms-preview-checkbox").check();
+    const optedOutRow = smsForm.locator(".sms-preview-panel tr.sms-preview-optedout");
+    await expect(optedOutRow).toContainText("Jamison Williamson", { timeout: to(10000) });
+    await expect(optedOutRow).toContainText("Opted out of SMS");
+    await expect(optedOutRow.locator(".sms-preview-edit-toggle")).toHaveCount(0);
+    await expect(smsForm.locator(".sms-preview-panel .sms-preview-msg")).toHaveText([testMessage]);
 
     // 5. Click Send
     const sendButton = smsForm.locator(".bulk-sms-submit");

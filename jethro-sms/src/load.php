@@ -52,6 +52,7 @@ require_once __DIR__ . '/HttpClient.php';
 require_once __DIR__ . '/DecoratingSmsProvider.php';
 require_once __DIR__ . '/TokenExpandingSmsProvider.php';
 require_once __DIR__ . '/DeduplicatingSmsProvider.php';
+require_once __DIR__ . '/OptOutSmsProvider.php';
 require_once __DIR__ . '/OverridingSmsProvider.php';
 
 // Fake HTTP client base (subclasses are in Providers/)

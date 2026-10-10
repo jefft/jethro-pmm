@@ -143,6 +143,10 @@ The **Message Preview** is useful to see exactly who will receive a SMS:
 People who share a mobile number (e.g. a child listed with a parent's number) receive **one message between them** rather than one each — the message is sent to the number once, with their names combined where the message uses tokens (e.g. "Hi Alice & Bob, …"), and it is charged once. The **Message Preview** shows them as one row (each name on its own line) with that combined message; editing it changes the one message they share. Each person still appears individually in the send results, in the Messages tab, and in per-person message history.
 :::
 
+:::note Opted-out numbers
+If someone has replied STOP (opted out with the SMS provider), Jethro never sends to their number — from bulk messages or from roster and date reminders. The **Message Preview** still lists them, greyed out as "Opted out of SMS", so you can see who will be skipped; they aren't counted in the cost, and after sending they're reported as opted out. Nothing is recorded in their message history.
+:::
+
 
 ### SMS Sender
 
