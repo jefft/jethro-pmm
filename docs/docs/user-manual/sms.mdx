@@ -205,7 +205,7 @@ A bulk SMS can be delayed / scheduled to send, for up to 24h in the case of 5Cen
 
 #### Send Cool-off
 
-By default, Jethro applies a **30-second cool-off delay** to all messages (except 2FA). This gives you a brief window to cancel a mistaken send. The delay is invisible — the message queues immediately but won't be dispatched until the cool-off expires. An administrator can change or disable this via <SettingRef name="SMS_SEND_COOLOFF" />. The cool-off needs an SMS provider that supports scheduled sending and cancellation (5CentSMS v5, Cellcast); with 5CentSMS v4 or HTTP-template gateways, messages are sent immediately.
+With an SMS provider that supports scheduled sending and cancellation (5CentSMS v5, Cellcast), Jethro by default applies a **30-second cool-off delay** to messages you send, giving you a brief window to cancel a mistaken send. The delay is invisible: the provider holds the message as a send scheduled 30 seconds ahead. With other providers (5CentSMS v4, SMS Broadcast, HTTP-template gateways), and for automatic messages (2-factor login codes, reminders), messages are sent immediately. An administrator can change or disable the delay via <SettingRef name="SMS_SEND_COOLOFF" />.
 
 ### Saving as a Note
 
@@ -238,7 +238,7 @@ Clicking <u>SMS History Log</u> takes one to [Persons → Messages](#messages-ov
 
 
 
-Scheduled bulk SMSes will have a 'Cancel all' link, which lets you cancel the send. In fact by default, all bulk SMS sends are cancellable for up to 30 seconds (the <SettingRef name="SMS_SEND_COOLOFF" /> delay).
+Scheduled bulk SMSes will have a 'Cancel all' link, which lets you cancel the send. With an SMS provider that supports cancelling (5CentSMS v5, Cellcast), messages you send immediately can also be cancelled for up to 30 seconds by default (the <SettingRef name="SMS_SEND_COOLOFF" /> delay).
 <video autoPlay loop muted playsInline width="800"><source src={CancelVideo} type="video/webm" />Your browser does not support the video tag.</video>
 
 

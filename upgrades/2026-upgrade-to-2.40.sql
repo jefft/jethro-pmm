@@ -177,7 +177,7 @@ VALUES
 	('SMS_5CENTSMS_APIKEY_ID', 'text', '', 'FiveCent SMS v5 API key ID', @sms_base + 65),
 	('SMS_5CENTSMS_APIKEY', 'text', '', 'FiveCent SMS v5 API key secret', @sms_base + 70),
 	('SMS_CELLCAST_APIKEY', 'text', '', 'Cellcast API bearer token', @sms_base + 75),
-	('SMS_SEND_COOLOFF', 'int', '30', 'Undo window: seconds an immediate SMS is held, cancellable, before dispatch. 0 to disable. Only works with providers that support scheduled send + cancel (5CentSMS v5, Cellcast); ignored for 5centsmsv4.', @sms_base + 33),
+	('SMS_SEND_COOLOFF', 'int', '30', 'Undo window: seconds an immediate SMS is held, cancellable, before dispatch. 0 to disable. Only with providers that can schedule and cancel (5CentSMS v5, Cellcast); other providers, 2FA codes and reminders send immediately.', @sms_base + 33),
 	('SMS_SHORTEN_URLS', 'bool', false, 'Whether the ''Shorten URLs'' checkbox is checked by default when sending an SMS', @sms_base + 28),
 	('SMS_UNICODE_PERMITTED', 'select{"when_free":"When it costs nothing extra","true":"Permitted (may cost extra)","false":"Not permitted"}', 'when_free', 'Whether to permit emojis and other unicode in SMSes', @sms_base + 20);
 
@@ -185,7 +185,7 @@ VALUES
 UPDATE setting SET note = 'Character limit for SMS messages. SMS is billed per 160 chars per person, so this is best set to 160 (1x), 306 (2x), 459 (3x), 612 (4x), 765 (5x) etc' WHERE symbol = 'SMS_MAX_LENGTH';
 
 -- Refresh SMS_SEND_COOLOFF note on installs that already have the row (INSERT IGNORE skips them).
-UPDATE setting SET note = 'Undo window: seconds an immediate SMS is held, cancellable, before dispatch. 0 to disable. Only works with providers that support scheduled send + cancel (5CentSMS v5, Cellcast); ignored for 5centsmsv4.' WHERE symbol = 'SMS_SEND_COOLOFF';
+UPDATE setting SET note = 'Undo window: seconds an immediate SMS is held, cancellable, before dispatch. 0 to disable. Only with providers that can schedule and cancel (5CentSMS v5, Cellcast); other providers, 2FA codes and reminders send immediately.' WHERE symbol = 'SMS_SEND_COOLOFF';
 
 -- SMS_SHORTEN_URLS is now only the "Shorten URLs" checkbox default; refresh its note.
 UPDATE setting SET note = 'Whether the ''Shorten URLs'' checkbox is checked by default when sending an SMS' WHERE symbol = 'SMS_SHORTEN_URLS';
