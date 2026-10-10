@@ -186,6 +186,12 @@ final readonly class NativeHttpClient implements HttpClient
         if ($response === false && $error !== '') {
             return \Result::failure('Unable to connect to SMS Server: ' . $error);
         }
+        // A 5xx body is a server error page, not an API response; 4xx bodies are
+        // left to the providers, whose APIs return JSON error details with them.
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        if ($httpCode >= 500) {
+            return \Result::failure("SMS server error (HTTP {$httpCode})");
+        }
 
         return \Result::success(new HttpResponse($response === false ? '' : $response));
     }

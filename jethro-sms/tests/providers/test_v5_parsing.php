@@ -197,7 +197,7 @@ test('send(): EXTRA destination in response (not in request) → ignored, delive
     assert_eq($deliveries[0]->recipient()->value, '0400000001');
 });
 
-test('send(): top-level {"error":"..."} response → empty deliveries array, sendSummary() returns Failed', function () {
+test('send(): top-level {"error":"..."} response → recipients FAILED with the error, sendSummary() returns Failed', function () {
     $json = json_encode(['error' => 'Invalid credentials']);
     $fake = new FakeHttpClient(successResponse($json));
     $provider = makeV5Provider($fake);
@@ -205,15 +205,18 @@ test('send(): top-level {"error":"..."} response → empty deliveries array, sen
     $recipients = [new PhoneNumber('0400000001')];
     $result = $provider->send(entries('Hello', $recipients), new PhoneNumber('0411000000'));
 
-    assert_true($result->isSuccess(), 'send() itself should succeed (wraps empty deliveries)');
+    assert_true($result->isSuccess(), 'rejected recipients are returned as FAILED deliveries, so they are logged');
     $deliveries = $result->getValue()->deliveries;
-    assert_eq($deliveries, [], 'Error response should yield empty deliveries');
+    assert_eq(count($deliveries), 1);
+    assert_eq($deliveries[0]->status(), SmsStatus::FAILED);
+    assert_eq($deliveries[0]->rawResponse(), 'Invalid credentials');
 
     $summary = sendSummary($deliveries, $recipients);
-    assert_true($summary instanceof \Sms\Failed, 'sendSummary() of empty deliveries should be Failed');
+    assert_true($summary instanceof \Sms\Failed);
+    assert_eq($summary->error, 'Invalid credentials');
 });
 
-test('send(): invalid JSON response → empty deliveries', function () {
+test('send(): invalid JSON response → recipients FAILED with an excerpt of the body', function () {
     $fake = new FakeHttpClient(successResponse('not valid json'));
     $provider = makeV5Provider($fake);
 
@@ -221,7 +224,9 @@ test('send(): invalid JSON response → empty deliveries', function () {
     $result = $provider->send(entries('Hello', $recipients), new PhoneNumber('0411000000'));
 
     assert_true($result->isSuccess());
-    assert_eq($result->getValue()->deliveries, [], 'Invalid JSON should yield empty deliveries');
+    $deliveries = $result->getValue()->deliveries;
+    assert_eq($deliveries[0]->status(), SmsStatus::FAILED);
+    assert_contains($deliveries[0]->rawResponse(), 'not valid json');
 });
 
 // ===========================================================================

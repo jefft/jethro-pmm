@@ -91,7 +91,7 @@ When authentication fails or the request is rejected at the API level, the respo
 }
 ```
 
-An error response yields an empty deliveries array. All requested recipients are then recorded as `FAILED`.
+An error response (or one that can't be parsed) records every recipient of that request as `FAILED`, with the `error` text as the reason, and the send goes on with its other requests (one per entry: e.g. per recipient for personalised messages). If a request fails in transport (timeout, connection error, HTTP 5xx) after earlier requests were accepted, the accepted deliveries are kept, that request's recipients are recorded as `UNKNOWN` (it may have been sent), and later ones as `FAILED` (not sent) — see `\Sms\finishStoppedSend()`. Only a failure before anything was accepted is reported as a plain send failure.
 
 ---
 

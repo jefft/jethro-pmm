@@ -34,6 +34,70 @@ function statusFromV5Code(int $code, string $statusText): SmsStatus
     };
 }
 
+// ---------------------------------------------------------------------------
+// finishStoppedSend — a multi-request send that stopped part-way
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of a provider send() whose entry $failedIndex failed, after the
+ * gateway accepted entries before it (providers send one request per entry).
+ *
+ * Returning a plain failure would throw away the deliveries already accepted
+ * — sent and charged, but then logged nowhere, so a retry sends them twice.
+ * Instead, when anything was accepted, this returns success with:
+ *  - the deliveries collected so far ($sent), unchanged;
+ *  - for the failed entry's recipients: UNKNOWN if the request may have
+ *    reached the gateway ($mayHaveBeenSent: a transport failure such as a
+ *    timeout), else FAILED (the gateway rejected it);
+ *  - for every later entry, never sent: FAILED.
+ * The error is in each such delivery's rawResponse and statusDetail, so
+ * sendSummary() reports a partial success and the send is logged in full.
+ * When nothing was accepted yet ($sent === []), the failure is returned as is.
+ *
+ * Unit tests: jethro-sms/tests/providers/test_stopped_send.php
+ *
+ * @param array<int, array{message: string, recipients: SmsRecipient[]}> $entries All entries of the send
+ * @param list<SmsDelivery> $sent Deliveries of the entries before $failedIndex
+ * @return \Result<SmsDeliveryBatch, string>
+ */
+function finishStoppedSend(array $entries, int $failedIndex, array $sent, string $error, bool $mayHaveBeenSent): \Result
+{
+    if ($sent === []) {
+        return \Result::failure($error);
+    }
+    $deliveries = $sent;
+    foreach (array_values($entries) as $i => $entry) {
+        if ($i === $failedIndex) {
+            array_push($deliveries, ...failedEntryDeliveries($entry, $mayHaveBeenSent ? SmsStatus::UNKNOWN : SmsStatus::FAILED, $error));
+        } elseif ($i > $failedIndex) {
+            array_push($deliveries, ...failedEntryDeliveries($entry, SmsStatus::FAILED, 'Not sent: an earlier request failed (' . $error . ')'));
+        }
+    }
+    return \Result::success(new SmsDeliveryBatch(null, $deliveries));
+}
+
+/**
+ * One delivery per recipient of a send entry that wasn't (or may not have
+ * been) accepted, carrying $detail as its rawResponse and statusDetail — so
+ * every recipient appears in the result, in request order, and is logged.
+ *
+ * @param array{message: string, recipients: SmsRecipient[]} $entry
+ * @return list<SmsDelivery>
+ */
+function failedEntryDeliveries(array $entry, SmsStatus $status, string $detail): array
+{
+    return array_values(array_map(
+        static fn(SmsRecipient $recipient) => new SmsDelivery(
+            recipient: $recipient->getPhoneNumber(),
+            status: $status,
+            rawResponse: $detail,
+            message: $entry['message'],
+            statusDetail: $detail,
+        ),
+        $entry['recipients'],
+    ));
+}
+
 
 // ---------------------------------------------------------------------------
 // sendSummary — aggregate per-recipient results for display/logging

@@ -209,7 +209,7 @@ class CellcastSmsProvider implements SmsProvider
 	): \Result {
 		$allDeliveries = [];
 
-		foreach ($entries as $entry) {
+		foreach (array_values($entries) as $index => $entry) {
 			$message = $entry['message'];
 			$recipients = $entry['recipients'];
 
@@ -240,8 +240,10 @@ class CellcastSmsProvider implements SmsProvider
 
 		$result = $this->request('POST', '/api/v1/gateway', $body);
 
+		// A transport failure may come after earlier entries were accepted
+		// (sent and charged): keep them, so the send is logged in full.
 		if ($result->isFailure()) {
-			return $result;
+			return \Sms\finishStoppedSend($entries, $index, $allDeliveries, $result->getError(), mayHaveBeenSent: true);
 		}
 
 		// Invalidate cached balance
@@ -250,7 +252,9 @@ class CellcastSmsProvider implements SmsProvider
 		$data = $result->getValue();
 
 			if (($data['status'] ?? true) === false) {
-				return \Result::failure(self::extractEnvelopeError($data));
+				// Rejected: record its recipients as failed, and go on with the other entries.
+				array_push($allDeliveries, ...\Sms\failedEntryDeliveries($entry, SmsStatus::FAILED, self::extractEnvelopeError($data)));
+				continue;
 			}
 
 			foreach ($this->parseSendResponse($data, $recipients) as $d) {

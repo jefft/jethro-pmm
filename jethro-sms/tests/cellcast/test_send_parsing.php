@@ -272,14 +272,21 @@ test('send: recipient absent from queueResponse is marked FAILED', function () {
     assert_eq($deliveries[1]->status(), SmsStatus::FAILED);
 });
 
-test('send: API-level status:false envelope returns failure with the API message', function () {
+test('send: API-level status:false envelope fails the recipients with the API message', function () {
     $response = ['status' => false, 'message' => 'Invalid credentials', 'data' => null];
     $provider = makeProvider(new FakeHttpClient(successResponse(json_encode($response))));
+    $recipients = [new PhoneNumber('0401000001')];
 
-    $result = $provider->send(entries('Hello', [new PhoneNumber('0401000001')]), new PhoneNumber('0400000000'));
+    $result = $provider->send(entries('Hello', $recipients), new PhoneNumber('0400000000'));
 
-    assert_true($result->isFailure());
-    assert_eq($result->getError(), 'Invalid credentials');
+    assert_true($result->isSuccess(), 'rejected recipients are returned as FAILED deliveries, so they are logged');
+    $deliveries = $result->getValue()->deliveries;
+    assert_eq(count($deliveries), 1);
+    assert_eq($deliveries[0]->status(), SmsStatus::FAILED);
+    assert_eq($deliveries[0]->rawResponse(), 'Invalid credentials');
+    $summary = \Sms\sendSummary($deliveries, $recipients);
+    assert_true($summary instanceof \Sms\Failed);
+    assert_eq($summary->error, 'Invalid credentials');
 });
 
 test('send: unregistered-sender error surfaces the per-field message', function () {
@@ -294,8 +301,9 @@ test('send: unregistered-sender error surfaces the per-field message', function 
 
     $result = $provider->send(entries('Hello', [new PhoneNumber('0401000001')]), new PhoneNumber('0400000000'));
 
-    assert_true($result->isFailure());
-    assert_eq($result->getError(), 'Your sender id is not registered.');
+    assert_true($result->isSuccess());
+    assert_eq($result->getValue()->deliveries[0]->status(), SmsStatus::FAILED);
+    assert_eq($result->getValue()->deliveries[0]->rawResponse(), 'Your sender id is not registered.');
 });
 
 test('send: empty data field returns empty deliveries array', function () {
