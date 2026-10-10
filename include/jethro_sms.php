@@ -420,6 +420,14 @@ function getRecipientsFromRequest(): SmsRequestRecipients
 		}
 	}
 
+	// A mobile with no digits (e.g. "-") can't be sent to: report it with the
+	// blank mobiles rather than sending it or silently dropping it.
+	foreach ($rawRecips as $pid => $data) {
+		if (!preg_match('/\d/', (string) ($data['mobile_tel'] ?? ''))) {
+			$blanks[$pid] = $data;
+			unset($rawRecips[$pid]);
+		}
+	}
 	// Filter out recipients whose mobile numbers are in the upstream opt-out list.
 	// Providers return numbers in international form ('61491570157'); compare
 	// with PhoneNumber::sameNumberAs() so local-form mobiles still match.
@@ -431,7 +439,6 @@ function getRecipientsFromRequest(): SmsRequestRecipients
 			$survivors = [];
 			foreach ($rawRecips as $pid => $data) {
                 $mobile = (string) ($data['mobile_tel'] ?? '');
-                if (!preg_match('/\d/', $mobile)) continue;
 				if (phoneNumberInList(new \Sms\PhoneNumber($mobile), $optedOutNumbers)) {
 					$optedOut[$pid] = $data;
 				} else {
