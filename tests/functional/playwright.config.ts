@@ -39,6 +39,8 @@ const SMS_SCENARIOS = [
   "sms-restricted-visibility",
   "5centsms-senderid-cache-test",
   "sms-wrong-profile",
+  // Brown family members share one mobile: one SMS and one preview row per number.
+  "sms-shared-mobile",
 ];
  
 export default defineConfig({
