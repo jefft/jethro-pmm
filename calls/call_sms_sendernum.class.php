@@ -15,7 +15,7 @@
  *     Submits validation fields to the provider to complete sender number
  *     verification.  Returns an HTML snippet (success or error).
  *
- * Requires PERM_SENDSMS.
+ * Requires PERM_SENDSMS, and only for the current user's own mobile number.
  */
 
 class Call_SMS_SenderNum extends Call
@@ -28,6 +28,18 @@ class Call_SMS_SenderNum extends Call
 		}
 
 		require_once JETHRO_ROOT . '/include/jethro_sms.php';
+
+		// Only the logged-in user's own mobile may be registered or verified:
+		// a verified number can then be used as the _USER_MOBILE_ sender, so
+		// registering someone else's would let one user send as another
+		// (SMS review Q9).
+		$requested = trim((string) ($_REQUEST['number'] ?? ''));
+		$own = \Jethro\Sms\getCurrentUserMobileNumber();
+		if ($requested !== '' && ($own === null || !(new \Sms\PhoneNumber($requested))->sameNumberAs($own))) {
+			echo '<div id="sms-register-' . ents((string) ($_REQUEST['label'] ?? '')) . '" class="sms-register-status" style="margin-top:4px;font-size:0.9em;color:#c00">'
+				. ents(_('You can only verify your own mobile number, as set on your person record.')) . '</div>';
+			return;
+		}
 
 		$action = $_REQUEST['action'] ?? '';
 
