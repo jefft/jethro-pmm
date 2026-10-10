@@ -5,7 +5,8 @@ VALUES ('NEEDS_UTF8MB4_UPGRADE', 'hidden', "1", "Whether the database charset up
 --
 -- SMS database tables
 -- sms:          one row per send operation (body text, sender, timing)
--- smsdelivery:  one row per recipient (person, remote ref, delivery status)
+-- smsdelivery:  one row per recipient (person, remote ref, delivery status);
+--               table _smsdelivery, read through the restricted smsdelivery view
 
 CREATE TABLE IF NOT EXISTS `sms` (
 	`id` INT NOT NULL AUTO_INCREMENT,
@@ -32,7 +33,8 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
-CREATE TABLE IF NOT EXISTS `smsdelivery` (
+-- The table is _smsdelivery; smsdelivery (below) is a restricted view of it.
+CREATE TABLE IF NOT EXISTS `_smsdelivery` (
 	`id` INT NOT NULL AUTO_INCREMENT,
 	`sms_id` INT NOT NULL,
 	`personid` INT NULL DEFAULT NULL COMMENT 'Person ID of the recipient, or NULL if sent to a raw mobile number',
@@ -55,24 +57,24 @@ CREATE TABLE IF NOT EXISTS `smsdelivery` (
 -- Rename 5csmsv5 → 5centsmsv5 in the ENUM and existing rows.  Idempotent:
 -- the INSERT IGNORE trick only runs the statement when it wouldn't error.
 SET @old = (SELECT 1 FROM information_schema.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'smsdelivery'
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '_smsdelivery'
     AND COLUMN_NAME = 'provider' AND COLUMN_TYPE LIKE '%5csmsv5%'
     AND COLUMN_TYPE NOT LIKE '%5centsmsv5%');
 SET @stmt = IF(@old = 1,
-    'ALTER TABLE `smsdelivery` MODIFY COLUMN `provider` ENUM(''5centsmsv5'',''5csmsv5'',''cellcast'',''smsbroadcast'',''5csmsv4'') NULL DEFAULT NULL',
+    'ALTER TABLE `_smsdelivery` MODIFY COLUMN `provider` ENUM(''5centsmsv5'',''5csmsv5'',''cellcast'',''smsbroadcast'',''5csmsv4'') NULL DEFAULT NULL',
     'SELECT 1');
 PREPARE stmt FROM @stmt;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
-UPDATE IGNORE `smsdelivery` SET `provider` = '5centsmsv5' WHERE `provider` = '5csmsv5';
+UPDATE IGNORE `_smsdelivery` SET `provider` = '5centsmsv5' WHERE `provider` = '5csmsv5';
 
--- Cost tracking: add segments_used / per_segment_cost to smsdelivery tables
+-- Cost tracking: add segments_used / per_segment_cost to _smsdelivery tables
 -- created by earlier 2.40 dev builds.  Idempotent; works on MySQL 8, which
 -- lacks ADD COLUMN IF NOT EXISTS.
 SET @missing = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
-    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'smsdelivery' AND COLUMN_NAME = 'segments_used');
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '_smsdelivery' AND COLUMN_NAME = 'segments_used');
 SET @stmt = IF(@missing,
-    'ALTER TABLE `smsdelivery`
+    'ALTER TABLE `_smsdelivery`
         ADD COLUMN `segments_used` INT NULL DEFAULT NULL COMMENT ''SMS segments charged, as reported by the provider; NULL if not reported'',
         ADD COLUMN `per_segment_cost` DECIMAL(10,5) NULL DEFAULT NULL COMMENT ''Dollars per segment at send time (provider-reported, else SMS_SEGMENT_COST or provider default)''',
     'SELECT 1');
@@ -88,8 +90,17 @@ CREATE TABLE IF NOT EXISTS `sms_note` (
 	PRIMARY KEY (`note_personid`, `note_id`, `smsdelivery_id`),
 	INDEX `smsdelivery_id` (`smsdelivery_id`),
 	CONSTRAINT `sms_note_ibfk_1` FOREIGN KEY (`note_personid`, `note_id`) REFERENCES `person_note` (`personid`, `id`) ON DELETE CASCADE,
-	CONSTRAINT `sms_note_ibfk_2` FOREIGN KEY (`smsdelivery_id`) REFERENCES `smsdelivery` (`id`) ON DELETE CASCADE
+	CONSTRAINT `sms_note_ibfk_2` FOREIGN KEY (`smsdelivery_id`) REFERENCES `_smsdelivery` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- smsdelivery: the deliveries the current user may see, as `person` does for
+-- _person: those to persons visible through the (restricted) person view, plus
+-- those to raw numbers. Pages read this; writers and system-level code
+-- (logging, status caching, history sync, CLI) use _smsdelivery. Recreate it
+-- after adding columns to _smsdelivery (SELECT * is expanded when created).
+CREATE OR REPLACE VIEW `smsdelivery` AS
+	SELECT sd.* FROM `_smsdelivery` sd
+	WHERE sd.personid IS NULL OR sd.personid IN (SELECT p.id FROM person p);
 
 -- Table for persisting sender number registrations (e.g. Cellcast).
 -- DbLoggingSmsProvider reads/writes here so registration survives sessions.

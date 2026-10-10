@@ -2,7 +2,11 @@
 /**
  * SMS delivery — one row per recipient within a send.
  *
- * Table: `smsdelivery` (created by upgrades/2026-upgrade-to-2.40.sql)
+ * Table: `_smsdelivery` (created by upgrades/2026-upgrade-to-2.40.sql), read
+ * through the `smsdelivery` view, which applies the current user's
+ * congregation/group restrictions as `person` does: pages read `smsdelivery`;
+ * writers and system-level code (logging, status caching, history sync, CLI)
+ * use `_smsdelivery`. See jethro-sms/docs/reference/database.mdx.
  *
  * Not to be confused with \Sms\SmsDelivery (the pure-layer value object in jethro-sms/src/sms.php).
  */
@@ -68,7 +72,7 @@ class SmsDelivery extends DB_Object
 	public function getInitSQL($table_name = NULL)
 	{
 		return "
-			CREATE TABLE `smsdelivery` (
+			CREATE TABLE `_smsdelivery` (
 				`id` INT NOT NULL AUTO_INCREMENT,
 				`sms_id` INT NOT NULL,
 				`personid` INT NULL DEFAULT NULL,
@@ -87,11 +91,30 @@ class SmsDelivery extends DB_Object
 			) ENGINE=InnoDB;";
 	}
 
+	/**
+	 * The deliveries the current user may see: those to persons visible through
+	 * the restricted person view, plus those to raw numbers. Synced with
+	 * upgrades/2026-upgrade-to-2.40.sql.
+	 */
+	public function getViewSQL()
+	{
+		return "
+			CREATE VIEW smsdelivery AS
+			SELECT sd.* FROM _smsdelivery sd
+			WHERE sd.personid IS NULL OR sd.personid IN (SELECT p.id FROM person p)
+		";
+	}
+
+	protected function _getInsertTableName()
+	{
+		return '_smsdelivery';
+	}
+
 	public function getForeignKeys()
 	{
 		return Array(
-			'sms_id' => '`sms`(`id`) ON DELETE CASCADE',
-			'personid' => '`_person`(`id`) ON DELETE CASCADE',
+			'_smsdelivery.sms_id' => '`sms`(`id`) ON DELETE CASCADE',
+			'_smsdelivery.personid' => '`_person`(`id`) ON DELETE CASCADE',
 		);
 	}
 	public function getInstancesQueryComps($params, $logic, $order)

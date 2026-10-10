@@ -73,7 +73,9 @@ WHERE an.subject = 'SMS Sent'
 -- _abstract_note rows for the same (person, SMS send). Without it,
 -- the LEFT JOIN smsdelivery guard evaluates against the pre-INSERT
 -- snapshot and fails to prevent duplicates within the same statement.
-INSERT INTO smsdelivery (sms_id, personid, status, provider)
+-- (_smsdelivery, the table: the smsdelivery view shows nothing without a
+-- current user, as when this script runs.)
+INSERT INTO _smsdelivery (sms_id, personid, status, provider)
 SELECT s.id, pn.personid, 'sent', '5csmsv4'
 FROM _abstract_note an
 JOIN person_note pn ON an.id = pn.id
@@ -81,7 +83,7 @@ JOIN sms s ON s.body = an.details
            AND s.sender = an.creator
            AND an.created >= s.created
            AND an.created <= s.created + INTERVAL 1 HOUR
-LEFT JOIN smsdelivery sd ON sd.sms_id = s.id
+LEFT JOIN _smsdelivery sd ON sd.sms_id = s.id
                          AND sd.personid = pn.personid
 WHERE an.subject = 'SMS Sent'
   AND sd.id IS NULL
@@ -125,7 +127,7 @@ JOIN sms s ON s.body = an.details
            AND s.sender = an.creator
            AND an.created >= s.created
            AND an.created <= s.created + INTERVAL 1 HOUR
-JOIN smsdelivery sd ON sd.sms_id = s.id AND sd.personid = pn.personid
+JOIN _smsdelivery sd ON sd.sms_id = s.id AND sd.personid = pn.personid
 LEFT JOIN sms_note sn ON sn.note_id = an.id
                       AND sn.note_personid = pn.personid
                       AND sn.smsdelivery_id = sd.id

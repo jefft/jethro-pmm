@@ -87,7 +87,7 @@ function handleExportSmslog(): void
                 COUNT(d.id) AS recipient_count
          FROM sms s
          LEFT JOIN staff_member sm ON sm.id = s.sender
-         LEFT JOIN smsdelivery d ON d.sms_id = s.id
+         LEFT JOIN _smsdelivery d ON d.sms_id = s.id
          GROUP BY s.id
          ORDER BY s.created'
     );
