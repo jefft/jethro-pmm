@@ -2535,7 +2535,7 @@ function insertSms(string $messageText, ?int $senderId, array $results, array $r
 function defaultSegmentCost(string $providerKey): float
 {
 	$class = match ($providerKey) {
-		'5centsmsv5', '5csmsv5' => \Sms\Providers\FiveCentSmsV5Provider::class,
+		'5centsmsv5' => \Sms\Providers\FiveCentSmsV5Provider::class,
 		'cellcast' => \Sms\Providers\CellcastSmsProvider::class,
 		'smsbroadcast' => \Sms\Providers\SmsBroadcastSmsProvider::class,
 		'5csmsv4' => \Sms\Providers\TemplateSmsProvider::class,

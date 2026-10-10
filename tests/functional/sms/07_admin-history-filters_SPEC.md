@@ -41,7 +41,7 @@ Add `"sms-admin-history-filters"` to the `SCENARIOS` array in `playwright.config
 2. Navigate to `?view=families&familyid=5` (Mann family).
 3. Fill the message textarea with `Filter test message ${ts}`.
 4. Click Send and wait for success result.
-5. Navigate to `?view=persons__sms` (Admin > SMS page).
+5. Navigate to `?view=persons__messages` (Persons > Messages).
 6. The page defaults to the "Send History" tab (or click it if there are tabs).
 7. Wait for the SMS history table to render and contain at least one row.
 8. **Recipient filter**: Type `Sena Mann` into the recipient filter input (`input[data-bind="filterRecipient"]` or similar).
@@ -59,7 +59,7 @@ Add `"sms-admin-history-filters"` to the `SCENARIOS` array in `playwright.config
 ## Notes on filter mechanism
 The admin SMS history filters are Datastar `data-bind` signals applied client-side — no server round-trip. Rows are shown/hidden via `data-show` or similar Datastar bindings. The test may need to use Playwright's `toBeVisible()` / `toBeHidden()` rather than `toHaveCount`.
 
-Check `views/view_3_persons__5_sms.class.php` for the exact signal names (`filterRecipient`, `filterBody`, `filterSender`, `filterDateFrom`, `filterDateTo`, `filterSingleOnly`).
+Check `views/view_3_persons__5_messages.class.php` for the exact signal names (`filterRecipient`, `filterBody`, `filterSender`, `filterDateFrom`, `filterDateTo`, `filterSingleOnly`).
 
 ## Assertions summary
 - After send: success result with "Sena Mann" or "Mendy Mann".

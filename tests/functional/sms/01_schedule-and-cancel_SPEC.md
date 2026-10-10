@@ -52,7 +52,7 @@ Add `"sms-schedule-and-cancel"` to the `SCENARIOS` array in `playwright.config.t
 
 Run **after** the previous test (they share DB state).
 
-1. Navigate to `?view=persons__sms`.
+1. Navigate to `?view=persons__messages`.
 2. Locate the SMS just sent (by message text containing the timestamp from step 2 above).
 3. Assert at least one delivery row shows a `scheduled` badge.
 4. Find the Cancel button (`[id^="sms-cancel-"]`) for this SMS entry.
