@@ -81,13 +81,14 @@ class User_System extends Abstract_User_System
 					add_message('SMS-code form has expired. Please try again.', 'warning');
 					$this->_reset2FA();
 					return;
-				} else if (array_get($_POST, '2fa_key') != $_SESSION['2fa']['key']) {
+				} else if (!hash_equals((string) $_SESSION['2fa']['key'], (string) array_get($_POST, '2fa_key'))) {
 					add_message("2-factor authentication was interrupted. Please try again.", 'warning');
 					$this->_reset2FA();
 					return;
 				}
 				if (!empty($_POST['2fa_code'])) {
-					if ($_POST['2fa_code'] == $_SESSION['2fa']['code']) {
+					// Constant-time comparison of the strings, not ==.
+					if (hash_equals((string) $_SESSION['2fa']['code'], trim((string) $_POST['2fa_code']))) {
 						$this->_2faLog($_SESSION['2fa']['pending_user']['username']." entered the correct code and will be logged in.");
 						// Mark the DB row so the SSE long-poll can stop polling.
 						if (!empty($_SESSION['2fa']['verify_token'])) {
@@ -444,6 +445,7 @@ class User_System extends Abstract_User_System
 
 		if (!strlen($user_details['mobile_tel'])) {
 			$this->_2faLog($_SESSION['2fa']['pending_user']['username']." can't log in because they have blank mobile number. Sysadmins have been notified");
+			$this->_notifySysadmins("The user ".$_SESSION['2fa']['pending_user']['username']." was unable to log in, because they have no mobile number for 2-factor authentication.");
 			$this->_reset2FA();
 			return;
 		}
@@ -465,7 +467,8 @@ class User_System extends Abstract_User_System
 			$this->_reset2FA();
 			return;
 		}
-		$this->_2faLog($_SESSION['2fa']['pending_user']['username']." was sent code ".$_SESSION['2fa']['code']." at ".$_SESSION['2fa']['pending_user']['mobile_tel']);
+		// Never log the code: anyone who can read the log could complete the login.
+		$this->_2faLog($_SESSION['2fa']['pending_user']['username']." was sent a code at ".$_SESSION['2fa']['pending_user']['mobile_tel']);
 	}
 
 	/**
@@ -594,7 +597,7 @@ class User_System extends Abstract_User_System
 		  ->setTo($emails)
 		  ->setBody($text);
 
-		$from_address = ifdef(MEMBER_REGO_EMAIL_FROM_ADDRESS, '');
+		$from_address = ifdef('MEMBER_REGO_EMAIL_FROM_ADDRESS', '');
 		if (strlen($from_address)) {
 			$message->setFrom(array($from_address => SYSTEM_NAME.' Jethro System'));
 		} else {
