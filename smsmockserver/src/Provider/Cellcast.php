@@ -175,9 +175,12 @@ final class Cellcast implements ProviderInterface
     private function handleAccount(Ctx $ctx): void
     {
         $balance = $ctx->profileHooks?->balance ?? 12345;
+        // Real shape (probed 2026-10): meta.status upper-case, account fields beside the balance.
         Util::json(200, [
-            'meta' => ['code' => 200, 'status' => 'success'],
-            'data' => ['sms_balance' => $balance],
+            'meta' => ['code' => 200, 'status' => 'SUCCESS'],
+            'message' => 'Account details',
+            'data' => ['account_name' => 'Mock Account', 'account_email' => 'mock@example.com', 'sms_balance' => $balance, 'mms_balance' => 0],
+            'error' => [],
         ]);
     }
 
@@ -236,7 +239,7 @@ final class Cellcast implements ProviderInterface
     {
         $cp = CellcastProfile::get($ctx->profileName);
         if ($cp !== null && $cp->senders !== []) {
-            Util::json(200, ['data' => $cp->senders]);
+            Util::json(200, self::envelope('Custom numbers listed', array_map(self::customNumberItem(...), $cp->senders)));
         }
 
         // Dynamic mode: defaults + the profile's pre-registered numbers + approved registrations
@@ -273,7 +276,7 @@ final class Cellcast implements ProviderInterface
             $out[] = ['number' => $row['value'], 'name' => $row['display_name']];
         }
 
-        Util::json(200, ['data' => $out]);
+        Util::json(200, self::envelope('Custom numbers listed', array_map(self::customNumberItem(...), $out)));
     }
 
     // ── Add CustomNumber ───────────────────────────────────────────────
@@ -389,73 +392,88 @@ final class Cellcast implements ProviderInterface
 
     // ── Report Message ─────────────────────────────────────────────────
 
+    /**
+     * GET /api/v2/report/message/{id}. Real shape (probed 2026-10): the
+     * standard envelope around the message; an unknown id is HTTP 500 with
+     * status false (Mongo's "Cast to ObjectId failed").
+     */
     private function handleReportMessage(Ctx $ctx, string $messageId): void
     {
         $row = $ctx->store->getMessageByRemoteId('cellcast', $messageId);
         if ($row === null) {
-            Util::json(200, [
+            Util::json(500, [
                 'status' => false,
-                'message' => 'message not found',
+                'message_type' => 'error',
+                'message' => 'Something went wrong!',
                 'data' => [],
-                'error' => ['message' => 'Cast to ObjectId failed'],
+                'error' => ['message' => 'Cast to ObjectId failed for value "' . $messageId . '" at path "_id"'],
             ]);
         }
 
-        $status = $ctx->state->deriveMessage($row, $ctx->now);
-        $cellcastStatus = self::cellcastStatusString($status);
-        $sendTime = (new \DateTimeImmutable($row['created_at']))->format(\DateTimeInterface::RFC3339);
-
-        Util::json(200, [
-            'data' => [
-                '_id' => $messageId,
-                'status' => $cellcastStatus,
-                'send_time' => $sendTime,
-                'updatedAt' => $sendTime,
-            ],
-        ]);
+        $item = $this->reportItem($ctx, $row);
+        $item['send_time'] = $item['scheduleAt'] ?? $item['createdAt'];
+        $item['updatedAt'] = $item['send_time'];
+        unset($item['scheduleAt']);
+        Util::json(200, self::envelope('Success', $item));
     }
 
+    /**
+     * GET /api/v2/report/message. Real shape (probed 2026-10; see
+     * jethro-sms/docs/reference/_cellcast/report/message/GET.md): the standard
+     * envelope with a paginated `data: {items, total, limit, current,
+     * totalPages, …}`.
+     */
     private function handleReportMessages(Ctx $ctx): void
     {
         $rows = $ctx->store->listMessagesForScope($ctx->profileName, 'cellcast');
         $page = max(1, (int) ($_GET['page'] ?? 1));
         $limit = max(1, (int) ($_GET['limit'] ?? 10));
 
-        $out = [];
-        foreach ($rows as $row) {
-            $status = $ctx->state->deriveMessage($row, $ctx->now);
-            $cellcastStatus = self::cellcastStatusString($status);
-            $scheduleAt = null;
-            if ($row['scheduled_send_at'] !== null) {
-                $scheduleAt = (new \DateTimeImmutable($row['scheduled_send_at']))->format(\DateTimeInterface::RFC3339);
-            }
-            $out[] = [
-                '_id'       => $row['remote_id'],
-                'status'    => $cellcastStatus,
-                'message'   => $row['body'],
-                'sender'    => $row['sender'],
-                'receiver'  => $row['destination'],
-                'createdAt' => (new \DateTimeImmutable($row['created_at']))->format(\DateTimeInterface::RFC3339),
-                'scheduleAt' => $scheduleAt,
-            ];
-        }
-
-        $total = count($out);
+        $total = count($rows);
         $totalPages = max(1, (int) ceil($total / $limit));
+        $items = array_map(fn(array $row) => $this->reportItem($ctx, $row), array_slice($rows, ($page - 1) * $limit, $limit));
 
-        Util::json(200, [
-            'status'      => true,
-            'message'     => 'Success',
-            'data'        => $out,
-            'total'       => $total,
-            'limit'       => $limit,
-            'current'     => $page,
-            'totalPages'  => $totalPages,
-            'hasPrevPage' => $page > 1,
-            'hasNextPage' => $page < $totalPages,
-            'prevPage'    => $page > 1 ? $page - 1 : null,
-            'nextPage'    => $page < $totalPages ? $page + 1 : null,
-        ]);
+        Util::json(200, self::envelope('Success', [
+            'items'         => $items,
+            'total'         => $total,
+            'limit'         => $limit,
+            'current'       => $page,
+            'totalPages'    => $totalPages,
+            'pagingCounter' => ($page - 1) * $limit + 1,
+            'hasPrevPage'   => $page > 1,
+            'hasNextPage'   => $page < $totalPages,
+            'prevPage'      => $page > 1 ? $page - 1 : null,
+            'nextPage'      => $page < $totalPages ? $page + 1 : null,
+        ]));
+    }
+
+    /** One message as the report endpoints list it. @param array<string, mixed> $row @return array<string, mixed> */
+    private function reportItem(Ctx $ctx, array $row): array
+    {
+        $scheduleAt = $row['scheduled_send_at'] !== null
+            ? (new \DateTimeImmutable($row['scheduled_send_at']))->format(\DateTimeInterface::RFC3339)
+            : null;
+        return [
+            '_id'        => $row['remote_id'],
+            'status'     => self::cellcastStatusString($ctx->state->deriveMessage($row, $ctx->now)),
+            'message'    => $row['body'],
+            'sender'     => $row['sender'],
+            'receiver'   => $row['destination'],
+            'createdAt'  => (new \DateTimeImmutable($row['created_at']))->format(\DateTimeInterface::RFC3339),
+            'scheduleAt' => $scheduleAt,
+        ];
+    }
+
+    /** A custom (sender) number as GET /api/v1/customNumber lists it. @param array{number:string,name:string} $n @return array<string, mixed> */
+    private static function customNumberItem(array $n): array
+    {
+        return ['_id' => 'cn_' . substr(sha1($n['number']), 0, 12), 'status' => 'active', 'deleted' => false, 'name' => $n['name'], 'number' => $n['number']];
+    }
+
+    /** The envelope most Cellcast v1/v2 endpoints wrap their data in. @return array<string, mixed> */
+    private static function envelope(string $message, mixed $data): array
+    {
+        return ['status' => true, 'message_type' => 'toast', 'message' => $message, 'data' => $data, 'error' => []];
     }
 
     private static function cellcastStatusString(string $status): string
@@ -465,7 +483,7 @@ final class Cellcast implements ProviderInterface
             State::MSG_SENT      => 'sent',
             State::MSG_DELIVERED => 'delivered',
             State::MSG_FAILED    => 'failed',
-            State::MSG_CANCELLED => 'cancelled',
+            State::MSG_CANCELLED => 'canceled',	// one 'l', as Cellcast spells it (_cellcast/report/message/{id}/GET.md)
             State::MSG_UNKNOWN   => 'unknown',
             default              => $status,
         };

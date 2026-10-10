@@ -39,6 +39,8 @@ final class FiveCentSms implements ProviderInterface
             // ── v5 routes (bare paths, no /api/v1/ prefix) ────────────
             case $method === 'POST' && $path === '/sms':
                 $this->handleSendV5($ctx);
+            case $method === 'GET' && $path === '/sms':
+                $this->handleListSmsV5($ctx);
             case $method === 'GET' && preg_match('#^/sms/([^/]+)$#', $path, $m):
                 $this->handleGetSmsV5($ctx, $m[1]);
             case $method === 'DELETE' && preg_match('#^/sms/([^/]+)$#', $path, $m):
@@ -345,13 +347,17 @@ final class FiveCentSms implements ProviderInterface
             ];
         }
 
-        \SmsMockServer\Util::json(200, ['messages' => $results]);
+        \SmsMockServer\Util::json(200, ['error' => '', 'messages' => $results]);
     }
 
 
     // ── v5 Get SMS ─────────────────────────────────────────────────────
 
-    /** GET /sms/{id} handler for FiveCentSmsV5Provider format. */
+    /** GET /sms/{id} handler for FiveCentSmsV5Provider format.
+     *  Live shape (probed 2026-10): {error:"", message:{destination, sender,
+     *  id, status:int, status_text, message_text, credits, send_timestamp,
+     *  delivery_timestamp("" until delivered), delivery_network,
+     *  customer_data}}. */
     private function handleGetSmsV5(Ctx $ctx, string $remoteId): void
     {
         $row = $ctx->store->getMessageByRemoteId('5centsms', $remoteId);
@@ -359,19 +365,54 @@ final class FiveCentSms implements ProviderInterface
             \SmsMockServer\Util::json(404, ['error' => 'SMS not found']);
         }
 
-        $status = $ctx->state->deriveMessage($row, $ctx->now);
-        [$code, $text] = $this->statusCode($status, false);
-        $deliveryTs = $ctx->state->deliveryTs($status, $row['created_at'], $ctx->now);
-
         \SmsMockServer\Util::json(200, [
-            'message' => [
-                'id' => $remoteId,
-                'status' => $code,
-                'status_text' => $text,
-                'delivery_timestamp' => $deliveryTs,
-                'send_timestamp' => strtotime($row['created_at']),
-            ],
+            'error' => '',
+            'message' => $this->v5MessageItem($ctx, $row),
         ]);
+    }
+
+    // ── v5 List SMS ────────────────────────────────────────────────────
+
+    /** GET /sms handler for FiveCentSmsV5Provider format.
+     *  Live shape (probed 2026-10): {count, error:"", messages:[item…],
+     *  next_page} — same item shape as GET /sms/{id}. */
+    private function handleListSmsV5(Ctx $ctx): void
+    {
+        $rows = $ctx->store->listMessagesForScope($ctx->profileName, '5centsms');
+        \SmsMockServer\Util::json(200, [
+            'count' => count($rows),
+            'error' => '',
+            'messages' => array_map(fn(array $row) => $this->v5MessageItem($ctx, $row), $rows),
+            'next_page' => '',
+        ]);
+    }
+
+    /** One message as the v5 GET /sms endpoints return it. Status codes are v5's (1001 sent, 1002 delivered, …) — probed live; NOT the v4-style 1/2/3 of statusCode(). @param array<string,mixed> $row @return array<string,mixed> */
+    private function v5MessageItem(Ctx $ctx, array $row): array
+    {
+        $status = $ctx->state->deriveMessage($row, $ctx->now);
+        [$code, $text] = match ($status) {
+            \SmsMockServer\State::MSG_DELIVERED => [1002, 'Delivered'],
+            \SmsMockServer\State::MSG_SENT      => [1001, 'Sent'],
+            \SmsMockServer\State::MSG_FAILED    => [1003, 'Failed'],
+            \SmsMockServer\State::MSG_SCHEDULED => [1005, 'Scheduled'],
+            \SmsMockServer\State::MSG_CANCELLED => [1007, 'Cancelled'],
+            default                             => [1003, 'Failed'],
+        };
+        $deliveryTs = $ctx->state->deliveryTs($status, $row['created_at'], $ctx->now);
+        return [
+            'destination'        => $row['destination'],
+            'sender'             => $row['sender'],
+            'id'                 => $row['remote_id'],
+            'status'             => $code,
+            'status_text'        => $text,
+            'message_text'       => $row['body'],
+            'credits'            => 1,
+            'send_timestamp'     => strtotime($row['created_at']),
+            'delivery_timestamp' => $deliveryTs ?? '',
+            'delivery_network'   => '',
+            'customer_data'      => '',
+        ];
     }
 
     // ── v5 Delete SMS ──────────────────────────────────────────────────
@@ -386,7 +427,9 @@ final class FiveCentSms implements ProviderInterface
 
         $ctx->store->markMessageCancelled((int) $row['id'], $ctx->now);
         \SmsMockServer\Util::json(200, [
+            'error' => '',
             'messages' => [
+                'destination' => $row['destination'],
                 'id' => $remoteId,
                 'status' => 1007,       // CANCELLED
                 'status_text' => 'Cancelled',

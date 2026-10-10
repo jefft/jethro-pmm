@@ -41,6 +41,8 @@ const SMS_SCENARIOS = [
   "sms-wrong-profile",
   // Brown family members share one mobile: one SMS and one preview row per number.
   "sms-shared-mobile",
+  // Default 30s cool-off: 'scheduled' on the Messages page, then 'sent' via polling.
+  "sms-scheduled-status",
 ];
  
 export default defineConfig({

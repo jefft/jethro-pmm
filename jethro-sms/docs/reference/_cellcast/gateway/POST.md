@@ -1,6 +1,6 @@
 # POST /api/v1/gateway — Send SMS
 
-**Status:** MOCK ONLY — not verified against real API  
+**Status:** live-verified 2026-10-10 (scheduled send via a real account, then cancelled).  
 (The gateway POST mock is disabled in `tests/sms-mock-overrides-cellcast.json`; `parseSendResponse()` logic is unit-tested via the fake HTTP client.)
 
 ---
@@ -148,7 +148,7 @@ if ($sendAt !== null) {
 
 | Field       | Type   | Description |
 |-------------|--------|-------------|
-| `Number`    | string | Recipient number as submitted, in international format. |
+| `Number`    | string | Recipient number **as submitted** (live 2026-10: `0402…` echoed back verbatim, not internationalised as earlier assumed; `parseSendResponse()` also matches on `sameNumberAs()`). A sibling `Contact` field carries the national form — Jethro reads `Number`. |
 | `MessageId` | string | Cellcast-assigned message identifier. Stored as `SmsDelivery::$remoteId`; used by the delivery-status endpoint (`GET /api/v2/report/message/{MessageId}`). |
 | `jobInfo`   | object | Nested job metadata; see below. |
 
