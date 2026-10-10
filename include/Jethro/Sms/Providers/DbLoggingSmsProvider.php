@@ -185,15 +185,9 @@ final class DbLoggingSmsProvider extends \Sms\DecoratingSmsProvider
 	}
 
 	/**
-	 * Cancel the deliveries in the batch, then persist updated statuses to smsdelivery.
+	 * List the provider's recent deliveries, recording their statuses in _smsdelivery.
 	 *
-	 * Delegates to the inner provider's cancel(), then for each returned delivery
-	 * with a non-null remoteId, updates smsdelivery.raw_response and smsdelivery.status.
-	 * Deliveries with null remoteId are skipped (no DB row to update).
-	 * PDOException on any individual update is silently swallowed (same pattern as
-	 * updateDelivery — the table may not exist in all environments).
-	 *
-	 * @return \Result<\Sms\SmsDeliveryBatch, string>
+	 * @return \Result<\Sms\SmsDelivery[], string>
 	 */
 	public function listRecentDeliveries(?int $since = null): \Result
 	{
@@ -260,6 +254,17 @@ final class DbLoggingSmsProvider extends \Sms\DecoratingSmsProvider
 		return $sql;
 	}
 
+	/**
+	 * Cancel the deliveries in the batch, then record the outcome in _smsdelivery.
+	 *
+	 * Only deliveries the provider reports a new status for are written
+	 * (cancelled, or e.g. sent when the cancel came too late). A refused cancel
+	 * returns the delivery unchanged — still SCHEDULED — and writing that back
+	 * could overwrite a newer status a concurrent poll has just stored (SMS
+	 * review Q7); it is left for the next status poll.
+	 *
+	 * @return \Result<\Sms\SmsDeliveryBatch, string>
+	 */
 	public function cancel(\Sms\SmsDeliveryBatch $batch): \Result
 	{
 		$result = parent::cancel($batch);
@@ -269,7 +274,10 @@ final class DbLoggingSmsProvider extends \Sms\DecoratingSmsProvider
 
 		/** @var \Sms\SmsDeliveryBatch $cancelledBatch */
 		$cancelledBatch = $result->getValue();
-		$this->persistStatuses($cancelledBatch->deliveries);
+		$this->persistStatuses(array_filter(
+			$cancelledBatch->deliveries,
+			static fn(\Sms\SmsDelivery $d) => $d->status() !== \Sms\SmsStatus::SCHEDULED,
+		));
 		return \Result::success($cancelledBatch);
 	}
 
