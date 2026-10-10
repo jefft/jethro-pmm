@@ -158,6 +158,12 @@ override to every person in its key, in one entry, so a shared mobile still
 gets one message. Both calls parse the field with
 `Jethro\Sms\messageOverridesFromRequest()`.
 
+A person whose number is on the provider's opt-out list gets a greyed
+`tr.sms-preview-optedout` row ("Opted out of SMS — will not be sent") with no
+pencil or textarea; `renderStatusline()` leaves such rows out of the recipient
+count and cost. They come from `OptOutSmsProvider` placeholders
+(`SmsStatus::OPTED_OUT`) via the same preview path.
+
 ## Encoding decision — UTF-16 counting vs code-point display
 
 > This was a genuine ambiguity, resolved as follows and pinned by

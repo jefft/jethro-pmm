@@ -18,17 +18,15 @@ namespace Jethro\Sms;
 final readonly class SmsRequestRecipients
 {
     /**
-     * @param JethroSmsRecipient[] $recipients       People with a mobile who are active and not opted out — safe to SMS
+     * @param JethroSmsRecipient[] $recipients       Active people with a mobile — opted-out ones included; OptOutSmsProvider skips them at send time
      * @param array<int, array>    $blanks           Person rows with no mobile_tel, keyed by person ID
      * @param array<int, array>    $archived         Person rows that are archived, keyed by person ID
-     * @param array<int, array>    $optedOut         Person rows whose mobile has opted out upstream, keyed by person ID
-     * @param array<int, array>    $rawPersonRecords Person rows for the sendable recipients, keyed by person ID — used for display/name lookup
+     * @param array<int, array>    $rawPersonRecords Person rows for the recipients, keyed by person ID — used for display/name lookup
      */
     public function __construct(
         public array $recipients,
         public array $blanks,
         public array $archived,
-        public array $optedOut,
         public array $rawPersonRecords,
     ) {}
 }

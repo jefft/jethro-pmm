@@ -34,10 +34,6 @@ class Call_SMS extends Call
             $ajax['failed_blank']['count'] = count($blanks);
             $ajax['failed_blank']['recipients'] = $blanks;
         }
-        if (!empty($smsReq->optedOut)) {
-            $ajax['failed_opted_out']['count'] = count($smsReq->optedOut);
-            $ajax['failed_opted_out']['recipients'] = $smsReq->optedOut;
-        }
 
         if (!empty($recips)) {
             $message = array_get($_POST, 'message', '');
@@ -139,9 +135,34 @@ class Call_SMS extends Call
                 /** @var \Jethro\Sms\JethroSmsDelivery[] $smsDeliveries */
                 $smsDeliveries = $smsBatch->deliveries;
 
+                // Opted-out people (OptOutSmsProvider) were never sent to:
+                // report them on their own, and keep them out of the send
+                // summary and the notes.  Deliveries pair with $orderedRecips
+                // by position.
+                $optedOut = [];
+                $sentDeliveries = [];
+                $sentRecips = [];
+                foreach ($smsDeliveries as $i => $delivery) {
+                    if ($delivery->status() === \Sms\SmsStatus::OPTED_OUT) {
+                        $pid = $delivery->recipientPersonId();
+                        if ($pid !== null) {
+                            $optedOut[$pid] = $rawRecips[$pid] ?? ['first_name' => "Person #$pid", 'last_name' => ''];
+                        }
+                        continue;
+                    }
+                    $sentDeliveries[] = $delivery;
+                    if (isset($orderedRecips[$i])) {
+                        $sentRecips[] = $orderedRecips[$i];
+                    }
+                }
+                if ($optedOut !== []) {
+                    $ajax['failed_opted_out']['count'] = count($optedOut);
+                    $ajax['failed_opted_out']['recipients'] = $optedOut;
+                }
+
                 // Build person→deliveryId map from JethroSmsDelivery objects
                 $broadcastMap = [];
-                foreach ($smsDeliveries as $delivery) {
+                foreach ($sentDeliveries as $delivery) {
                     $pid = $delivery->recipientPersonId();
                     $did = $delivery->databaseId();
                     if ($pid !== null && $did !== null) {
@@ -149,10 +170,10 @@ class Call_SMS extends Call
                     }
                 }
 
-                // Pass $orderedRecips (entry order) so that delivery positions
+                // Pass recipients in entry order so that delivery positions
                 // align with recipient positions, enabling sendSummary()'s
                 // positional matching for shared-mobile correctness.
-                $summary = \Sms\sendSummary($smsDeliveries, $orderedRecips);
+                $summary = $sentDeliveries === [] ? null : \Sms\sendSummary($sentDeliveries, $sentRecips);
 
                 // Server-side note creation — eliminates the data-loss window
                 // that existed when the browser fired a second AJAX for notes.
@@ -234,7 +255,8 @@ class Call_SMS extends Call
                     $ajax['note_saved'] = true;
                 }
 
-                // Convert to AJAX response
+                // Convert to AJAX response.  No summary when everyone opted
+                // out: failed_opted_out above is the whole result.
                 if ($summary instanceof \Sms\AllSent) {
                     $ajax['sent']['count'] = count($summary->recipients);
                     $ajax['sent']['recipients'] = self::_recipientNames($summary->recipients, $rawRecips);
@@ -251,7 +273,7 @@ class Call_SMS extends Call
                     $ajax['failed']['recipients'] = self::_recipientNames($summary->failures, $rawRecips);
                 } elseif ($summary instanceof \Sms\Failed) {
                     $ajax['error'] = "Unable to send SMS\n" . $summary->error;
-                } else {
+                } elseif ($summary !== null) {
                     $ajax['error'] = "Unexpected send result type";
                 }
             }

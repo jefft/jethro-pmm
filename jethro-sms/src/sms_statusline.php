@@ -311,11 +311,12 @@ function buildCostLine(int $segs, string $segmentType, int $recipientCount, floa
  * jsdoc (preserved in git history) for the full design rationale; the
  * composition order and special-cases below mirror it exactly.
  *
- * $deliveries: preview rows ['key'=>string,'name'=>string,'message'=>string,'status'=>int],
- *              one per message sent (Jethro\Sms\previewRows()), so the cost
- *              basis counts messages — empty array = "no preview yet" fallback.
+ * $deliveries: preview rows ['key'=>string,'name'=>string,'message'=>string,'status'=>string (SmsStatus value)],
+ *              one per message (Jethro\Sms\previewRows()), so the cost basis
+ *              counts messages; OPTED_OUT rows are never sent and don't count
+ *              — empty array = "no preview yet" fallback.
  *
- * @param array<int, array{key?: string, name?: string, message?: string, status?: int}> $deliveries
+ * @param array<int, array{key?: string, name?: string, message?: string, status?: string}> $deliveries
  * @return array{html: string, blocked: bool, blockReason: string}
  */
 function renderStatusline(string $message, array $deliveries, SmsStatuslineConfig $cfg, ?int $explicitRecipientCount = null): array
@@ -383,9 +384,10 @@ function renderStatusline(string $message, array $deliveries, SmsStatuslineConfi
     // SEGMENT / COST BASIS — prefer preview, fall back to raw-text estimate.
     // ---------------------------------------------------------------
     if ($deliveries !== []) {
+        $sendable = array_filter($deliveries, static fn(array $d): bool => ($d['status'] ?? '') !== SmsStatus::OPTED_OUT->value);
         $maxLen = 0;
         $maxMsg = '';
-        foreach ($deliveries as $d) {
+        foreach ($sendable as $d) {
             $m = $d['message'] ?? '';
             $mLen = utf16Length($m);
             if ($mLen > $maxLen) {
@@ -397,7 +399,7 @@ function renderStatusline(string $message, array $deliveries, SmsStatuslineConfi
         $previewGsmLen = gsmLength($maxMsg);
         $segs = $segIsUcs2 ? ucs2SegmentCount($maxLen) : gsmSegmentCount($previewGsmLen);
         $segChars = $segIsUcs2 ? $maxLen : $previewGsmLen;
-        $recipientCount = count($deliveries);
+        $recipientCount = count($sendable);
     } else {
         $segIsUcs2 = $escHasNonGsm;
         $segs = $escHasNonGsm ? $escUcs2Segs : gsmSegmentCount($escGsmLen);
@@ -498,9 +500,10 @@ function _truncatedCharList(array $displayChars): string
  * line ("\n"-separated); each renders on its own line.
  *
  * $overrides: [rowKey => editedMessage]. Edited rows highlighted (#fff3cd).
- * Returns '' when $deliveries is empty.
+ * Returns '' when $deliveries is empty.  An OPTED_OUT row (status) is shown
+ * greyed with "Opted out", and has no edit control: nothing will be sent.
  *
- * @param array<int, array{key?: string, name?: string, message?: string, status?: int}> $deliveries
+ * @param array<int, array{key?: string, name?: string, message?: string, status?: string}> $deliveries
  * @param array<int|string, string> $overrides
  */
 function renderPreviewPanel(array $deliveries, array $overrides): string
@@ -522,6 +525,17 @@ function renderPreviewPanel(array $deliveries, array $overrides): string
             $m = ($d['message'] ?? '') !== '' ? $d['message'] : '(empty)';
         }
         $name = ($d['name'] ?? '') !== '' ? $d['name'] : ('#' . $key);
+        // People sharing a mobile share a row: one name per line.
+        $nameHtml = implode('<br>', array_map(
+            static fn(string $n): string => '<span style="white-space:nowrap">' . \ents($n) . '</span>',
+            explode("\n", $name),
+        ));
+        if (($d['status'] ?? '') === SmsStatus::OPTED_OUT->value) {
+            $h .= '<tr class="sms-preview-optedout" style="color:#999">'
+                . '<td style="vertical-align:top">' . $nameHtml . '</td>'
+                . '<td><em>Opted out of SMS — will not be sent</em></td><td></td></tr>';
+            continue;
+        }
         $style = $edited ? ' style="background:#fff3cd"' : '';
         // Datastar-driven inline editing: the pencil sets $editingRow to this
         // row's key; the message <span> hides and the edit <textarea>
@@ -536,11 +550,6 @@ function renderPreviewPanel(array $deliveries, array $overrides): string
         $editText = $edited ? (string) $m : (string) (($d['message'] ?? ''));
         $post = "@post('?call=sms_statusline', {contentType: 'form'})";
         $h .= '<tr>';
-        // People sharing a mobile share a row: one name per line.
-        $nameHtml = implode('<br>', array_map(
-            static fn(string $n): string => '<span style="white-space:nowrap">' . \ents($n) . '</span>',
-            explode("\n", $name),
-        ));
         $h .= '<td style="vertical-align:top;color:#999">' . $nameHtml . '</td>';
         $h .= '<td style="width:100%">'
             . '<span class="sms-preview-msg" data-row="' . \ents($key) . '"' . $style

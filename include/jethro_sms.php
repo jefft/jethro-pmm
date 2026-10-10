@@ -191,8 +191,13 @@ function getSmsProvider(bool $tfa = false, bool $logToDb = true): \Result
 		// Deduplicating must sit INSIDE DbLoggingSmsProvider — logging needs
 		// per-person results so insertSms()'s positional pairing stays 1:1 —
 		// and OUTSIDE TokenExpandingSmsProvider — per-group token expansion
-		// reads the logicalRecipients key the decorator attaches. Do not reorder.
+		// reads the logicalRecipients key the decorator attaches.  OptOut sits
+		// between DbLogging and Deduplicating: opted-out numbers are dropped
+		// before grouping; DbLogging drops their placeholders when logging.  It is
+		// paired with DbLogging, so unlogged system sends (2FA) skip it.
+		// Do not reorder.
 		$provider = new \Sms\DeduplicatingSmsProvider($provider);
+		$provider = new \Sms\OptOutSmsProvider($provider);
 		$provider = new \Jethro\Sms\Providers\DbLoggingSmsProvider($provider);
 	}
 
@@ -354,9 +359,9 @@ function sendSms(
  * When `sms_type` is `'family'`, selected persons are expanded to all
  * adults in their families (using Age_Bracket and Family lookups).
  *
- * Recipients whose phone number appears in the upstream provider's opt-out
- * list are moved from `$rawRecips` into `$optedOut` before constructing
- * the result.  Numbers are normalised to international format for comparison.
+ * Opted-out numbers stay in the recipient list: OptOutSmsProvider (in the
+ * send chain) skips them and returns an OPTED_OUT delivery for each, so the
+ * preview can show them and the send logs them.
  *
  * @return SmsRequestRecipients  Categorised recipients ready for sending and UI display
  * @see getRecipientsFromPersonRecords()
@@ -364,7 +369,7 @@ function sendSms(
  */
 function getRecipientsFromRequest(): SmsRequestRecipients
 {
-	$blanks = $archived = $rawRecips = $optedOut = [];
+	$blanks = $archived = $rawRecips = [];
 
 	if (!empty($_REQUEST['queryid'])) {
 		$query = $GLOBALS['system']->getDBObject('person_query', (int)$_REQUEST['queryid']);
@@ -424,7 +429,7 @@ function getRecipientsFromRequest(): SmsRequestRecipients
 				'(status' => \Person_Status::getArchivedIDs(),
 			], 'AND');
 		} else {
-			$rawRecips = $blanks = $archived = $optedOut = [];
+			$rawRecips = $blanks = $archived = [];
 		}
 	}
 
@@ -436,32 +441,11 @@ function getRecipientsFromRequest(): SmsRequestRecipients
 			unset($rawRecips[$pid]);
 		}
 	}
-	// Filter out recipients whose mobile numbers are in the upstream opt-out list.
-	// Providers return numbers in international form ('61491570157'); compare
-	// with PhoneNumber::sameNumberAs() so local-form mobiles still match.
-	$optedOut = [];
-	if ($rawRecips !== []) {
-		$optedOutNumbers = getOptedOutPhoneNumbers();
-		if ($optedOutNumbers !== []) {
-			$optedOut = [];
-			$survivors = [];
-			foreach ($rawRecips as $pid => $data) {
-                $mobile = (string) ($data['mobile_tel'] ?? '');
-				if (phoneNumberInList(new \Sms\PhoneNumber($mobile), $optedOutNumbers)) {
-					$optedOut[$pid] = $data;
-				} else {
-					$survivors[$pid] = $data;
-				}
-			}
-			$rawRecips = $survivors;
-		}
-	}
 
 	return new SmsRequestRecipients(
 		recipients: getRecipientsFromPersonRecords($rawRecips),
 		blanks: $blanks,
 		archived: $archived,
-		optedOut: $optedOut,
 		rawPersonRecords: $rawRecips,
 	);
 }
@@ -541,7 +525,7 @@ function messageOverridesFromRequest(): array
  *
  * @param array<int, array<string, mixed>> $rawPersonRecords person rows keyed by ID ({@see SmsRequestRecipients::$rawPersonRecords})
  * @param string $message fallback text for deliveries that carry none
- * @return list<array{key: string, name: string, message: string, status: int}>
+ * @return list<array{key: string, name: string, message: string, status: string}>
  * @see messageOverridesFromRequest()
  * @see \Sms\renderPreviewPanel()
  */

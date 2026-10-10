@@ -26,6 +26,7 @@ enum SmsStatusIcon: string
     case FAILED = 'failed';
     case CANCELLED = 'cancelled';
     case UNKNOWN = 'unknown';
+    case OPTED_OUT = 'opted-out';
 
     public function icon(): string
     {
@@ -35,7 +36,7 @@ enum SmsStatusIcon: string
             self::QUEUED, self::SENDING, self::TEST_MESSAGE, self::IN_PROGRESS => '⏳',
             self::SCHEDULED => '🕐',
             self::FAILED => '✗',
-            self::CANCELLED => '⊘',
+            self::CANCELLED, self::OPTED_OUT => '⊘',
             self::UNKNOWN => '',
         };
     }
@@ -53,6 +54,7 @@ enum SmsStatusIcon: string
             \Sms\SmsStatus::FAILED => self::FAILED,
             \Sms\SmsStatus::CANCELLED => self::CANCELLED,
             \Sms\SmsStatus::UNKNOWN => self::UNKNOWN,
+            \Sms\SmsStatus::OPTED_OUT => self::OPTED_OUT,
         };
     }
  }

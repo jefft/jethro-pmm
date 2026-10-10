@@ -198,6 +198,10 @@ function send_reminder($person, $expiryDate)
 				$result = \Jethro\Sms\sendSms($message, [$recipient], $smsSenderNumber, logToDb: true);
 				if ($result->isFailure()) {
 					echo "Failed to send SMS to ".$toNumber.": " . $result->getError() . "\n";
+				} elseif (($result->getValue()->deliveries[0] ?? null)?->status() === \Sms\SmsStatus::OPTED_OUT) {
+					if (!empty($ini['VERBOSE'])) {
+						echo $person['first_name'].' '.$person['last_name'].' '.$toNumber." has opted out of SMS and was not sent one\n";
+					}
 				} else {
 					$sentSomething = TRUE;
 					if (!empty($ini['VERBOSE'])) {

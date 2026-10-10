@@ -18,10 +18,10 @@ use function \Sms\renderStatusline;
 
 require_once __DIR__ . '/../../src/load.php';
 
-/** @param array<int,array{personId?:?int,name?:string,message?:string,status?:int}> $deliveries */
+/** @return array{key: string, name: string, message: string, status: string} */
 function _row(int $pid, string $msg): array
 {
-    return ['key' => (string) $pid, 'name' => "P$pid", 'message' => $msg, 'status' => 0];
+    return ['key' => (string) $pid, 'name' => "P$pid", 'message' => $msg, 'status' => 'queued'];
 }
 
 test('empty message -> empty html, not blocked', function () {
@@ -44,6 +44,17 @@ test('cost line phrasing: "1 segment -> 4 recipients = $0.20." (no leading char 
     $res = renderStatusline($msg, $deliveries, $cfg);
     assert_contains($res['html'], '1 segment → 4 recipients = $0.20.');
     assert_false($res['blocked']);
+});
+
+test('opted-out rows are not counted or charged; all opted out -> no cost line', function () {
+    $cfg = new SmsStatuslineConfig(segmentCost: 0.05);
+    $msg = str_repeat('a', 29);
+    $out = ['status' => 'opted-out'] + _row(3, str_repeat('b', 300));
+    $res = renderStatusline($msg, [_row(1, $msg), _row(2, $msg), $out], $cfg);
+    assert_contains($res['html'], '1 segment → 2 recipients = $0.10.', 'the long opted-out message does not set the segment count either');
+
+    $res = renderStatusline($msg, [$out], $cfg);
+    assert_not_contains($res['html'], 'recipients');
 });
 
 test('plural "segments" when >1 segment', function () {
