@@ -1010,16 +1010,27 @@ function synchronizeHistory(?int $since = null): array
 			. " SET d.personid = p.personid WHERE d.phone_key <> ''"
 		);
 
-		// --- Match batches against existing sms rows: same body ±10 minutes ---
-		// Existing rows may predate remote_id logging, so body+time is the
-		// only batch identity we can rely on.
+		// --- Match batches against existing sms rows ---
+		// 1. By provider message ID: a batch with any delivery already logged
+		//    (same provider, same remote_id) belongs to that delivery's message.
+		$db->exec(
+			'UPDATE sms_new b SET b.sms_id = ('
+			. ' SELECT sd.sms_id FROM smsdelivery_new d'
+			. ' JOIN _smsdelivery sd ON sd.remote_id = d.remote_id COLLATE utf8mb4_unicode_ci AND sd.provider = ' . $db->quote($providerKey)
+			. " WHERE d.batch_id = b.id AND d.remote_id <> '' LIMIT 1"
+			. ')'
+		);
+		// 2. Otherwise by the same body within ±10 minutes of the *send* time
+		//    (scheduled time, else creation): existing rows may predate
+		//    remote_id logging, and a scheduled send is created long before it
+		//    is sent, which the provider reports.
 		$db->exec(
 			'UPDATE sms_new b SET b.sms_id = ('
 			. ' SELECT s.id FROM sms s'
 			. ' WHERE s.body = b.body COLLATE utf8mb4_unicode_ci'
-			. '  AND s.created BETWEEN b.created - INTERVAL 10 MINUTE AND b.created + INTERVAL 10 MINUTE'
-			. ' ORDER BY ABS(TIMESTAMPDIFF(SECOND, s.created, b.created)) LIMIT 1'
-			. ')'
+			. '  AND COALESCE(s.scheduled_send_at, s.created) BETWEEN b.created - INTERVAL 10 MINUTE AND b.created + INTERVAL 10 MINUTE'
+			. ' ORDER BY ABS(TIMESTAMPDIFF(SECOND, COALESCE(s.scheduled_send_at, s.created), b.created)) LIMIT 1'
+			. ') WHERE b.sms_id IS NULL'
 		);
 		$db->exec('UPDATE smsdelivery_new d JOIN sms_new b ON b.id = d.batch_id SET d.sms_id = b.sms_id');
 
