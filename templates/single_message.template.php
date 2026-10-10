@@ -47,7 +47,7 @@ $isMulti = $recipientCount > 1;
 						echo ' &middot; ' . $indicator;
 						if ($status === 'scheduled') {
 							$smsId = (int)$id;
-							if (\Jethro\Sms\canCancelScheduledDelivery()) {
+							if (\Jethro\Sms\canCancelScheduledDelivery(isset($entry['sender']) ? (int) $entry['sender'] : null)) {
 								echo ' <span id="sms-cancel-' . $smsId . '">'
 									. '<a href="#" data-on:click="@post(\'?call=sms_cancel&sms_id=' . $smsId . '\')"'
 									. ' style="cursor:pointer;font-size:smaller;text-decoration:underline">'

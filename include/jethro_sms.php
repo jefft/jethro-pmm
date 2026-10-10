@@ -649,12 +649,20 @@ function cancelSms(\Sms\SmsDeliveryBatch $batch): \Result
 	return $providerResult->getValue()->cancel($batch);
 }
 /**
- * Whether the current user can cancel a scheduled SMS delivery.
+ * Whether the current user can cancel a scheduled SMS sent by $senderPersonId
+ * (null: sent by a script) — so Cancel links are shown only to those
+ * Call_SMS_Cancel will let cancel it: "SMS - send", a provider that can
+ * cancel, and the original sender or a system administrator.
  * Does not check delivery status — call only for SCHEDULED deliveries.
  */
-function canCancelScheduledDelivery(): bool
+function canCancelScheduledDelivery(?int $senderPersonId): bool
 {
-    if (!$GLOBALS['user_system']->havePerm(PERM_SENDSMS)) {
+    $user = $GLOBALS['user_system'];
+    if (!$user->havePerm(PERM_SENDSMS)) {
+        return false;
+    }
+    if (!$user->havePerm(PERM_SYSADMIN)
+        && ($senderPersonId === null || $senderPersonId !== (int) ($user->getCurrentUser('id') ?? 0))) {
         return false;
     }
     $providerResult = getSmsProvider();

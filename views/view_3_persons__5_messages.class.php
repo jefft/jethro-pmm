@@ -98,7 +98,9 @@ class View_persons__messages extends View
             <?php
             foreach ($sends as $smsId => $send) {
                 $sendDeliveries = $deliveriesBySmsId[$smsId] ?? [];
-                $hasScheduled = (int)($send['scheduled_count'] ?? 0) > 0;
+                // Cancel link only for those Call_SMS_Cancel will let cancel it.
+                $hasScheduled = (int)($send['scheduled_count'] ?? 0) > 0
+                    && \Jethro\Sms\canCancelScheduledDelivery(isset($send['sender']) ? (int)$send['sender'] : null);
                 $uniqueBodies = array_unique(array_map(fn(array $d): string => (string)($d['body'] ?? ''), $sendDeliveries));
                 $hasTokens = count($uniqueBodies) > 1;
                 $senderName = (!empty($send['sender_fn']) ? trim($send['sender_fn'] . ' ' . $send['sender_ln']) : 'system');
