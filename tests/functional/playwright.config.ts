@@ -35,6 +35,8 @@ const SMS_SCENARIOS = [
   "sms-2fa",
   "sms-cooloff",
   "sms-messages-page",
+  // Restricted staff persona 6pmonly sees only deliveries to persons it may see.
+  "sms-restricted-visibility",
   "5centsms-senderid-cache-test",
   "sms-wrong-profile",
 ];
