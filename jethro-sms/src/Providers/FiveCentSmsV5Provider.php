@@ -1092,7 +1092,7 @@ class FiveCentSmsV5Provider implements SmsProvider
     {
         $allDeliveries = [];
 
-        foreach ($entries as $entry) {
+        foreach (array_values($entries) as $index => $entry) {
             $message = $entry['message'];
             $recipients = $entry['recipients'];
 
@@ -1133,18 +1133,41 @@ class FiveCentSmsV5Provider implements SmsProvider
 
             $response = $this->httpClient->send($request);
 
+            // A transport failure may come after earlier entries were accepted
+            // (sent and charged): keep them, so the send is logged in full.
             if ($response->isFailure()) {
-                return \Result::failure($response->getError());
+                return \Sms\finishStoppedSend($entries, $index, $allDeliveries, $response->getError(), mayHaveBeenSent: true);
             }
 
             $this->cache?->delete('sms_balance');
 
-            foreach ($this->parseResponse($response->getValue(), $recipientNumbers) as $d) {
+            $parsed = $this->parseResponse($response->getValue(), $recipientNumbers);
+            if ($parsed === [] && $recipients !== []) {
+                // Rejected (API error, or a response we can't read): record its
+                // recipients as failed, and go on with the other entries.
+                array_push($allDeliveries, ...\Sms\failedEntryDeliveries($entry, SmsStatus::FAILED, self::responseError($response->getValue()->body)));
+                continue;
+            }
+            foreach ($parsed as $d) {
                 $allDeliveries[] = $d->with(message: $message);
             }
         }
 
         return \Result::success(new SmsDeliveryBatch(null, $allDeliveries));
+    }
+
+    /**
+     * The error message of a rejected send response ({"error": "Invalid
+     * credentials"}), else a short excerpt of the body.
+     */
+    private static function responseError(string $body): string
+    {
+        $data = json_decode($body, true);
+        $error = \is_array($data) ? ($data['error'] ?? null) : null;
+        if (\is_string($error) && $error !== '') {
+            return $error;
+        }
+        return 'Unexpected response from SMS server: ' . mb_substr(trim($body), 0, 200);
     }
 
     /**
