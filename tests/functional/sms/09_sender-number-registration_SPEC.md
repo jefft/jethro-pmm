@@ -50,7 +50,7 @@ The implementation should match whatever the actual UI does. The key assertions 
 
 1. Navigate to `?view=persons&personid=1` (Dennis Demo).
 2. Click the SMS modal trigger.
-3. In the modal, assert the sender dropdown or sender area shows `"your mobile number needs verifying"` (or the exact phrase from `views/view_3_persons__5_sms.class.php` / `include/jethro_sms.php`).
+3. In the modal, assert the sender dropdown or sender area shows `"your mobile number needs verifying"` (or the exact phrase from `views/view_3_persons__5_messages.class.php` / `include/jethro_sms.php`).
 4. Click the `a.sms-register-number` link.
 5. Assert a registration form appears with an input for the phone number to register (pre-filled with the user's mobile, or empty).
 6. If the phone is not pre-filled, type `0491570158`.
@@ -66,7 +66,7 @@ The implementation should match whatever the actual UI does. The key assertions 
 Before implementing, check:
 ```
 grep -n 'sms-register-number\|register.*number\|otp\|OTP\|verify.*number' \
-  include/jethro_sms.php views/view_3_persons__5_sms.class.php resources/js/jethro.js
+  include/jethro_sms.php views/view_3_persons__5_messages.class.php resources/js/jethro.js
 ```
 This will reveal:
 - The AJAX call target (what `?call=` is used).
