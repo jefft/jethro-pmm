@@ -206,7 +206,7 @@ class Call_SMS_Info extends Call
 
         if ($output !== '') {
             echo $output;
-            if ($smsId > 0 && $anyScheduled && \Jethro\Sms\canCancelScheduledDelivery()) {
+            if ($smsId > 0 && $anyScheduled && \Jethro\Sms\canCancelScheduledDelivery(isset($row['sender']) ? (int) $row['sender'] : null)) {
                 echo ' <span id="sms-cancel-' . $smsId . '">'
                     . '<a href="#" data-on:click="@post(\'?call=sms_cancel&sms_id=' . $smsId . '\')"'
                     . ' style="cursor:pointer;font-size:smaller;text-decoration:underline">'

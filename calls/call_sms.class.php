@@ -272,6 +272,8 @@ class Call_SMS extends Call
                 }
             }
         }
+        // Whether the result may link to Persons → Messages ("SMS - view all").
+        $ajax['can_view_history'] = $GLOBALS['user_system']->havePerm(PERM_VIEWSMS);
         echo json_encode($ajax);
     }
 

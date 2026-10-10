@@ -388,7 +388,9 @@ JethroSMS.onAJAXSuccess = function (data, resultsDiv) {
 		} else {
 			message = 'Message ' + verb + ' ' + sentCount + ' recipients';
 		}
-		message += ' <a href="?view=persons__messages">(SMS History Log)</a>';
+		if (data.can_view_history) {
+			message += ' <a href="?view=persons__messages">(SMS History Log)</a>';
+		}
 		JethroSMS.appendAlert(resultsDiv, 'alert-success', message, sentCount == 1 ? null : data.sent.recipients);
 		JethroSMS.markRecipientStatuses(data.sent.recipients, 'sms-success', 'SMS sent', false);
 
