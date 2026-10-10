@@ -39,51 +39,41 @@ class Call_SMS_Statusline extends Call
 
         $message = array_get($_POST, 'message', '');
 
-        // Per-recipient message overrides from the preview panel — same
-        // parsing as the send/preview path in call_sms.class.php.
-        $overrides = [];
-        if (!empty($_POST['message_overrides']) && is_array($_POST['message_overrides'])) {
-            foreach ($_POST['message_overrides'] as $pid => $msg) {
-                if (is_string($msg) && $msg !== '') {
-                    $overrides[(int)$pid] = $msg;
-                }
-            }
-        }
+        // Message overrides from the preview panel, by row key — the keys
+        // previewRows() gives the rows below.
+        $overrides = \Jethro\Sms\messageOverridesFromRequest();
 
         $smsReq = \Jethro\Sms\getRecipientsFromRequest();
         $shortenUrls = \Jethro\Sms\shortenUrlsFromRequest();
         $cfg = \Jethro\Sms\makeStatuslineConfig($shortenUrls);
 
-        // Build per-recipient preview rows (token expansion + real recipient
-        // set) via the existing preview path. Empty when there is no message
-        // or no sendable recipients — renderStatusline then falls back to a
-        // raw-text estimate.
-        $deliveries = [];
+        // Build the preview rows (token expansion + real recipient set, one
+        // row per phone number) via the preview path. Empty when there is no
+        // message or no sendable recipients — renderStatusline then falls
+        // back to a raw-text estimate.
+        $rows = [];
         if (trim((string)$message) !== '' && $smsReq->recipients) {
             $sender = \Jethro\Sms\getSenderFromRequest();
             if ($sender !== null) {
                 $res = \Jethro\Sms\sendSms($message, $smsReq->recipients, sender: $sender, preview: true, shortenUrls: $shortenUrls);
                 if ($res->isSuccess()) {
-                    $deliveries = self::toPreviewRows($res->getValue(), $smsReq, (string)$message);
+                    $rows = \Jethro\Sms\previewRows($res->getValue(), $smsReq->rawPersonRecords, (string)$message);
                 }
             }
         }
 
         // Apply overrides into the rows used for the cost basis + panel: the
-        // edited text is what will actually be sent to that recipient.
-        if ($overrides !== []) {
-            foreach ($deliveries as &$row) {
-                $pid = $row['personId'] ?? null;
-                if ($pid !== null && array_key_exists($pid, $overrides)) {
-                    $row['message'] = $overrides[$pid];
-                }
+        // edited text is what will actually be sent to that row's number.
+        foreach ($rows as &$row) {
+            if (array_key_exists($row['key'], $overrides)) {
+                $row['message'] = $overrides[$row['key']];
             }
-            unset($row);
         }
+        unset($row);
 
         $actualCount = count($smsReq->recipients ?? []);
-        $status = \Sms\renderStatusline((string)$message, $deliveries, $cfg, $actualCount);
-        $panel = \Sms\renderPreviewPanel($deliveries, $overrides);
+        $status = \Sms\renderStatusline((string)$message, $rows, $cfg, $actualCount);
+        $panel = \Sms\renderPreviewPanel($rows, $overrides);
 
         // Schedule time validation: if send_at exceeds the provider's max
         // deferred send delay, block the Send button with a reason.
@@ -132,35 +122,5 @@ class Call_SMS_Statusline extends Call
             'smsSendBlocked' => $status['blocked'],
             'smsBlockReason' => $status['blockReason'],
         ]);
-    }
-
-    /**
-     * Convert a preview SmsDeliveryBatch into statusline/preview-panel rows.
-     * Mirrors the preview-row construction in calls/call_sms.class.php.
-     *
-     * @return array<int, array{personId: ?int, name: string, message: string, status: int}>
-     */
-    private static function toPreviewRows(
-        \Sms\SmsDeliveryBatch $batch,
-        \Jethro\Sms\SmsRequestRecipients $smsReq,
-        string $message,
-    ): array {
-        $rawRecips = $smsReq->rawPersonRecords;
-        $rows = [];
-        /** @var \Jethro\Sms\JethroSmsDelivery[] $deliveries */
-        $deliveries = $batch->deliveries;
-        foreach ($deliveries as $d) {
-            $pid = method_exists($d, 'recipientPersonId') ? $d->recipientPersonId() : null;
-            $person = $pid !== null ? ($rawRecips[$pid] ?? null) : null;
-            $rows[] = [
-                'personId' => $pid,
-                'name' => $person
-                    ? trim(($person['first_name'] ?? '') . ' ' . ($person['last_name'] ?? ''))
-                    : $d->recipient()->value,
-                'message' => $d->message() ?? $message,
-                'status' => $d->status()->value,
-            ];
-        }
-        return $rows;
     }
 }

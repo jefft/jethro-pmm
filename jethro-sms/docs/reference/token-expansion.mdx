@@ -4,7 +4,7 @@ sidebar_position: 7
 
 # SMS Token Expansion
 
-When a message contains `%…%` tokens, `TokenExpandingSmsProvider` intercepts the send and expands them per recipient.
+When a message contains `%…%` tokens, `TokenExpandingSmsProvider` intercepts the send and expands them per recipient. When the entry carries `logicalRecipients` (recipients sharing a mobile, clustered by `DeduplicatingSmsProvider`), it expands **per group** instead: each member's token values are joined with " & " ("Hi Alice & Bob, …"), so the one message sent to the shared handset reads naturally.
 
 ## Available Tokens
 

@@ -37,6 +37,8 @@ readonly class SmsDelivery
         private ?int        $segmentsUsed = null,
         /** Dollars per segment the provider reported for this delivery (Cellcast costpersms); null if not reported. */
         private ?float      $perSegmentCost = null,
+        /** TRUE if this delivery bears the segments/cost the gateway charged for its message. FALSE on the extra per-person rows DeduplicatingSmsProvider fans out for recipients sharing the dialled number — those record segments_used 0 and must not have cost copied onto them by status polls. */
+        private bool        $costBearer = true,
     )
     {
     }
@@ -54,18 +56,20 @@ readonly class SmsDelivery
      * already wraps subtypes into plain SmsDelivery).
      */
     public function with(
-        ?SmsStatus $status = null,
-        ?string   $remoteId = null,
-        ?int      $deliveryTimestamp = null,
-        ?int      $sendTimestamp = null,
-        ?string   $rawResponse = null,
-        ?string   $message = null,
-        ?string   $statusDetail = null,
-        ?int      $segmentsUsed = null,
-        ?float    $perSegmentCost = null,
+        ?PhoneNumber $recipient = null,
+        ?SmsStatus   $status = null,
+        ?string      $remoteId = null,
+        ?int         $deliveryTimestamp = null,
+        ?int         $sendTimestamp = null,
+        ?string      $rawResponse = null,
+        ?string      $message = null,
+        ?string      $statusDetail = null,
+        ?int         $segmentsUsed = null,
+        ?float       $perSegmentCost = null,
+        ?bool        $costBearer = null,
     ): self {
         return new self(
-            recipient: $this->recipient,
+            recipient: $recipient ?? $this->recipient,
             status: $status ?? $this->status,
             remoteId: $remoteId ?? $this->remoteId,
             deliveryTimestamp: $deliveryTimestamp ?? $this->deliveryTimestamp,
@@ -75,6 +79,7 @@ readonly class SmsDelivery
             statusDetail: $statusDetail ?? $this->statusDetail,
             segmentsUsed: $segmentsUsed ?? $this->segmentsUsed,
             perSegmentCost: $perSegmentCost ?? $this->perSegmentCost,
+            costBearer: $costBearer ?? $this->costBearer,
         );
     }
 
@@ -135,6 +140,12 @@ readonly class SmsDelivery
     public function perSegmentCost(): ?float
     {
         return $this->perSegmentCost;
+    }
+
+    /** Whether this delivery bears the segments/cost its (possibly shared) message was charged. */
+    public function costBearer(): bool
+    {
+        return $this->costBearer;
     }
 
     /**

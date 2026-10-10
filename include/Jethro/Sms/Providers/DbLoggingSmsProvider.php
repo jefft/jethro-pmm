@@ -240,16 +240,20 @@ final class DbLoggingSmsProvider extends \Sms\DecoratingSmsProvider
 	 * SQL SET fragment recording the segments/price a provider reported for a
 	 * delivery. Only reported values are written, so a status poll that
 	 * doesn't include them never erases what the send recorded.
+	 * Both fields are guarded on cost_bearer: recipients sharing a number
+	 * share the delivery's remote_id, so this UPDATE matches every row of the
+	 * group and only the bearer row (which carries the charge) may take the
+	 * provider's count — the non-bearer rows must keep their explicit 0.
 	 * See docs/docs/developer/reference/sms/database.mdx "Cost tracking".
 	 */
 	private static function costAssignments(\Sms\SmsDelivery $delivery): string
 	{
 		$sql = '';
 		if ($delivery->segmentsUsed() !== null) {
-			$sql .= ', segments_used = ' . (int) $delivery->segmentsUsed();
+			$sql .= ', segments_used = IF(cost_bearer, ' . (int) $delivery->segmentsUsed() . ', segments_used)';
 		}
 		if ($delivery->perSegmentCost() !== null) {
-			$sql .= ', per_segment_cost = ' . number_format($delivery->perSegmentCost(), 5, '.', '');
+			$sql .= ', per_segment_cost = IF(cost_bearer, ' . number_format($delivery->perSegmentCost(), 5, '.', '') . ', per_segment_cost)';
 		}
 		return $sql;
 	}
@@ -267,18 +271,42 @@ final class DbLoggingSmsProvider extends \Sms\DecoratingSmsProvider
 	 */
 	public function cancel(\Sms\SmsDeliveryBatch $batch): \Result
 	{
-		$result = parent::cancel($batch);
+		// Recipients sharing a number share the group's remote_id — cancelling
+		// the same upstream message once is enough. Deduplicate by remote_id
+		// for the upstream call, then fan each outcome back out so the
+		// returned batch matches the input delivery-for-delivery.
+		$first = [];
+		$outcomeIndex = [];
+		foreach ($batch->deliveries as $delivery) {
+			$remoteId = $delivery->remoteId();
+			if ($remoteId !== null && isset($outcomeIndex[$remoteId])) {
+				continue;
+			}
+			if ($remoteId !== null) {
+				$outcomeIndex[$remoteId] = count($first);
+			}
+			$first[] = $delivery;
+		}
+
+		$result = parent::cancel(new \Sms\SmsDeliveryBatch($batch->batchId, $first));
 		if ($result->isFailure()) {
 			return $result;
 		}
 
 		/** @var \Sms\SmsDeliveryBatch $cancelledBatch */
 		$cancelledBatch = $result->getValue();
+		$merged = [];
+		foreach ($batch->deliveries as $delivery) {
+			$remoteId = $delivery->remoteId();
+			$merged[] = ($remoteId !== null && isset($outcomeIndex[$remoteId]))
+				? $cancelledBatch->deliveries[$outcomeIndex[$remoteId]]
+				: $delivery;
+		}
 		$this->persistStatuses(array_filter(
-			$cancelledBatch->deliveries,
+			$merged,
 			static fn(\Sms\SmsDelivery $d) => $d->status() !== \Sms\SmsStatus::SCHEDULED,
 		));
-		return \Result::success($cancelledBatch);
+		return \Result::success(new \Sms\SmsDeliveryBatch($cancelledBatch->batchId, $merged));
 	}
 
 	/**

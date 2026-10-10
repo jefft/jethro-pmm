@@ -164,9 +164,9 @@ test.describe("SMS bulk send from families view", () => {
         texts.push((await m.innerText()).trim());
       }
 
-      // Verify specific expansions appear for known family members
-      expect(texts).toContain('Greetings, Martin Luther!');
-      expect(texts).toContain('Greetings, Katharina von Bora!');
+      // Verify specific expansions appear for known family members. Martin
+      // and Katharina share a mobile: one message with both names combined.
+      expect(texts).toContain('Greetings, Martin & Katharina Luther & von Bora!');
       expect(texts).toContain('Greetings, Magdalena Luther!');
 
       // Verify messages are NOT all identical (personalisation is working)
@@ -304,7 +304,8 @@ test.describe("SMS bulk composer - Datastar live reactivity", () => {
     // computed server-side and morphed into #sms-statusline-bulk via SSE.
     await statuslinePost;
     const statusLine = page.locator("#sms-statusline-bulk");
-    await expect(statusLine).toContainText("3 recipients");
+    // 3 adults, 2 phones (Martin and Katharina share one) → 2 messages.
+    await expect(statusLine).toContainText("2 recipients");
     await expect(statusLine).toContainText("1 segment");
     await expect(statusLine).toContainText("$");
   });
@@ -312,14 +313,17 @@ test.describe("SMS bulk composer - Datastar live reactivity", () => {
   test("changing sms_type recomputes the recipient set server-side", async ({ page }) => {
     const form = page.locator("#smshttp");
     await form.locator(".sms-message").fill("Hi %firstname%");
-    const statusLine = page.locator("#sms-statusline-bulk");
-    // "the selected persons" -> the 3 Luther family adults with mobiles.
-    await expect(statusLine).toContainText("3 recipients");
+    // "the selected persons" -> the 3 Luther family adults with mobiles,
+    // Magdalena among them.
+    await form.locator(".sms-preview-checkbox").check();
+    const previewPanel = form.locator(".sms-preview-panel");
+    await expect(previewPanel).toContainText("Magdalena Luther", { timeout: to(10000) });
 
-    // "the adults in the selected persons' families" re-posts via
-    // data-on:change and the server returns a different recipient count.
+    // "the adults in the selected persons' families" (Martin and Katharina)
+    // re-posts via data-on:change and the server returns a different set.
     await page.locator("#sms_type_family").check();
-    await expect(statusLine).toContainText("2 recipients");
+    await expect(previewPanel).not.toContainText("Magdalena Luther");
+    await expect(previewPanel).toContainText("Katharina von Bora");
   });
 
   test("editing a per-recipient message highlights the row and re-renders server-side", async ({ page }) => {
@@ -332,7 +336,7 @@ test.describe("SMS bulk composer - Datastar live reactivity", () => {
     await expect(firstMsg).toContainText("Hi ", { timeout: to(10000) });
 
     // Pencil -> the edit <textarea> for that row appears (data-show toggled by
-    // the $editingPid signal set on data-on:click).
+    // the $editingRow signal set on data-on:click).
     await form.locator(".sms-preview-edit-toggle").first().click();
     const editBox = form.locator(".sms-preview-edit").first();
     await expect(editBox).toBeVisible();

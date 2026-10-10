@@ -87,13 +87,19 @@ final readonly class PhoneNumber implements SmsSender, SmsRecipient
      */
     public function sameNumberAs(self $other): bool
     {
-        if ($this->value === $other->value) {
-            return true;
-        }
-        if (\strlen($this->value) < 9 || \strlen($other->value) < 9) {
-            return false;
-        }
-        return substr($this->value, -9) === substr($other->value, -9);
+        return $this->sameNumberKey() === $other->sameNumberKey();
+    }
+
+    /**
+     * The sameNumberAs() rule as a key: two numbers are the same phone
+     * exactly when their keys are equal — the last 9 digits, or the whole
+     * number when shorter. Lets callers group recipients by phone in one
+     * pass (DeduplicatingSmsProvider, Jethro\Sms\previewRows()) instead of
+     * comparing every pair.
+     */
+    public function sameNumberKey(): string
+    {
+        return \strlen($this->value) < 9 ? $this->value : substr($this->value, -9);
     }
 
     public function getPhoneNumber(): self

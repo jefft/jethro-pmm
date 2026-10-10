@@ -68,6 +68,24 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 UPDATE IGNORE `_smsdelivery` SET `provider` = '5centsmsv5' WHERE `provider` = '5csmsv5';
 
+-- Shared mobile numbers: when several recipients share one number,
+-- DeduplicatingSmsProvider sends one gateway message for the group and
+-- DbLogging writes one smsdelivery row per person, all sharing the group's
+-- remote_id. Only the group's primary row bears the charge (segments_used as
+-- reported); the other rows record segments_used = 0 and cost_bearer = 0, so
+-- sms_usage_daily / cost sums count the message once, and status polls guard
+-- their cost updates on cost_bearer.  Idempotent; works on MySQL 8, which
+-- lacks ADD COLUMN IF NOT EXISTS.
+SET @missing = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '_smsdelivery' AND COLUMN_NAME = 'cost_bearer');
+SET @stmt = IF(@missing,
+    'ALTER TABLE `_smsdelivery`
+        ADD COLUMN `cost_bearer` TINYINT(1) UNSIGNED NOT NULL DEFAULT 1 COMMENT ''TRUE if this row bears the segments/cost its (possibly shared) message was charged; 0 on the secondary persons of a shared number''',
+    'SELECT 1');
+PREPARE stmt FROM @stmt;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 -- Cost tracking: add segments_used / per_segment_cost to _smsdelivery tables
 -- created by earlier 2.40 dev builds.  Idempotent; works on MySQL 8, which
 -- lacks ADD COLUMN IF NOT EXISTS.

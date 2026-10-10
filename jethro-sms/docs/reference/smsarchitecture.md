@@ -31,11 +31,13 @@ The `SmsProvider` interface is the seam. Everything above it works identically r
 │  ┌─────────────────────────────────┐    │
 │  │ DbLoggingSmsProvider            │    │
 │  │  ┌──────────────────────────┐   │    │
-│  │  │ TokenExpandingSmsProvider │   │    │
-│  │  │  ┌───────────────────┐   │   │    │
-│  │  │  │ Raw Provider      │   │   │    │
-│  │  │  │ (v5/v4/SMSBcast)  │   │   │    │
-│  │  │  └───────────────────┘   │   │    │
+│  │  │ DeduplicatingSmsProvider │   │    │
+│  │  │  ┌──────────────────┐    │   │    │
+│  │  │  │ TokenExpanding…  │    │   │    │
+│  │  │  │  ┌────────────┐  │    │   │    │
+│  │  │  │  │ Raw Prov.  │  │    │   │    │
+│  │  │  │  └────────────┘  │    │   │    │
+│  │  │  └──────────────────┘    │   │    │
 │  │  └──────────────────────────┘   │    │
 │  └─────────────────────────────────┘    │
 └──────────────┬──────────────────────────┘
@@ -105,14 +107,15 @@ including per-recipient message overrides — traverses the chain in **one**
 a `$batchId` is gone.)
 
 1. Raw provider (v5, Cellcast, SMS Broadcast, etc.) with `SessionSmsCache` wired in
-2. `TokenExpandingSmsProvider` — walks the entries. An entry whose message references a known variable (one of `firstname`, `lastname`, `fullname` as supplied by `getAvailableTokens()`) is split into one entry per recipient with the expanded text (person data fetched via the injected token resolver). Function-only tokens (e.g. `%(shorten url)%`) are expanded once for the whole entry. Entries without tokens pass through unchanged, preserving batched multi-recipient HTTP calls at the raw provider. A bare `%` such as "20% off" does not trigger per-recipient splitting. Expanded entries carry a `template` key with the pre-expansion text. The bridge injects an s-expression `Templater` (with a `concat` function registered); a `shorten` function is registered per send — the preview shortener closure in preview mode, the real (mapping-storing) one otherwise.
+2. `TokenExpandingSmsProvider` — walks the entries. When an entry carries `logicalRecipients` (see 2a), a message referencing a known variable expands **per group** — each member's token values joined with " & " ("Hi Alice & Bob, …"), one entry per shared number. Otherwise an entry whose message references a known variable (one of `firstname`, `lastname`, `fullname` as supplied by `getAvailableTokens()`) is split into one entry per recipient with the expanded text (person data fetched via the injected token resolver). Function-only tokens (e.g. `%(shorten url)%`) are expanded once for the whole entry. Entries without tokens pass through unchanged, preserving batched multi-recipient HTTP calls at the raw provider. A bare `%` such as "20% off" does not trigger per-recipient splitting. Expanded entries carry a `template` key with the pre-expansion text. The bridge injects an s-expression `Templater` (with a `concat` function registered); a `shorten` function is registered per send — the preview shortener closure in preview mode, the real (mapping-storing) one otherwise.
+2a. `DeduplicatingSmsProvider` — sends one message per PHONE NUMBER: recipients sharing a number (parent/child on the parent's mobile) are clustered by `PhoneNumber::sameNumberKey()` (the `sameNumberAs()` rule as a key), the entry's `recipients` are reduced to one primary per number and a parallel `logicalRecipients` array records who each delivery is for (see `SmsProvider::send()`). After the inner chain answers, the per-number results are fanned back out to one delivery per person, in original recipient order (sharers need not be adjacent), so DbLogging's positional pairing is untouched; non-primary rows carry `segments_used` 0 and `costBearer` false. Unique-number sends pass through untouched; previews take the same path, so they show the combined message — **chain-order contract: inside `DbLoggingSmsProvider`, outside `TokenExpandingSmsProvider`; do not reorder.**
 3. `DbLoggingSmsProvider` — intercepts `send()`, `registerSenderNumber()`, `updateDelivery()`, `cancel()`, `listRecentDeliveries()`, `verifySenderNumber()`. On `send()`, pre-flight-checks that token-bearing entries have only `JethroSmsRecipient` recipients, then inserts **one `sms` row for the whole batch** (storing the first entry's `template` — pre-expansion — or message) plus per-recipient `smsdelivery` rows, and wraps deliveries in `JethroSmsDelivery` (person ID + database ID). When `$preview` is true, skips DB writes entirely (`databaseId: null`). Persists `sms_registered_sender` when a completed `registerSenderNumber()` step carries `registered && number`. Caches `updateDelivery()` results in the DB (and short-circuits upstream polling once a status is final); persists statuses returned by `cancel()` and `listRecentDeliveries()`.
 4. `OverridingSmsProvider` — validates the sender against `SMS_SENDER` and the `SMS_SENDER_OPTIONS` allowlist (a mismatch returns `Result::failure`, it does not throw), and applies the `SMS_SEND_COOLOFF` delay to immediate sends. The cooloff is an *undo window*: it is applied only when the send is user-initiated (`userInitiated:` mirrors `logToDb` — system sends such as 2FA and reminders skip it) **and** the inner provider has both `DEFERRED_SEND` and `DEFERRED_SEND_CANCEL` (without cancel it would be pure latency). Because the whole send action is one `send()` call, all deliveries naturally share one `sendAt`. Sits outside `DbLoggingSmsProvider` so the DB layer sees the cooloff-modified `$sendAt`.
 
 The final chain, outermost first:
 
 ```
-OverridingSmsProvider → DbLoggingSmsProvider → TokenExpandingSmsProvider → RawProvider
+OverridingSmsProvider → DbLoggingSmsProvider → DeduplicatingSmsProvider → TokenExpandingSmsProvider → RawProvider
 ```
 
 `getSmsProvider()` constructs the chain on every call — constants cannot
@@ -360,7 +363,7 @@ precedes the visible checkbox so "unticked" ≠ "absent".
 - **`DbLoggingSmsProvider`** skips all database inserts. Wraps deliveries in `JethroSmsDelivery` with `databaseId: null`.
 - **Concrete providers** return mock `SmsDelivery` objects with `$message` set (for non-token sends that reach them).
 
-`Call_SMS` reads `$_POST['preview']` and returns `{preview: [{personId, name, message, status}]}` — each recipient's expanded message with their name, for the JS to display.
+`Call_SMS` reads `$_POST['preview']` and returns `{preview: [{key, name, message, status}]}` from `Jethro\Sms\previewRows()` — **one row per phone number**: people sharing a mobile share a row (names one per line, the combined message, key = their person IDs joined `_`). `Call_SMS_Statusline` renders the same rows, so the cost line counts messages, not people.
 
 The JS preview panel (`.sms-preview-panel`) is hidden by default. A "Message preview" checkbox (visible when `%tokens%` are available) toggles it. When revealed, a debounced (2s) AJAX call fires on keyup, fetching expanded messages for accurate segment/cost calculation. The counter display shows `"29 chars (1 segment) → 4 recipients = $0.20"` — template length with actual (post-expansion) segment count.
 
@@ -374,12 +377,12 @@ When the template message changes (new preview AJAX response), unedited spans up
 
 ### Send flow
 
-`Call_SMS` reads `$_POST['message_overrides']` — a `personId => customMessage` map produced by `JethroSMS.getMessageOverrides()` from the edited preview entries.
+`Call_SMS` reads `$_POST['message_overrides']` via `Jethro\Sms\messageOverridesFromRequest()` — a `rowKey => customMessage` map from the edited preview rows. A row key lists the row's person IDs (`140_142_143` for a shared mobile); the override applies to each of them.
 
 The send is **one** `sendSms()` call with an entries array:
 
 1. Partition recipients into `$standard` (no override) and overridden, preserving original relative order within each group.
-2. Build entries: one entry per distinct message — `['message' => $template, 'recipients' => $standard]` first (if non-empty), then one `['message' => $customMessage, 'recipients' => [$recipient]]` per override.
+2. Build entries: one entry per distinct message — `['message' => $template, 'recipients' => $standard]` first (if non-empty), then one entry per distinct override text holding everyone with that override (so the people of a shared-mobile row stay together and `DeduplicatingSmsProvider` sends them one message).
 3. Call `sendSms($entries, [], sender: $sender, sendAt: $sendAt)` — the whole action traverses the decorator chain once. `TokenExpandingSmsProvider` splits token-bearing entries per recipient internally.
 4. `DbLoggingSmsProvider` inserts one `sms` row for the whole batch (storing the first entry's pre-expansion `template`) plus one `smsdelivery` row per delivery.
 5. `OverridingSmsProvider` computes the cooloff `sendAt` once — trivially shared by all deliveries.

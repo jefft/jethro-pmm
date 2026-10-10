@@ -51,8 +51,9 @@ for the full rationale):
 ```
 OverridingSmsProvider      ← sender validation + send cooloff
   → DbLoggingSmsProvider   ← database persistence
-    → TokenExpandingSmsProvider  ← per-recipient token expansion
-      → [Concrete Provider]      ← talks to the gateway
+    → DeduplicatingSmsProvider   ← one message per shared number
+      → TokenExpandingSmsProvider  ← per-recipient/per-group token expansion
+        → [Concrete Provider]      ← talks to the gateway
 ```
 
 Each decorator implements `SmsProvider` and delegates to the inner provider

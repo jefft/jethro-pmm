@@ -76,8 +76,8 @@ nginx/php-fpm don't buffer the stream (see `nginx/CLAUDE_NGINX.md`).
 | `$smspreview` / `$smspreviewbulk` | `data-bind` on preview checkbox | Show/hide the preview panel wrapper |
 | `$smsSendBlocked` | SSE `datastar-patch-signals` | `true` when blocked (unicode policy or over budget) |
 | `$smsBlockReason` | SSE `datastar-patch-signals` | Human-readable block reason |
-| `$editingPid` | Pencil button `data-on:click` | Which preview row is in edit mode |
-| `$smsoverride_<PID>` | `data-bind` on override textarea | Per-recipient override text |
+| `$editingRow` | Pencil button `data-on:click` | Key of the preview row in edit mode |
+| `$smsoverride_<KEY>` | `data-bind` on override textarea | Override text for that row's message |
 
 ### UI toggles (client-only, no SSE)
 
@@ -143,13 +143,20 @@ storming:
 
 ## Per-recipient overrides
 
-Overrides are server-rendered in `renderPreviewPanel()`: each row has a message
-`<span>` and an edit `<textarea>` bound to `$smsoverride_<PID>` and named
-`message_overrides[PID]`. The pencil button sets `$editingPid` to toggle the
+Overrides are server-rendered in `renderPreviewPanel()`. The preview has **one
+row per phone number** (`Jethro\Sms\previewRows()`): people sharing a mobile get
+one message, so they share a row — names one per line, the combined message
+("Hello Alice & Bob"). Each row has a key: its person IDs joined by `_` (`140`,
+or `140_142_143` for a shared mobile). The row's message `<span>` and edit
+`<textarea>` are bound to `$smsoverride_<KEY>`, and the textarea is named
+`message_overrides[KEY]`. The pencil button sets `$editingRow` to toggle the
 swap (`data-show`); on blur the textarea posts back and the server recomputes
 the cost line (no segment/cost maths runs client-side). Because the override
-textareas are real form fields, the unchanged **send** path (`?call=sms`) picks
-them up via `serialize()` (bulk) or a DOM sweep (modal).
+textareas are real form fields, the **send** path (`?call=sms`) picks them up
+via `serialize()` (bulk) or a DOM sweep (modal); `Call_SMS` applies a row's
+override to every person in its key, in one entry, so a shared mobile still
+gets one message. Both calls parse the field with
+`Jethro\Sms\messageOverridesFromRequest()`.
 
 ## Encoding decision — UTF-16 counting vs code-point display
 
