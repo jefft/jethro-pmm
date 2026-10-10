@@ -27,6 +27,10 @@ use function Jethro\Sms\insertSms;
  * On updateDelivery(), records the latest status (and the provider's status
  * JSON in smsdelivery.raw_response — never overwriting it with an empty value).
  * Subsequent calls for the same delivery skip the upstream API.
+ *
+ * Reads and writes the _smsdelivery table, not the restricted smsdelivery
+ * view: logging and status caching are system-level, whoever triggers them
+ * (see db_objects/smsdelivery.class.php).
  */
 final class DbLoggingSmsProvider extends \Sms\DecoratingSmsProvider
 {
@@ -133,7 +137,7 @@ final class DbLoggingSmsProvider extends \Sms\DecoratingSmsProvider
 		// Check if already final — return early without an upstream round-trip.
 		try {
 			$row = $db->queryRow(
-				'SELECT status, delivered_at FROM smsdelivery WHERE remote_id = ' . $db->quote($remoteId)
+				'SELECT status, delivered_at FROM _smsdelivery WHERE remote_id = ' . $db->quote($remoteId)
 			);
 
 			if ($row) {
@@ -167,7 +171,7 @@ final class DbLoggingSmsProvider extends \Sms\DecoratingSmsProvider
 
 		try {
 			$db->exec(
-				'UPDATE smsdelivery SET status = ' . $db->quote($status)
+				'UPDATE _smsdelivery SET status = ' . $db->quote($status)
 				. ($rawResponse !== '' ? ', raw_response = ' . $db->quote($rawResponse) : '')
 				. ($deliveredAt !== null ? ', delivered_at = ' . $db->quote($deliveredAt) : '')
 				. self::costAssignments($updated)
@@ -226,7 +230,7 @@ final class DbLoggingSmsProvider extends \Sms\DecoratingSmsProvider
 					: null;
 
 				$db->exec(
-					'UPDATE smsdelivery SET status = ' . $db->quote($status)
+					'UPDATE _smsdelivery SET status = ' . $db->quote($status)
 					. ($rawResponse !== '' ? ', raw_response = ' . $db->quote($rawResponse) : '')
 					. ($deliveredAt !== null ? ', delivered_at = ' . $db->quote($deliveredAt) : '')
 					. self::costAssignments($delivery)

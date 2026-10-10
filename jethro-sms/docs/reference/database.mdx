@@ -14,7 +14,7 @@ column names alone.
 
 ```
 ┌──────────────┐       ┌──────────────────┐       ┌────────────────────────────────────┐
-│  _person     │       │  sms             │       │  smsdelivery                       │
+│  _person     │       │  sms             │       │  _smsdelivery (view: smsdelivery)  │
 ├──────────────┤       ├──────────────────┤       ├────────────────────────────────────┤
 │ id        PK │◄──┐   │ id            PK │──┐    │ id           PK                    │
 │ first_name   │   │   │ body             │  │    │ sms_id       FK ──────────────────┐│
@@ -50,10 +50,10 @@ column names alone.
 **Key relationships** (FK columns versus diagram lines):
 
 - `sms.sender` → `_person.id` (nullable: NULL for script sends)
-- `smsdelivery.sms_id` → `sms.id`: one send produces one delivery row per recipient (CASCADE delete)
-- `smsdelivery.personid` → `_person.id` (nullable: NULL if raw mobile number)
+- `_smsdelivery.sms_id` → `sms.id`: one send produces one delivery row per recipient (CASCADE delete)
+- `_smsdelivery.personid` → `_person.id` (nullable: NULL if raw mobile number)
 - `sms_note.(personid, id)` → `person_note.(personid, id)`: the note lives in the `person_note` / `_abstract_note` system
-- `sms_note.smsdelivery_id` → `smsdelivery.id`: a delivery may have zero or one linked notes (CASCADE delete)
+- `sms_note.smsdelivery_id` → `_smsdelivery.id`: a delivery may have zero or one linked notes (CASCADE delete)
 - `person_note.id` → `_abstract_note.id`
 - `sms_registered_sender`: standalone — read as a first-check cache before upstream API calls
 
@@ -87,6 +87,7 @@ the base table.
 | `person_group` | `_person_group` | Group restrictions via `getCurrentUserID()` |
 | `member` | `_person` + `_family` | Flattened join; visible only when the current user shares a member-sharing group with the person |
 | `abstract_note` | `_abstract_note` | Assignee is current user AND status is 'pending', OR user has permission bits 48 |
+| `smsdelivery` | `_smsdelivery` | Deliveries to persons visible through `person`, plus those with no person (raw numbers) |
 
 The views use `getCurrentUserID()`, a MySQL stored function that returns the
 session variable `@current_user_id`. In CLI/testing contexts, set it before
@@ -103,9 +104,24 @@ matches `NULL = …`).
 ### Why `_person` not `person` in FKs?
 
 MySQL does not allow foreign keys to reference views — only base tables. So
-`sms.sender REFERENCES _person(id)` and `smsdelivery.personid REFERENCES
-_person(id)`. This is correct: the FK ensures referential integrity at the
-storage level; the view layer adds security on top.
+`sms.sender REFERENCES _person(id)` and `_smsdelivery.personid REFERENCES
+_person(id)`, and `sms_note.smsdelivery_id` references `_smsdelivery(id)`.
+This is correct: the FK ensures referential integrity at the storage level;
+the view layer adds security on top.
+
+### Which name to use for SMS deliveries
+
+Pages and calls read **`smsdelivery`**, so restricted accounts only ever see
+deliveries to persons they may see (Persons → Messages, the person Messages
+tab, `?call=sms_info`, notes, the `Sms` aggregates — a send with no visible
+delivery isn't listed, and its counts and cost cover visible deliveries only).
+Writers and system-level code use **`_smsdelivery`**: logging a send
+(`insertSms`), status caching (`DbLoggingSmsProvider`), Synchronize History,
+cancel (`cancelSms`, already permission-checked: a sender's cancel reaches all
+their recipients), CLI export and the legacy-note migration. Several of these
+run with no current user, when the view would be empty. `SmsDelivery`
+(`db_objects/smsdelivery.class.php`) inserts into `_smsdelivery`. The view is
+`SELECT sd.*`, expanded when created: recreate it after adding columns.
 
 ### Legacy SMS notes
 

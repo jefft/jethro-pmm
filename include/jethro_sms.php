@@ -690,7 +690,7 @@ function loadSmsBatch(int $smsId): \Result
 
 	$rows = $db->queryAll(
 		'SELECT sd.id, sd.personid, sd.remote_id, sd.status, sd.body, p.mobile_tel'
-		. ' FROM smsdelivery sd'
+		. ' FROM _smsdelivery sd'
 		. ' JOIN _person p ON p.id = sd.personid'
 		. ' WHERE sd.sms_id = ' . (int)$smsId
 	);
@@ -754,7 +754,7 @@ function checkSynchronized(?int $since = null): string
 	$dbRows = $db->queryAll(
 		'SELECT sd.remote_id, sd.status, sd.delivered_at, sd.body,'
 		. ' p.mobile_tel, s.created AS send_time'
-		. ' FROM smsdelivery sd'
+		. ' FROM _smsdelivery sd'
 		. ' JOIN sms s ON s.id = sd.sms_id'
 		. ' LEFT JOIN _person p ON p.id = sd.personid'
 		. ' WHERE s.created >= ' . $db->quote($sinceDate)
@@ -1027,14 +1027,14 @@ function synchronizeHistory(?int $since = null): array
 		// row: by remote_id when both sides have one …
 		$deleted = (int)$db->exec(
 			'DELETE d FROM smsdelivery_new d'
-			. ' JOIN smsdelivery sd ON sd.sms_id = d.sms_id AND sd.remote_id = d.remote_id COLLATE utf8mb4_unicode_ci'
+			. ' JOIN _smsdelivery sd ON sd.sms_id = d.sms_id AND sd.remote_id = d.remote_id COLLATE utf8mb4_unicode_ci'
 			. " WHERE d.remote_id <> ''"
 		);
 		// … otherwise by recipient phone (via personid or the raw_response
 		// destination).
 		$deleted += (int)$db->exec(
 			'DELETE d FROM smsdelivery_new d'
-			. ' JOIN smsdelivery sd ON sd.sms_id = d.sms_id'
+			. ' JOIN _smsdelivery sd ON sd.sms_id = d.sms_id'
 			. ' LEFT JOIN _person p ON p.id = sd.personid'
 			. " WHERE d.phone_key <> '' AND d.phone_key IN ("
 			. $phoneKeySql('p.mobile_tel') . ', '
@@ -1070,7 +1070,7 @@ function synchronizeHistory(?int $since = null): array
 		$db->exec('UPDATE smsdelivery_new d JOIN sms_new b ON b.id = d.batch_id SET d.sms_id = b.sms_id');
 
 		$imported = (int)$db->exec(
-			'INSERT INTO smsdelivery (sms_id, personid, remote_id, raw_response, body, provider, delivered_at, status, segments_used, per_segment_cost)'
+			'INSERT INTO _smsdelivery (sms_id, personid, remote_id, raw_response, body, provider, delivered_at, status, segments_used, per_segment_cost)'
 			. " SELECT d.sms_id, d.personid, NULLIF(d.remote_id, ''), d.raw_response, d.body, "
 			. $db->quote($providerKey) . ', d.delivered_at, d.status, d.segments_used, d.per_segment_cost'
 			. ' FROM smsdelivery_new d WHERE d.sms_id IS NOT NULL'
@@ -2442,7 +2442,7 @@ function insertSms(string $messageText, ?int $senderId, array $results, array $r
 	// phone matches each recipient (pre-fix behaviour, unchanged).
 	$personToBroadcast  = [];
 	$personToDeliveryId = [];
-	$recipStmt = $db->prepare('INSERT INTO smsdelivery (sms_id, personid, remote_id, raw_response, status, body, provider, segments_used, per_segment_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+	$recipStmt = $db->prepare('INSERT INTO _smsdelivery (sms_id, personid, remote_id, raw_response, status, body, provider, segments_used, per_segment_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
 	$configuredPrice = configuredSegmentCost($provider);
 
 	if ($usePositional) {

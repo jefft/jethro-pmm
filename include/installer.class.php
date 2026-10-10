@@ -239,7 +239,7 @@ class Installer
 				PRIMARY KEY (note_personid, note_id, smsdelivery_id),
 				INDEX smsdelivery_id (smsdelivery_id),
 				CONSTRAINT sms_note_pn_fk FOREIGN KEY (note_personid, note_id) REFERENCES person_note (personid, id) ON DELETE CASCADE,
-				CONSTRAINT sms_note_sd_fk FOREIGN KEY (smsdelivery_id) REFERENCES smsdelivery (id) ON DELETE CASCADE
+				CONSTRAINT sms_note_sd_fk FOREIGN KEY (smsdelivery_id) REFERENCES _smsdelivery (id) ON DELETE CASCADE
 			) ENGINE=InnoDB;",
 
 			"-- Synced with upgrades/2026-upgrade-to-2.40.sql:95-98 — persisting sender number registrations

@@ -102,7 +102,8 @@ processes:
       # call re-enters the same php-fpm pool, so leftovers saturate the pool
       # and unrelated tests time out. Re-run before every suite by
       # tests/functional/global-setup.ts.
-      mariadb jethro_functest -e "UPDATE smsdelivery SET status='cancelled' WHERE status='scheduled'"
+      # (_smsdelivery: the smsdelivery view shows nothing without a current user.)
+      mariadb jethro_functest -e "UPDATE _smsdelivery SET status='cancelled' WHERE status='scheduled'"
     readiness_probe:
       exec:
         command: mariadb jethro_functest -sNBe "select count(*) from _person;"

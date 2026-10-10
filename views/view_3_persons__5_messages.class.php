@@ -29,42 +29,25 @@ class View_persons__messages extends View
         require_once JETHRO_ROOT . '/include/jethro_sms.php';
         $currentProviderKey = \Jethro\Sms\getCurrentSmsProviderKey();
 
-        $hasRestrictions = !empty($GLOBALS['user_system']->getCurrentRestrictions());
-
-        if ($hasRestrictions) {
-            $sends = self::_getRestrictedSends();
-            if (!$sends) {
-                ?>
-                <p><i>No SMS messages have been sent yet.</i></p>
-                <?php
-                return;
-            }
-            $smsIds = array_keys($sends);
-            $deliveries = self::_getRestrictedDeliveries($smsIds);
-        } else {
-            $sends = $GLOBALS['system']->getDBObjectData('sms', [], 'AND', 'created DESC');
-            if (!$sends) {
-                ?>
-                <p><i>No SMS messages have been sent yet.</i></p>
-                <?php
-                return;
-            }
-            $smsIds = array_keys($sends);
-            $deliveries = $GLOBALS['system']->getDBObjectData('smsdelivery', ['sms_id' => $smsIds], 'AND', 'personid');
+        // Restricted accounts: the smsdelivery view only holds deliveries to
+        // persons they may see (and to raw numbers), so the Sms aggregates
+        // (recipient/status counts, cost) count only those, and sends with no
+        // such delivery aren't listed (inner join). See smsdelivery.class.php.
+        $sends = $GLOBALS['system']->getDBObjectData('sms', [], 'AND', 'created DESC');
+        if (!$sends) {
+            ?>
+            <p><i>No SMS messages have been sent yet.</i></p>
+            <?php
+            return;
         }
+        $deliveries = $GLOBALS['system']->getDBObjectData('smsdelivery', ['sms_id' => array_keys($sends)], 'AND', 'personid');
 
-        // Normalise delivery shapes and group by sms_id.
+        // Group by sms_id.
         $deliveriesBySmsId = [];
-		foreach ($deliveries as $key => $d) {
-			if (isset($d['id'])) {
-				$d['_id'] = (int)$d['id'];
-				$d['_visible'] = 1;
-			} else {
-				$d['_id'] = (int)$key;
-				$d['_visible'] = 1;
-			}
-			$deliveriesBySmsId[(int)$d['sms_id']][] = $d;
-		}
+        foreach ($deliveries as $id => $d) {
+            $d['_id'] = (int)$id;
+            $deliveriesBySmsId[(int)$d['sms_id']][] = $d;
+        }
 
         ?>
             <div class="sms-history-layout">
@@ -120,18 +103,8 @@ class View_persons__messages extends View
                 $hasTokens = count($uniqueBodies) > 1;
                 $senderName = (!empty($send['sender_fn']) ? trim($send['sender_fn'] . ' ' . $send['sender_ln']) : 'system');
 
-                $visibleDeliveries = [];
-                $hiddenCount = 0;
-                foreach ($sendDeliveries as $d) {
-                    if (!empty($d['_visible'])) {
-                        $visibleDeliveries[] = $d;
-                    } else {
-                        $hiddenCount++;
-                    }
-                }
-
                 $recipientNames = [];
-                foreach ($visibleDeliveries as $d) {
+                foreach ($sendDeliveries as $d) {
                     $recipientNames[] = $d['recipient_name'] ?? '';
                 }
 
@@ -165,7 +138,7 @@ class View_persons__messages extends View
                     <td class="sms-history-recipients">
                         <div class="sms-history-recipients-scroll">
                         <?php
-                        foreach ($visibleDeliveries as $d) {
+                        foreach ($sendDeliveries as $d) {
                             $name = $d['recipient_name'] ?: ('Person #' . ((int)$d['personid']));
                             $status = $d['status'] ?? 'unknown';
                             $did = (int)($d['_id'] ?? 0);
@@ -191,11 +164,6 @@ class View_persons__messages extends View
                                 echo ents($name);
                             }
                             ?><br />
-                            <?php
-                        }
-                        if ($hiddenCount > 0) {
-                            ?>
-                            <span class="text-muted"><i>Visibility of <?php echo $hiddenCount; ?> other recipient<?php echo $hiddenCount > 1 ? 's' : ''; ?> limited by permissions</i></span>
                             <?php
                         }
                         ?>
@@ -228,60 +196,5 @@ class View_persons__messages extends View
         </table>
         </div><!-- /.sms-history-layout -->
         <?php
-    }
-
-    /**
-     * Query sms rows with restriction-aware delivery aggregates.
-     */
-    private static function _getRestrictedSends(): array
-    {
-        $db = $GLOBALS['db'];
-        $rows = $db->queryAll(
-            'SELECT sms.*,
-                COALESCE(sender_p.first_name, \'\') AS sender_fn,
-                COALESCE(sender_p.last_name, \'\') AS sender_ln,
-                COUNT(rd.id) AS recipient_count,
-                SUM(rd.status IN (\'queued\',\'sent\',\'delivered\',\'test-message\')) AS delivered_count,
-                SUM(rd.status IN (\'failed\',\'cancelled\')) AS failed_count,
-                SUM(rd.status = \'scheduled\') AS scheduled_count
-            FROM sms
-            LEFT JOIN _person sender_p ON sender_p.id = sms.sender
-            JOIN smsdelivery rd ON rd.sms_id = sms.id
-            LEFT JOIN person rp ON rp.id = rd.personid
-            WHERE rp.id IS NOT NULL OR rd.personid IS NULL
-            GROUP BY sms.id
-            ORDER BY sms.created DESC'
-        );
-        if ($rows === false) {
-            return [];
-        }
-        $result = [];
-        foreach ($rows as $row) {
-            $result[(int)$row['id']] = $row;
-        }
-        return $result;
-    }
-
-    /**
-     * Query smsdelivery rows with restriction-aware recipient names.
-     */
-    private static function _getRestrictedDeliveries(array $smsIds): array
-    {
-        if ($smsIds === []) {
-            return [];
-        }
-        $db = $GLOBALS['db'];
-        $placeholders = implode(',', array_fill(0, count($smsIds), '?'));
-        $rows = $db->queryAll(
-            "SELECT sd.id, sd.sms_id, sd.personid, sd.body, sd.status, sd.provider,
-                CONCAT(COALESCE(p.first_name, ''), ' ', COALESCE(p.last_name, '')) AS recipient_name,
-                (p.id IS NOT NULL OR sd.personid IS NULL) AS _visible
-            FROM smsdelivery sd
-            LEFT JOIN person p ON p.id = sd.personid
-            WHERE sd.sms_id IN ({$placeholders})
-            ORDER BY sd.personid",
-            array_map('intval', $smsIds)
-        );
-        return $rows !== false ? $rows : [];
     }
 }
