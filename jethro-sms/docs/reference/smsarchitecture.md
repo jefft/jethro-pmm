@@ -221,8 +221,18 @@ Rendering: `Jethro\Sms\renderRegistrationStepHtml()` (web, in
 `jethro-sms/src/cli.php`).
 Pinned by `tests/sms/registration/test_results_are_structured.php`.
 
-`DbLoggingSmsProvider` persists to `sms_registered_sender` when
-a completed registration has `registered` true and a non-null `number`.
+`DbLoggingSmsProvider` records sender numbers in `sms_registered_sender`
+with the person they are verified for, and a number belongs to the first
+person verified for it: a completed registration (`registered` true) claims
+it for the current user, and so does `verifySenderNumber()` when the
+provider reports an unclaimed number verified. A number claimed by someone
+else is never verified for you, whatever the provider says. At send time,
+`senderNotVerifiedError()` (`include/jethro_sms.php`, called by
+`call_sms`) refuses sending as your own mobile on a provider with
+`REGISTER_SENDER_NUMBER` unless it is verified for you — so a user who sets
+their mobile to someone else's verified number can't send as them (SMS
+review Q9). Providers can't prove possession of a number already on the
+account (Cellcast skips the OTP), hence first person wins.
 
 The creation step happens eagerly (in step 2, not step 3) so that a taken or invalid ID fails before the user fills in the compliance form.
 
@@ -252,7 +262,7 @@ The `_USER_MOBILE_` token (in `SMS_SENDER` or `SMS_SENDER_OPTIONS`) is resolved 
 
 ## Known quirks
 
-- **No `sms_registered_sender` for out-of-band verification**: v5's `registerSenderNumber()` registration step returns `registered: false` (verification is via SMS link, not OTP), so `DbLoggingSmsProvider` does not persist. Once the user clicks the verification link and the number appears as `"approved"` in the sender ID list, `verifySenderNumber()` → `getSenderNumbers()` will detect it via the API.
+- **Out-of-band verification (5CentSMS v5)**: v5's `registerSenderNumber()` registration step returns `registered: false` (verification is via SMS link, not OTP), so nothing is recorded then. Once the user clicks the verification link and the number appears as `"approved"` in the sender ID list, `verifySenderNumber()` → `getSenderNumbers()` detects it via the API, and `DbLoggingSmsProvider` records it for the current user (first person wins, above).
 
 - **`verifySenderNumber()` is gated on `REGISTER_SENDER_NUMBER`**: the UI registration prompt in `jethro_sms.php` only calls `verifySenderNumber()` when the capability is present. This is correct — providers without sender number registration always return `true`.
 

@@ -602,6 +602,39 @@ function getLegitimateSenderStrings(): array
 }
 
 /**
+ * Why the current user may not send as $sender, or null if they may.
+ *
+ * Sending as their own mobile, on a provider that verifies sender numbers
+ * (REGISTER_SENDER_NUMBER: Cellcast, 5CentSMS v5), needs the number verified
+ * *for them*: a number belongs to the first person verified for it
+ * (DbLoggingSmsProvider::verifySenderNumber()), so a user who sets their
+ * mobile to someone else's verified number can't send as them (SMS review
+ * Q9). If the check itself fails (provider unreachable), the send isn't
+ * blocked: it would fail on its own, and a number owned by someone else is
+ * refused from the database before the provider is asked.
+ */
+function senderNotVerifiedError(\Sms\SmsSender $sender): ?string
+{
+    $own = getCurrentUserMobileNumber();
+    if ($own === null || !$sender instanceof \Sms\PhoneNumber || !$sender->sameNumberAs($own)) {
+        return null;
+    }
+    $providerResult = getSmsProvider();
+    if ($providerResult->isFailure()) {
+        return null;
+    }
+    $provider = $providerResult->getValue();
+    if (!$provider->hasCapability(\Sms\SmsCapability::REGISTER_SENDER_NUMBER)) {
+        return null;
+    }
+    $verified = $provider->verifySenderNumber($own);
+    if ($verified->isSuccess() && $verified->getValue() === false) {
+        return 'Your mobile number ' . $own->value . ' isn\'t verified as a sender for you: verify it from the sender list first.';
+    }
+    return null;
+}
+
+/**
  * The current (logged-in) user's mobile number — what the `_USER_MOBILE_`
  * sender token resolves to.  Null when nobody is logged in (CLI, cron,
  * pre-2FA login) or the user has no mobile.

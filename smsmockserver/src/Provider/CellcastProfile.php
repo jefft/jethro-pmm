@@ -26,7 +26,23 @@ final class CellcastProfile
         public array $senders = [],
         /** @var list<array{number:string,first_name:string,last_name:string,full_name:string}> */
         public array $optOuts = [],
+        /** @var list<array{number:string,name:string}> Sender numbers already registered on the account, in dynamic mode */
+        public array $preRegistered = [],
     ) {}
+
+    /**
+     * Sender numbers the account already has (GET /api/v1/customNumber lists
+     * them alongside the defaults), e.g. the test user's own mobile, as on a
+     * real account where it was verified before Jethro sends from it.
+     *
+     * @param list<string> $numbers International form, e.g. '61491570157'
+     */
+    public function preRegisterNumbers(array $numbers): void
+    {
+        foreach ($numbers as $n) {
+            $this->preRegistered[] = ['number' => $n, 'name' => $n];
+        }
+    }
 
     /** Register a cellcast profile with the given name. */
     public static function register(string $name, callable $setup): self
