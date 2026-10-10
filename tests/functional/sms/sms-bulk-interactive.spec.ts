@@ -45,12 +45,13 @@ test.describe("SMS bulk — in-page Datastar interactivity then send", () => {
     // 3. Verify the live client-side char count
     await expect(form.locator(".sms-charcount-instant")).toHaveText("5 chars");
 
-    // 4. Verify the server-rendered statusline shows segment/cost with
-    //    3 family adults. Segment cost comes from the provider.
+    // 4. Verify the server-rendered statusline shows segment/cost: 3 family
+    //    adults on 2 phones (Martin and Katharina share one) → 2 messages.
+    //    Segment cost comes from the provider.
     const statusLine = form.locator("#sms-statusline-bulk");
     await expect(statusLine).toContainText("1 segment");
-    await expect(statusLine).toContainText("3 recipients");
-    await expect(statusLine).toContainText("$0.13");
+    await expect(statusLine).toContainText("2 recipients");
+    await expect(statusLine).toContainText("$0.09");
 
     // 5. Preview panel wrapper is initially hidden
     const previewWrap = form.locator(".sms-preview-wrap");
@@ -65,9 +66,9 @@ test.describe("SMS bulk — in-page Datastar interactivity then send", () => {
     await expect(previewPanel).toContainText("Martin Luther");
     await expect(previewPanel).toContainText("Katharina von Bora");
     await expect(previewPanel).toContainText("Magdalena Luther");
-    // 3 rows, each with "Hello" as the message text
+    // 2 rows (one per phone), each with "Hello" as the message text
     const previewMessages = previewPanel.locator(".sms-preview-msg");
-    await expect(previewMessages).toHaveCount(3);
+    await expect(previewMessages).toHaveCount(2);
     for (const msg of await previewMessages.all()) {
       await expect(msg).toHaveText("Hello");
     }
@@ -79,17 +80,16 @@ test.describe("SMS bulk — in-page Datastar interactivity then send", () => {
     await form.locator(".sms-message").fill("Hello" + " %firstname%");
     await statuslinePost2;
 
-    // 9. Preview rows now show expanded names, not the raw token
-    await expect(previewPanel).toContainText("Hello Martin");
-    await expect(previewPanel).toContainText("Hello Katharina");
+    // 9. Preview rows now show expanded names, not the raw token; the
+    //    shared phone gets both names in one message
+    await expect(previewPanel).toContainText("Hello Martin & Katharina");
     await expect(previewPanel).toContainText("Hello Magdalena");
 
-    // 10. Switch sms_type to "families" — recipient count drops to 2
-    //     (Katharina shares a family, so family adults = 2 distinct adults
-    //     across the selected persons' families)
+    // 10. Switch sms_type to "families" — the family adults are Martin and
+    //     Katharina, who share a phone: 1 message
     await page.locator("#sms_type_family").check();
-    await expect(statusLine).toContainText("2 recipients");
-    await expect(statusLine).toContainText("$0.09");
+    await expect(statusLine).toContainText("1 recipients");
+    await expect(statusLine).toContainText("$0.04");
 
     // 11. Uncheck all person checkboxes — no recipients selected.
     //     The statusline should show no segment/cost line when no one
@@ -113,15 +113,15 @@ test.describe("SMS bulk — in-page Datastar interactivity then send", () => {
     // 12. Select only person 186 (Martin Luther, primary school — a child).
     //     sms_type is still "family" (adults in selected persons' families).
     //     Even though the only selected person is a child, family mode
-    //     correctly finds the adults in Martin's family: Katharina von Bora
-    //     and Magdalena Luther (his parents).
+    //     correctly finds the adults in his family: Martin and Katharina,
+    //     on one shared phone.
     await page.locator('input[name="personid[]"][value="186"]').check();
     const childPost = page.waitForResponse(
       (r) => r.url().includes("call=sms_statusline") && r.request().method() === "POST",
     );
     await form.locator(".sms-message").press("Space");
     await childPost;
-    await expect(statusLine).toContainText("2 recipients");
+    await expect(statusLine).toContainText("1 recipients");
 
 
     // 13. Switch to person mode. Only Martin (child, no mobile) is selected

@@ -71,7 +71,34 @@ class TokenExpandingSmsProvider extends DecoratingSmsProvider
                 continue;
             }
 
-            if ($this->templater->referencesVariables($message, $this->varNames)) {
+            $logicalRecipients = $entry['logicalRecipients'] ?? null;
+            if (is_array($logicalRecipients) && count($logicalRecipients) === count($recipients)) {
+                // Person variables referenced and the entry carries delivery
+                // groups (DeduplicatingSmsProvider) — expand per GROUP: token
+                // values of all group members, joined " & ", one message per
+                // shared number ("Hi Alice & Bob, …").  Members of a group
+                // share the number, so they share the one message body.
+                foreach ($recipients as $i => $recipient) {
+                    $group = $logicalRecipients[$i];
+                    $combined = [];
+                    foreach ($group as $member) {
+                        $tokens = ($this->tokenResolver)($member);
+                        foreach ($this->varNames as $name) {
+                            $value = $tokens[$name] ?? null;
+                            if ($value !== null && $value !== '') {
+                                $combined[$name][] = $value;
+                            }
+                        }
+                    }
+                    $result = $this->templater->expand($message, fn(string $name): ?string =>
+                        isset($combined[$name]) ? implode(' & ', $combined[$name]) : null
+                    );
+                    if ($result->isFailure()) {
+                        return $result;
+                    }
+                    $expanded[] = ['message' => $result->getValue(), 'recipients' => [$recipient], 'template' => $message, 'logicalRecipients' => [$group]];
+                }
+            } elseif ($this->templater->referencesVariables($message, $this->varNames)) {
                 // Person variables referenced — expand per recipient
                 foreach ($recipients as $recipient) {
                     $tokens = ($this->tokenResolver)($recipient);
@@ -86,12 +113,18 @@ class TokenExpandingSmsProvider extends DecoratingSmsProvider
             } else {
                 // Function-only tokens (e.g. %(shorten url)%) — expand once,
                 // no per-recipient data needed. Unknown %word% tokens remain
-                // literal (resolver returns null for all names).
+                // literal (resolver returns null for all names).  Any
+                // logicalRecipients key rides along unchanged: the body is
+                // identical for every member of a group.
                 $result = $this->templater->expand($message, fn(string $_): ?string => null);
                 if ($result->isFailure()) {
                     return $result;
                 }
-                $expanded[] = ['message' => $result->getValue(), 'recipients' => $recipients, 'template' => $message];
+                $newEntry = ['message' => $result->getValue(), 'recipients' => $recipients, 'template' => $message];
+                if (isset($entry['logicalRecipients'])) {
+                    $newEntry['logicalRecipients'] = $entry['logicalRecipients'];
+                }
+                $expanded[] = $newEntry;
             }
         }
 

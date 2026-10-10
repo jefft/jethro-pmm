@@ -21,7 +21,7 @@ require_once __DIR__ . '/../../src/load.php';
 /** @param array<int,array{personId?:?int,name?:string,message?:string,status?:int}> $deliveries */
 function _row(int $pid, string $msg): array
 {
-    return ['personId' => $pid, 'name' => "P$pid", 'message' => $msg, 'status' => 0];
+    return ['key' => (string) $pid, 'name' => "P$pid", 'message' => $msg, 'status' => 0];
 }
 
 test('empty message -> empty html, not blocked', function () {

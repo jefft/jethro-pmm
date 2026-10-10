@@ -42,13 +42,13 @@ class Call_SMS extends Call
         if (!empty($recips)) {
             $message = array_get($_POST, 'message', '');
 
-            // Per-recipient message overrides from the preview panel
+            // Per-person message overrides from the preview panel. A row
+            // shared by people on one mobile (key '140_142', see previewRows())
+            // overrides the one message they get, so it applies to each.
             $messageOverrides = [];
-            if (!empty($_POST['message_overrides']) && is_array($_POST['message_overrides'])) {
-                foreach ($_POST['message_overrides'] as $pid => $msg) {
-                    if (is_string($msg) && $msg !== '') {
-                        $messageOverrides[(int)$pid] = $msg;
-                    }
+            foreach (\Jethro\Sms\messageOverridesFromRequest() as $rowKey => $msg) {
+                foreach (explode('_', (string)$rowKey) as $pid) {
+                    $messageOverrides[(int)$pid] = $msg;
                 }
             }
 
@@ -67,7 +67,8 @@ class Call_SMS extends Call
             if (empty($message)) {
                 $ajax['error'] = "Empty message";
             } elseif (!empty($_POST['preview'])) {
-                // Preview mode: return per-recipient expanded messages without sending.
+                // Preview mode: return the expanded messages without sending,
+                // one row per phone number.
                 $sender = \Jethro\Sms\getSenderFromRequest();
                 if ($sender === null) {
                     echo json_encode(['error' => 'No valid sender configured.']);
@@ -78,24 +79,7 @@ class Call_SMS extends Call
                     echo json_encode(['error' => $result->getError()]);
                     return;
                 }
-                /** @var \Jethro\Sms\JethroSmsDeliveryBatch|\Sms\SmsDeliveryBatch $batch */
-                $batch = $result->getValue();
-                /** @var \Jethro\Sms\JethroSmsDelivery[] $deliveries */
-                $deliveries = $batch->deliveries;
-                $preview = [];
-                foreach ($deliveries as $d) {
-                    $pid = $d->recipientPersonId();
-                    $person = $pid !== null ? ($rawRecips[$pid] ?? null) : null;
-                    $preview[] = [
-                        'personId' => $pid,
-                        'name' => $person
-                            ? trim(($person['first_name'] ?? '') . ' ' . ($person['last_name'] ?? ''))
-                            : $d->recipient()->value,
-                        'message' => $d->message() ?? $message,
-                        'status' => $d->status()->value,
-                    ];
-                }
-                echo json_encode(['preview' => $preview]);
+                echo json_encode(['preview' => \Jethro\Sms\previewRows($result->getValue(), $rawRecips, (string)$message)]);
                 return;
             } elseif ($tooLong !== []) {
                 $ajax['error'] = 'Message too long (limit ' . $maxLen . ' characters) for: '
@@ -119,35 +103,29 @@ class Call_SMS extends Call
 
                 set_time_limit(300);
 
-                // Build entries: one entry per distinct message.
-                // Recipients receiving the unmodified template go in one entry;
-                // each per-recipient override gets its own entry.
-                // Order: standard recipients first, then overridden ones, so
-                // deliveries arrive in the order sendSummary() expects.
-                $entries = [];
+                // Build entries: one entry per distinct message — the template
+                // for everyone not overridden, then one per override text.
+                // Grouping overrides by text keeps the people of a shared-mobile
+                // preview row in one entry, so DeduplicatingSmsProvider still
+                // sends them one message.
                 $standard = [];
-                $overriddenPersonIds = [];
+                $overridden = [];
                 foreach ($recips as $r) {
                     $pid = $r instanceof \Jethro\Sms\JethroSmsRecipient ? $r->personId : null;
                     if ($pid !== null && isset($messageOverrides[$pid])) {
-                        $entries[] = ['message' => $messageOverrides[$pid], 'recipients' => [$r]];
-                        $overriddenPersonIds[$pid] = true;
+                        $text = $messageOverrides[$pid];
+                        $overridden[$text] ??= ['message' => $text, 'recipients' => []];
+                        $overridden[$text]['recipients'][] = $r;
                     } else {
                         $standard[] = $r;
                     }
                 }
+                $entries = array_values($overridden);
                 if ($standard !== []) {
-                    // Prepend so standard recipients come first in delivery order
                     array_unshift($entries, ['message' => $message, 'recipients' => $standard]);
                 }
-
-                $orderedRecips = $standard;
-                foreach ($recips as $r) {
-                    $pid = $r instanceof \Jethro\Sms\JethroSmsRecipient ? $r->personId : null;
-                    if ($pid !== null && isset($overriddenPersonIds[$pid])) {
-                        $orderedRecips[] = $r;
-                    }
-                }
+                // Deliveries come back in entry order.
+                $orderedRecips = array_merge(...array_column($entries, 'recipients'));
 
                 $result = \Jethro\Sms\sendSms($entries, [], sender: $sender, sendAt: $sendAt, shortenUrls: \Jethro\Sms\shortenUrlsFromRequest());
                 if ($result->isFailure()) {
@@ -171,9 +149,9 @@ class Call_SMS extends Call
                     }
                 }
 
-                // Pass $orderedRecips (standard-first, overridden-second) so that
-                // delivery positions align with recipient positions, enabling
-                // sendSummary()'s positional matching for shared-mobile correctness.
+                // Pass $orderedRecips (entry order) so that delivery positions
+                // align with recipient positions, enabling sendSummary()'s
+                // positional matching for shared-mobile correctness.
                 $summary = \Sms\sendSummary($smsDeliveries, $orderedRecips);
 
                 // Server-side note creation — eliminates the data-loss window

@@ -30,6 +30,7 @@
  *    {@see getRecipientsFromRequest()}      — resolve recipients from $_REQUEST params
  *    {@see getRecipientsFromPersonRecords()} — person DB rows → JethroSmsRecipient[]
  *    {@see getSenderFromRequest()}          — resolve sender, enforcing closed vocabulary
+ *    {@see messageOverridesFromRequest()}   — preview-panel message overrides, by row key
  *    {@see getLegitimateSenderStrings()}    — build the closed vocabulary
  *    {@see getCurrentUserMobileNumber()}    — resolve _USER_MOBILE_ sender
  *
@@ -45,6 +46,7 @@
  *
  *  Display / HTML
  *    {@see formatSendSummary()}            — human-readable send result
+ *    {@see previewRows()}                  — preview-panel rows, one per phone number
  *    {@see renderSmsDeliveryStatusIndicator()} — status column for the SMS log
  *    {@see renderSmsDeliveryStatusIcon()}      — status icon for delivery tracking
  *    {@see renderRegistrationStepHtml()}       — sender registration form
@@ -185,6 +187,12 @@ function getSmsProvider(bool $tfa = false, bool $logToDb = true): \Result
 		previewShortenFn: fn(string $url): string => getUrlShortener()->previewShorten($url));
 
 	if ($logToDb) {
+		// Order contract (see jethro-sms/docs/reference/smsarchitecture.md):
+		// Deduplicating must sit INSIDE DbLoggingSmsProvider — logging needs
+		// per-person results so insertSms()'s positional pairing stays 1:1 —
+		// and OUTSIDE TokenExpandingSmsProvider — per-group token expansion
+		// reads the logicalRecipients key the decorator attaches. Do not reorder.
+		$provider = new \Sms\DeduplicatingSmsProvider($provider);
 		$provider = new \Jethro\Sms\Providers\DbLoggingSmsProvider($provider);
 	}
 
@@ -491,6 +499,84 @@ function getRecipientsFromPersonRecords(array $personRecords): array
 function shortenUrlsFromRequest(): bool
 {
 	return ($_REQUEST['shorten_urls'] ?? null) === '1';
+}
+
+/**
+ * The preview panel's message overrides from the request: row key => text.
+ *
+ * A row key names the people one preview row's message goes to: their
+ * person IDs joined by '_' ('140', or '140_142_143' for people sharing a
+ * mobile; see previewRows()).  Each row posts its override as
+ * message_overrides[KEY] (Sms\renderPreviewPanel()).  Malformed keys and
+ * empty texts are dropped.  PHP turns a single-ID key like '140' into int 140.
+ *
+ * @return array<int|string, string>
+ * @see docs/docs/developer/reference/sms/SMS_DATASTAR.md
+ */
+function messageOverridesFromRequest(): array
+{
+	$raw = $_POST['message_overrides'] ?? [];
+	$overrides = [];
+	if (is_array($raw)) {
+		foreach ($raw as $key => $msg) {
+			if (is_string($msg) && $msg !== '' && preg_match('/^\d+(?:_\d+)*$/', (string)$key)) {
+				$overrides[$key] = $msg;
+			}
+		}
+	}
+	return $overrides;
+}
+
+/**
+ * Preview-panel rows for a preview send: ONE row per phone number, the unit
+ * the gateway sends and charges.  People sharing a mobile get one message
+ * between them (Sms\DeduplicatingSmsProvider), so they share a row: names
+ * one per line ("\n"), the combined message they will receive, and a key listing
+ * their person IDs in recipient order ('140_142_143').  The key names the
+ * row's override field, which the send path applies to everyone in it
+ * (Call_SMS).  A row sits where its first person sat in the recipient list.
+ *
+ * A preview is one message, so grouping by number alone matches what
+ * DeduplicatingSmsProvider does per entry.
+ *
+ * @param array<int, array<string, mixed>> $rawPersonRecords person rows keyed by ID ({@see SmsRequestRecipients::$rawPersonRecords})
+ * @param string $message fallback text for deliveries that carry none
+ * @return list<array{key: string, name: string, message: string, status: int}>
+ * @see messageOverridesFromRequest()
+ * @see \Sms\renderPreviewPanel()
+ */
+function previewRows(\Sms\SmsDeliveryBatch $batch, array $rawPersonRecords, string $message): array
+{
+	/** @var list<non-empty-list<\Sms\SmsDelivery>> $groups */
+	$groups = [];
+	$groupOfNumber = [];
+	foreach ($batch->deliveries as $d) {
+		$g = $groupOfNumber[$d->recipient()->sameNumberKey()] ??= count($groups);
+		$groups[$g][] = $d;
+	}
+
+	$rows = [];
+	foreach ($groups as $deliveries) {
+		$pids = [];
+		$names = [];
+		foreach ($deliveries as $d) {
+			$pid = $d instanceof JethroSmsDelivery ? $d->recipientPersonId() : null;
+			$person = $pid !== null ? ($rawPersonRecords[$pid] ?? null) : null;
+			if ($pid !== null) {
+				$pids[] = $pid;
+			}
+			$names[] = $person
+				? trim(($person['first_name'] ?? '') . ' ' . ($person['last_name'] ?? ''))
+				: $d->recipient()->value;
+		}
+		$rows[] = [
+			'key' => implode('_', $pids),
+			'name' => implode("\n", $names),
+			'message' => $deliveries[0]->message() ?? $message,
+			'status' => $deliveries[0]->status()->value,
+		];
+	}
+	return $rows;
 }
 
 /**
@@ -2501,7 +2587,7 @@ function insertSms(string $messageText, ?int $senderId, array $results, array $r
 	// phone matches each recipient (pre-fix behaviour, unchanged).
 	$personToBroadcast  = [];
 	$personToDeliveryId = [];
-	$recipStmt = $db->prepare('INSERT INTO _smsdelivery (sms_id, personid, remote_id, raw_response, status, body, provider, segments_used, per_segment_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+	$recipStmt = $db->prepare('INSERT INTO _smsdelivery (sms_id, personid, remote_id, raw_response, status, body, provider, segments_used, per_segment_cost, cost_bearer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
 	$configuredPrice = configuredSegmentCost($provider);
 
 	if ($usePositional) {
@@ -2521,7 +2607,8 @@ function insertSms(string $messageText, ?int $senderId, array $results, array $r
 				$rawResponse     = $recipientResult->rawResponse();
 				$status          = $recipientResult->status()->toMySql();
 				$recipStmt->execute([$smsId, $recip->personId, $remoteId, $rawResponse, $status, $recipientResult->body(), $provider,
-					$recipientResult->segmentsUsed(), $recipientResult->perSegmentCost() ?? $configuredPrice]);
+					$recipientResult->segmentsUsed(), $recipientResult->perSegmentCost() ?? $configuredPrice,
+					$recipientResult->costBearer() ? 1 : 0]);
 				$personToBroadcast[(string)$recip->personId]  = $smsId;
 				$personToDeliveryId[(string)$recip->personId] = (int)$db->lastInsertId();
 			}
@@ -2548,7 +2635,8 @@ function insertSms(string $messageText, ?int $senderId, array $results, array $r
 			$rawResponse = $recipientResult ? $recipientResult->rawResponse() : '';
 			$status      = $recipientResult ? $recipientResult->status()->toMySql() : \Sms\SmsStatus::SENDING->toMySql();
 			$recipStmt->execute([$smsId, $recip->personId, $destRemoteIdMap[$phone] ?? null, $rawResponse, $status, $recipientResult?->body(), $provider,
-				$recipientResult?->segmentsUsed(), $recipientResult?->perSegmentCost() ?? $configuredPrice]);
+				$recipientResult?->segmentsUsed(), $recipientResult?->perSegmentCost() ?? $configuredPrice,
+				($recipientResult?->costBearer() ?? true) ? 1 : 0]);
 			$personToBroadcast[(string)$recip->personId]  = $smsId;
 			$personToDeliveryId[(string)$recip->personId] = (int)$db->lastInsertId();
 		}

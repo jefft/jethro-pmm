@@ -60,7 +60,15 @@ interface SmsProvider
      * recipients) pairs at once, and each decorator processes them in a
      * single invocation.  A single-message send is just a batch of one entry.
      *
-     * @param array<int, array{message: string, recipients: SmsRecipient[]}> $entries
+     * @param array<int, array{message: string, recipients: SmsRecipient[], logicalRecipients?: list<list<SmsRecipient>>}> $entries
+     *     When an entry carries `logicalRecipients`, the arrays run parallel:
+     *     `recipients[i]` is the one number dialled for delivery i (the
+     *     group's first member) and `logicalRecipients[i]` lists EVERY
+     *     recipient that delivery satisfies, primary first.  Written by
+     *     DeduplicatingSmsProvider, read by TokenExpandingSmsProvider (which
+     *     expands per group); raw providers ignore it and dial `recipients`.
+     *     Must not be stripped by decorators: the positional pairing with the
+     *     provider response is load-bearing.
      * @param SmsSender $sender
      * @param int|null $sendAt Unix timestamp for deferred delivery (only for providers with DEFERRED_SEND capability), or null for immediate
      * @param bool $preview When true, expand tokens and return per-recipient

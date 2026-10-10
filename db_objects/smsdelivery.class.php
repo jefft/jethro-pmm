@@ -67,6 +67,13 @@ class SmsDelivery extends DB_Object
                 'label' => 'Cost per segment ($)',
                 'allow_empty' => true,
             ],
+            'cost_bearer' => [
+                'type' => 'bool',
+                'label' => 'Bears message cost',
+                'default' => 1,
+                'allow_empty' => false,
+                'show_in_summary' => false,
+            ],
     ];
     }
 	public function getInitSQL($table_name = NULL)
@@ -84,6 +91,7 @@ class SmsDelivery extends DB_Object
 				`status` ENUM('queued','sent','delivered','failed','in-progress','scheduled','cancelled','sending','test-message','unknown') NOT NULL DEFAULT 'sending',
 				`segments_used` INT NULL DEFAULT NULL,
 				`per_segment_cost` DECIMAL(10,5) NULL DEFAULT NULL,
+				`cost_bearer` TINYINT(1) UNSIGNED NOT NULL DEFAULT 1,
 				PRIMARY KEY (`id`),
 				INDEX `sms_id` (`sms_id`),
 				INDEX `personid` (`personid`),

@@ -27,6 +27,7 @@ column names alone.
                    │                              │ delivered_at       │              ││
                    │                              │ segments_used      │              ││
                    │                              │ per_segment_cost   │              ││
+                   │                              │ cost_bearer        │              ││
                    │                              └────────────────────┘              ││
                    │                                       │  │                       ││
                    │                              ┌────────┘  └──────────┐            ││
@@ -69,8 +70,11 @@ Each `smsdelivery` row records what that delivery cost, at the time it was sent:
 |---|---|---|
 | `segments_used` | SMS segments charged, i.e. SMS against the provider balance (one credit is one SMS segment) | 5CentSMS `credits`; Cellcast `smsDetail.smscount`. NULL when the provider doesn't report it (SMS Broadcast, v4/template, rows logged before 2.40's cost tracking) |
 | `per_segment_cost` | Dollars per segment | Cellcast `smsDetail.costpersms` (or `deductibleCredit / smscount`); otherwise `SMS_SEGMENT_COST` if set, else the sending provider's `SEGMENT_COST_MILLICENTS` default |
+| `cost_bearer` | Whether this row bears the charge for its (possibly shared) message | `DeduplicatingSmsProvider` via the send — TRUE on a group's primary row, FALSE on the secondary persons sharing the number |
 
-Both are written by the send (`logSms()`), by status polls (`DbLoggingSmsProvider`, only overwriting with values the provider actually reported) and by Synchronize History.
+Both cost columns are written by the send (`logSms()`), by status polls (`DbLoggingSmsProvider`, only overwriting with values the provider actually reported) and by Synchronize History.
+
+**Shared mobile numbers.** When several recipients share one number, one gateway message serves the whole group: all their `smsdelivery` rows share the group's `remote_id`, the primary row carries the reported `segments_used` (and `cost_bearer` 1), and each secondary row records `segments_used` 0 / `cost_bearer` 0 — so a message is counted once whether it went to one person or five sharing a handset. Status polls guard their cost update with `IF(cost_bearer, …)` so the provider's count is never copied onto a secondary's zero row. `sms_usage_daily` and `Sms::costSqlExpr()` count an explicit 0 as 0 (only NULL counts as 1).
 
 The Messages page's Cost column (`Sms::costSqlExpr()`) sums `segments_used × per_segment_cost` over accepted deliveries, treating an unknown `segments_used` as 1 and an unknown `per_segment_cost` as the default of **the provider recorded on that row** (`\Jethro\Sms\defaultSegmentCost()`). Prices are fixed per row, so changing `SMS_SEGMENT_COST` or switching providers only affects new sends.
 

@@ -145,8 +145,8 @@ JethroSMS.init = function() {
 		$('#sms-send-response-bulk').hide().text('');
 
 		var smsData = $(this.form).serialize();
-			// Per-recipient overrides ride along automatically: they are real
-			// <textarea name="message_overrides[PID]"> fields in the form,
+			// Message overrides ride along automatically: they are real
+			// <textarea name="message_overrides[KEY]"> fields in the form,
 			// captured by serialize() and parsed server-side by Call_SMS.
 
 		$.ajax({
@@ -241,11 +241,12 @@ JethroSMS.init = function() {
 			sender: $('#sms_sender').val(),
 			note_type: modalDiv.attr("data-note-type") || 'person'
 		}
-			// Collect per-recipient overrides from the preview panel's edit
-			// textareas (name="message_overrides[PID]").
+			// Collect message overrides from the preview panel's edit
+			// textareas (name="message_overrides[KEY]", KEY = person IDs
+			// joined by '_' — see Jethro\Sms\previewRows()).
 			var overrides = {};
 			$('#send-sms-modal [name^="message_overrides["]').each(function() {
-				var m = this.name.match(/message_overrides\[(\d+)\]/);
+				var m = this.name.match(/message_overrides\[(\d+(?:_\d+)*)\]/);
 				if (m && $(this).val() !== '') overrides[m[1]] = $(this).val();
 			});
 			if (!$.isEmptyObject(overrides)) {

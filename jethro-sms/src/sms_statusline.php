@@ -311,10 +311,11 @@ function buildCostLine(int $segs, string $segmentType, int $recipientCount, floa
  * jsdoc (preserved in git history) for the full design rationale; the
  * composition order and special-cases below mirror it exactly.
  *
- * $deliveries: array of ['personId'=>?int,'name'=>string,'message'=>string,'status'=>int]
- *              from the preview expansion — empty array = "no preview yet" fallback.
+ * $deliveries: preview rows ['key'=>string,'name'=>string,'message'=>string,'status'=>int],
+ *              one per message sent (Jethro\Sms\previewRows()), so the cost
+ *              basis counts messages — empty array = "no preview yet" fallback.
  *
- * @param array<int, array{personId?: ?int, name?: string, message?: string, status?: int}> $deliveries
+ * @param array<int, array{key?: string, name?: string, message?: string, status?: int}> $deliveries
  * @return array{html: string, blocked: bool, blockReason: string}
  */
 function renderStatusline(string $message, array $deliveries, SmsStatuslineConfig $cfg, ?int $explicitRecipientCount = null): array
@@ -489,10 +490,17 @@ function _truncatedCharList(array $displayChars): string
  * Render the preview-panel table (inner content of #sms-preview-panel).
  * Port of JethroSMS.renderPreviewPanel.
  *
- * $overrides: [personId => editedMessage]. Edited rows highlighted (#fff3cd).
+ * One row per message.  Each row's `key` is its identity — in Jethro the
+ * person IDs the message goes to, joined '_' (several when people share a
+ * mobile; see Jethro\Sms\previewRows()).  The key names the row's Datastar
+ * signals and its override field message_overrides[KEY], so only
+ * [A-Za-z0-9_] are kept.  Such a row's `name` lists its people one per
+ * line ("\n"-separated); each renders on its own line.
+ *
+ * $overrides: [rowKey => editedMessage]. Edited rows highlighted (#fff3cd).
  * Returns '' when $deliveries is empty.
  *
- * @param array<int, array{personId?: ?int, name?: string, message?: string, status?: int}> $deliveries
+ * @param array<int, array{key?: string, name?: string, message?: string, status?: int}> $deliveries
  * @param array<int|string, string> $overrides
  */
 function renderPreviewPanel(array $deliveries, array $overrides): string
@@ -506,49 +514,53 @@ function renderPreviewPanel(array $deliveries, array $overrides): string
     $h .= '<thead><tr><th>Recipient</th><th>Message</th><th style="width:1px"></th></tr></thead>';
     $h .= '<tbody>';
     foreach ($deliveries as $d) {
-        $pid = $d['personId'] ?? '';
-        $pidKey = (string) $pid;
-        $edited = array_key_exists($pidKey, $overrides) || array_key_exists($pid, $overrides);
+        $key = (string) preg_replace('/\W/', '', (string) ($d['key'] ?? ''));
+        $edited = array_key_exists($key, $overrides);
         if ($edited) {
-            $m = $overrides[$pidKey] ?? $overrides[$pid];
+            $m = $overrides[$key];
         } else {
             $m = ($d['message'] ?? '') !== '' ? $d['message'] : '(empty)';
         }
-        $name = ($d['name'] ?? '') !== '' ? $d['name'] : ('#' . $pid);
+        $name = ($d['name'] ?? '') !== '' ? $d['name'] : ('#' . $key);
         $style = $edited ? ' style="background:#fff3cd"' : '';
-        // Datastar-driven inline editing: the pencil sets $editingPid to this
-        // row's personId; the message <span> hides and the edit <textarea>
+        // Datastar-driven inline editing: the pencil sets $editingRow to this
+        // row's key; the message <span> hides and the edit <textarea>
         // (bound to its own override signal + posted on blur) shows. The
-        // textarea posts message_overrides[PID] only once the user edits it
+        // textarea posts message_overrides[KEY] only once the user edits it
         // (see the name gate below); the send path then picks it up. No
-        // client-side
-        // segment/cost maths runs — the override text posts back and the
-        // server recomputes. See docs/.../SMS_DATASTAR.md.
-        $sigName = 'smsoverride_' . $pidKey;
-        $editedSig = 'smsedited_' . $pidKey;
+        // client-side segment/cost maths runs — the override text posts back
+        // and the server recomputes. See docs/.../SMS_DATASTAR.md.
+        $jsKey = "'" . $key . "'";
+        $sigName = 'smsoverride_' . $key;
+        $editedSig = 'smsedited_' . $key;
         $editText = $edited ? (string) $m : (string) (($d['message'] ?? ''));
         $post = "@post('?call=sms_statusline', {contentType: 'form'})";
         $h .= '<tr>';
-        $h .= '<td style="white-space:nowrap;vertical-align:top;color:#999">' . \ents($name) . '</td>';
+        // People sharing a mobile share a row: one name per line.
+        $nameHtml = implode('<br>', array_map(
+            static fn(string $n): string => '<span style="white-space:nowrap">' . \ents($n) . '</span>',
+            explode("\n", $name),
+        ));
+        $h .= '<td style="vertical-align:top;color:#999">' . $nameHtml . '</td>';
         $h .= '<td style="width:100%">'
-            . '<span class="sms-preview-msg" data-personid="' . \ents($pidKey) . '"' . $style
-            . ' data-show="$editingPid != ' . \ents($pidKey) . '">' . \ents($m) . '</span>'
+            . '<span class="sms-preview-msg" data-row="' . \ents($key) . '"' . $style
+            . ' data-show="$editingRow != ' . \ents($jsKey) . '">' . \ents($m) . '</span>'
             // The override <textarea> only becomes a submitted field (name set)
-            // once the user actually types in it ($smsedited_<pid> flips true on
+            // once the user actually types in it ($smsedited_<key> flips true on
             // input). Otherwise its pre-filled expansion would be posted by every
             // compose-box keystroke (the form posts via contentType:form) and the
             // server would mistake that echoed expansion for a manual edit,
             // wrongly highlighting the row.
             . '<textarea class="sms-preview-edit"'
-            . ' data-attr:name="$' . $editedSig . ' ? \'message_overrides[' . $pidKey . ']\' : \'\'"'
+            . ' data-attr:name="$' . $editedSig . ' ? \'message_overrides[' . $key . ']\' : \'\'"'
             . ' rows="1" style="width:100%;font-size:0.9em;padding:2px"'
             . ' data-bind:' . \ents($sigName)
-            . ' data-show="$editingPid == ' . \ents($pidKey) . '"'
+            . ' data-show="$editingRow == ' . \ents($jsKey) . '"'
             . ' data-on:input="$' . $editedSig . ' = true"'
             . ' data-on:blur="' . \ents($post) . '">' . \ents($editText) . '</textarea>'
             . '</td>';
         $h .= '<td><button type="button" class="editbutton sms-preview-edit-toggle" title="Edit message"'
-            . ' data-on:click="$editingPid = ' . \ents($pidKey) . '">&#9998;</button></td>';
+            . ' data-on:click="$editingRow = ' . \ents($jsKey) . '">&#9998;</button></td>';
         $h .= '</tr>';
     }
     $h .= '</tbody></table>';
