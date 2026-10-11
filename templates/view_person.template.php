@@ -518,15 +518,16 @@ if (isset($tabs['attendance'])) {
 		if (count($groupids) > 1 || reset($attendances) != '') {
 			$groups = $GLOBALS['system']->getDBObjectData('person_group', Array('id' => $groupids));
 		}
+		// present is NULL when attendance is unknown; '' is that key.
 		$classes = Array(
 					'0'	=> 'absent',
 					'1'	=> 'present',
-					NULL => 'unknown'
+					''	=> 'unknown'
 				   );
 		$labels = Array(
 					'0'	=> 'A',
 					'1'	=> 'P',
-					NULL => '?'
+					''	=> '?'
 				   );
 		foreach ($attendances as $groupid => $group_attendances) {
 			$start = reset($group_attendances);
@@ -557,8 +558,8 @@ if (isset($tabs['attendance'])) {
 					<?php
 					foreach ($group_attendances as $att) {
 						?>
-						<td class="<?php echo $classes[$att['present']]; ?>">
-							<?php echo $labels[$att['present']]; ?>
+						<td class="<?php echo $classes[$att['present'] ?? '']; ?>">
+							<?php echo $labels[$att['present'] ?? '']; ?>
 						</td>
 						<?php
 					}
