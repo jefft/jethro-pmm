@@ -97,8 +97,8 @@ processes:
       devbox.d/bin/jethro_load_demodata jethro_functest
       devbox.d/bin/mariadb_recreate_db jethro_functest_walkthrough jethro_functest_smsmockserver
       # Cancel any SMS deliveries still 'scheduled'. Each one renders a Datastar
-      # polling span (?call=sms_info, as often as every 2s per batch for the
-      # first hour; see smsScheduledPollIntervalSecs()) whose PHP-side status
+      # polling span (?call=sms_info, backing off from every 2s per batch, for
+      # up to 24h; see smsDeliveryPollIntervalSecs()) whose PHP-side status
       # call re-enters the same php-fpm pool, so leftovers saturate the pool
       # and unrelated tests time out. Re-run before every suite by
       # tests/functional/global-setup.ts.

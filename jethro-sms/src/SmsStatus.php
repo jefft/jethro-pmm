@@ -98,12 +98,14 @@ enum SmsStatus: string
             || $this === self::UNKNOWN);
     }
 
-    /** Whether an immediate status poll on page load is worthwhile.
-     * SCHEDULED uses interval-based polling instead (see renderSmsDeliveryStatusIndicator). */
-    public function isImmediatelyPolled(): bool
+    /** MySQL values of every status that may still change (!isFinal()) — the
+     * deliveries status polling keeps asking about.
+     * @return list<string> */
+    public static function nonFinalValues(): array
     {
-        return $this === self::QUEUED
-            || $this === self::SENDING
-            || $this === self::DELIVERY_IN_PROGRESS;
+        return array_values(array_map(
+            static fn(self $s): string => $s->value,
+            array_filter(self::cases(), static fn(self $s): bool => !$s->isFinal()),
+        ));
     }
 }

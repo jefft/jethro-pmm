@@ -12,23 +12,22 @@ SMS gateways are asynchronous — a message is accepted (status: Queued), dispat
 
 ## The Solution: Client-Side Polling
 
-Rather than a server-side cron job, Jethro uses **client-side JavaScript polling**.
+Rather than a server-side cron job, Jethro polls from the page with **Datastar**.
 
 ### Why Client-Side?
 
 - **Simplicity** — no cron setup, no background worker
-- **Lazy** — polls only when someone actually views the messages page
-- **Self-limiting** — capped at 20 lookups per page
-- **Self-cleaning** — exits when all deliveries reach final status
+- **Lazy** — polls only when someone actually views a messages page
+- **Self-limiting** — intervals back off with age; polling stops 24h after the send time
+- **Self-cleaning** — a span stops polling once its delivery reaches a final status
 
 ### How It Works
 
-1. `single_message.template.php` emits `<span data-delivery-id="N">` for each non-final delivery
-2. On page load, JavaScript scans for these elements
-3. Each triggers a GET to `?call=sms_info&id=N`
-4. `Call_SMS_Info` checks the provider and returns updated status HTML
-5. If status is now final, the span updates and stops polling
-6. If still non-final, the span re-renders and remains in the polling pool
+1. The status renderers (`renderSmsDeliveryStatusIndicator()` on a person's Messages tab, `renderSmsDeliveryStatusIcon()` on Persons → Messages) emit a polling span for every delivery that is not final (`SmsStatus::isFinal()`) — **including 'sent'**, since delivery confirmation or a late failure arrives after the gateway accepts the message — while its provider is the configured one and it is under 24h (`STATUS_POLL_WINDOW_SECS`) past its send time
+2. The span fires `?call=sms_info&id=N` on a backoff interval (`smsDeliveryPollIntervalSecs()`), and once on render when past its send time
+3. `Call_SMS_Info` asks the provider (one `listRecentDeliveries()` call over the polling window) and returns updated status HTML
+4. If status is now final, the span updates and stops polling
+5. If still non-final, the span re-renders with a fresh interval
 
 ## Caching
 
@@ -49,8 +48,8 @@ For scheduled messages, the polling response includes a Cancel link. This appear
 
 ## Limitations
 
-- Only polls when the messages page is open (not a true background process)
-- Capped at 20 lookups per page (older messages may never update)
+- Only polls when a messages page is open (not a true background process)
+- Deliveries still not final 24h after their send time are never re-checked
 - Browser must remain open for polling to continue
 
 ## See Also

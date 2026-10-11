@@ -42,19 +42,21 @@ $isMulti = $recipientCount > 1;
 						providerKey: $entry['provider'] ?? null,
 						currentProviderKey: $currentProviderKey,
 						scheduledAt: $entry['scheduled_send_at'] ?? null,
+						sentAt: $entry['scheduled_send_at'] ?? $entry['created'] ?? null,
 					);
 					if ($indicator !== '') {
 						echo ' &middot; ' . $indicator;
-						if ($status === 'scheduled') {
-							$smsId = (int)$id;
-							if (\Jethro\Sms\canCancelScheduledDelivery(isset($entry['sender']) ? (int) $entry['sender'] : null)) {
-								echo ' <span id="sms-cancel-' . $smsId . '">'
-									. '<a href="#" data-on:click="@post(\'?call=sms_cancel&sms_id=' . $smsId . '\')"'
-									. ' style="cursor:pointer;font-size:smaller;text-decoration:underline">'
-									. '(' . _('Cancel') . ')</a></span>';
-							} else {
-								echo '<span id="sms-cancel-' . $smsId . '"></span>';
-							}
+						// Always render the cancel span so status polls
+						// (Call_SMS_Info) have a target to clear once the send
+						// is no longer scheduled.
+						$smsId = (int)$id;
+						if ($status === 'scheduled' && \Jethro\Sms\canCancelScheduledDelivery(isset($entry['sender']) ? (int) $entry['sender'] : null)) {
+							echo ' <span id="sms-cancel-' . $smsId . '">'
+								. '<a href="#" data-on:click="@post(\'?call=sms_cancel&sms_id=' . $smsId . '\')"'
+								. ' style="cursor:pointer;font-size:smaller;text-decoration:underline">'
+								. '(' . _('Cancel') . ')</a></span>';
+						} else {
+							echo '<span id="sms-cancel-' . $smsId . '"></span>';
 						}
 					}
 				}
