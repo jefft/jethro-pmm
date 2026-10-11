@@ -1349,23 +1349,42 @@ function formatSendSummary(\Sms\SendSummary $sendResult, array $nameLookup, stri
 }
 
 /**
- * Render the delivery status indicator for an SMS delivery.
+ * How long after its send time a delivery that hasn't reached a final status
+ * (\Sms\SmsStatus::isFinal()) keeps being polled: 24 hours.  Carriers that
+ * never return a delivery receipt would otherwise leave a 'sent' message
+ * polling forever.  Also the window Call_SMS_Info asks the provider's
+ * delivery list for.
+ *
+ * @see smsDeliveryPollIntervalSecs()
+ * @see docs/docs/developer/explanation/sms/delivery-polling.mdx
+ */
+const STATUS_POLL_WINDOW_SECS = 86400;
+
+/**
+ * Render the delivery status indicator for an SMS delivery (per-person
+ * Messages tab).
  *
  * Returns an HTML <span> with tick(s) or status text — no surrounding markup.
  *
  *   ✓✓  = delivered (with delivery timestamp tooltip)
  *   ✓   = sent (gateway accepted, not yet delivered)
  *   text = other final status (failed, cancelled)
- *   ref  = non-final, provider matches → polling span with data-on:load
+ *   icon + ref = other non-final status (scheduled with a countdown, queued, …)
+ *
+ * Any delivery not yet final — 'sent' included — carries Datastar polling
+ * (?call=sms_info) while the provider matches and it is within
+ * STATUS_POLL_WINDOW_SECS of its send time; past its send time it also fetches
+ * once on render.  Outside that it renders statically.
  *
  * @param string $status              MySQL status value (e.g. 'delivered', 'sent')
  * @param int|null $deliveredAt       Unix timestamp of delivery, for tooltip
- * @param int|null $deliveryId        smsdelivery.id, for the AJAX polling span
+ * @param int|null $deliveryId        smsdelivery.id, for the polling span
  * @param string|null $remoteId       Remote message ID from the gateway
  * @param string|null $providerKey    Provider that sent this delivery
  * @param string|null $currentProviderKey  Currently configured provider (null = no polling possible)
- * @param string|null $scheduledAt  MySQL datetime of scheduled send, for the title tooltip
- * @return string  HTML <span> element, or '' if no indicator can be shown
+ * @param string|null $scheduledAt  MySQL datetime of a scheduled send, for the title and countdown
+ * @param string|null $sentAt       MySQL datetime the message is or was sent (scheduled_send_at, else sms.created); drives polling — null = don't poll
+ * @return string  HTML <span> element
  */
 function renderSmsDeliveryStatusIndicator(
     string $status,
@@ -1375,16 +1394,15 @@ function renderSmsDeliveryStatusIndicator(
     ?string $providerKey = null,
     ?string $currentProviderKey = null,
     ?string $scheduledAt = null,
+    ?string $sentAt = null,
 ): string
 {
 	$smsStatus = \Sms\SmsStatus::fromMySql($status);
-    $icon     = SmsStatusIcon::fromStatus($smsStatus)->icon();
-    $pollable = $currentProviderKey !== null && $providerKey === $currentProviderKey && $deliveryId !== null;
-    $ref      = ($remoteId !== null && $remoteId !== '') ? ents($remoteId) : '';
+    $icon      = SmsStatusIcon::fromStatus($smsStatus)->icon();
+    $ref       = ($remoteId !== null && $remoteId !== '') ? ents($remoteId) : '';
 
     $outerAttrs  = [];
-    $statusAttrs = ['class' => 'message-status'];
-    $content     = '';
+    $statusAttrs = ['class' => 'message-status', 'data-message-attribution' => $status];
 
     if ($deliveryId !== null) {
         $outerAttrs['id'] = 'sms-delivery-status-' . $deliveryId;
@@ -1394,51 +1412,34 @@ function renderSmsDeliveryStatusIndicator(
         $statusAttrs['title'] = $deliveredAt !== null && $deliveredAt > 0
             ? 'Delivery timestamp: ' . date('j M Y g:ia', $deliveredAt)
             : 'delivered';
-        $statusAttrs['data-message-attribution'] = $status;
         $content = $icon;
-
     } elseif ($smsStatus === \Sms\SmsStatus::SENT) {
         $statusAttrs['title'] = 'sent';
-        $statusAttrs['data-message-attribution'] = $status;
         $content = $icon;
-
     } elseif ($smsStatus->isFinal()) {
         $statusAttrs['title'] = $status;
-        $statusAttrs['data-message-attribution'] = $status;
         $content = $icon !== '' ? $icon . ' ' . $status : $status;
-
-    } elseif ($smsStatus->isImmediatelyPolled() && $pollable) {
-        $outerAttrs['data-init'] = "@get('?call=sms_info&id={$deliveryId}')";
-        $statusAttrs['data-message-attribution'] = $status;
+    } else {
         $statusAttrs['title'] = $status . ($scheduledAt !== null ? ': ' . format_datetime($scheduledAt) : '');
         $content = trim($icon . ' ' . $ref);
-
-    } elseif ($smsStatus === \Sms\SmsStatus::SCHEDULED && $pollable) {
-        // Thundering-herd gate in call_sms_info makes per-delivery jitter
-        // unnecessary: only the lowest-ID scheduled delivery per sms_id
-        // performs the upstream lookup; all other calls are no-ops.
-        $pollSecs = smsScheduledPollIntervalSecs($scheduledAt);
-        if ($pollSecs !== null) {
-            $outerAttrs["data-on-interval__duration.{$pollSecs}s"] = "@get('?call=sms_info&id={$deliveryId}')";
-        }
-        // If the scheduled time has already passed, also trigger an immediate
-        // status fetch — the DB may still say "scheduled" but the provider
-        // may already have transitioned to delivered.  Gated on $pollSecs:
-        // once a delivery is over an hour overdue polling stops altogether
-        // (see smsScheduledPollIntervalSecs()), including this catch-up fetch.
-        if ($pollSecs !== null && $scheduledAt !== null && strtotime($scheduledAt) < time()) {
-            $outerAttrs['data-init'] = "@get('?call=sms_info&id={$deliveryId}')";
-        }
-        $statusAttrs['data-message-attribution'] = $status;
-        $statusAttrs['title'] = $status . ($scheduledAt !== null ? ': ' . format_datetime($scheduledAt) : '');
-        $content = trim($icon . ' ' . $ref);
-        if ($scheduledAt !== null) {
+        if ($smsStatus === \Sms\SmsStatus::SCHEDULED && $scheduledAt !== null) {
             $seconds = strtotime($scheduledAt) - time();
             $content .= ' ' . ($seconds > 0 ? 'in ' . _formatDuration($seconds) : format_datetime($scheduledAt));
         }
+    }
 
-    } else {
-        return '';
+    // Thundering-herd gate in call_sms_info makes per-delivery jitter
+    // unnecessary (batch pages); here every delivery polls itself.
+    $pollable = $currentProviderKey !== null && $providerKey === $currentProviderKey && $deliveryId !== null;
+    $pollSecs = $pollable && !$smsStatus->isFinal() ? smsDeliveryPollIntervalSecs($sentAt) : null;
+    if ($pollSecs !== null) {
+        $get = "@get('?call=sms_info&id={$deliveryId}')";
+        $outerAttrs["data-on-interval__duration.{$pollSecs}s"] = $get;
+        // Past its send time the provider may already have moved on (e.g.
+        // scheduled → sent → delivered): fetch once now, not just on the timer.
+        if (strtotime((string) $sentAt) <= time()) {
+            $outerAttrs['data-init'] = $get;
+        }
     }
 
     $outerAttrStr = '';
@@ -1453,40 +1454,43 @@ function renderSmsDeliveryStatusIndicator(
 }
 
 /**
- * Datastar poll interval for a delivery still marked scheduled.
+ * Datastar poll interval for a delivery that hasn't reached a final status.
  *
- * Approaching the send time the interval shrinks (a tenth of the time
- * remaining, floor 2s, cap 300s); once the send time passes it grows
- * again at the same rate, so deliveries the provider never resolves
- * (e.g. stale or seeded data) back off instead of hammering
- * ?call=sms_info at the 2s floor.  After an hour overdue, polling
- * stops altogether.
+ * Counted from the send time: approaching it the interval shrinks (a tenth
+ * of the time remaining, floor 2s, cap 300s); once it passes it grows again
+ * at the same rate, so deliveries the provider is slow to resolve back off
+ * instead of hammering ?call=sms_info at the 2s floor.  STATUS_POLL_WINDOW_SECS
+ * after the send time polling stops altogether.
  *
  * See docs/docs/developer/reference/sms/SMS_DATASTAR.md.
  *
- * @param string|null $scheduledAt MySQL datetime of the scheduled send (null = unknown, assume 2 minutes away)
+ * @param string|null $sentAt MySQL datetime the message is or was sent (scheduled_send_at, else sms.created); null = unknown, don't poll
  * @return int|null Seconds between polls (2–300), or null to stop polling
  */
-function smsScheduledPollIntervalSecs(?string $scheduledAt): ?int
+function smsDeliveryPollIntervalSecs(?string $sentAt): ?int
 {
-    $remaining = $scheduledAt !== null ? (int)(strtotime($scheduledAt) - time()) : 120;
-    if ($remaining < -3600) {
+    if ($sentAt === null) {
+        return null;
+    }
+    $remaining = (int)(strtotime($sentAt) - time());
+    if ($remaining < -STATUS_POLL_WINDOW_SECS) {
         return null;
     }
     return max(2, min(300, (int)ceil(abs($remaining) / 10)));
 }
 
 /**
- * Render a delivery-status icon with title rollover.
+ * Render a delivery-status icon with title rollover (admin Messages page).
  *
  * Always returns a <span> with the status icon and a descriptive title.
- * Unlike renderSmsDeliveryStatusIndicator(), this never returns ''.  For
- * scheduled deliveries it carries a Datastar polling attribute that fires
- * `?call=sms_info&id=N` (plus `&batch=1` when $batch is true).
+ * Like renderSmsDeliveryStatusIndicator(), any delivery not yet final polls
+ * `?call=sms_info&id=N` (plus `&batch=1` when $batch is true) while the
+ * provider matches and it is within STATUS_POLL_WINDOW_SECS of its send time,
+ * fetching once on render when past its send time.
  *
  * @param string $status       MySQL status value (e.g. 'delivered', 'scheduled')
  * @param int|null $deliveredAt   Unix timestamp of delivery, for the title tooltip
- * @param string|null $scheduledAt  MySQL datetime of scheduled send, for the title tooltip
+ * @param string|null $scheduledAt  MySQL datetime of a scheduled send, for the title and countdown
  * @param int|null $deliveryId    When provided, stamps id="sms-delivery-status-N" for Datastar morph
  * @param string|null $providerKey  Provider that sent this delivery
  * @param string|null $currentProviderKey  Currently configured provider key
@@ -1494,6 +1498,7 @@ function smsScheduledPollIntervalSecs(?string $scheduledAt): ?int
  * @param bool $batch          True when every sibling of this delivery is also
  *                             rendered on the page (admin Messages view), so the
  *                             poll may morph the whole batch by id.
+ * @param string|null $sentAt  MySQL datetime the message is or was sent (scheduled_send_at, else sms.created); drives polling — null = don't poll
  * @return string  HTML <span> element
  */
 function renderSmsDeliveryStatusIcon(
@@ -1505,6 +1510,7 @@ function renderSmsDeliveryStatusIcon(
     ?string $currentProviderKey = null,
     string $remoteId = '',
     bool $batch = false,
+    ?string $sentAt = null,
 ): string
 {
     $smsStatus = \Sms\SmsStatus::fromMySql($status);
@@ -1518,20 +1524,21 @@ function renderSmsDeliveryStatusIcon(
     }
 
     $content = $icon;
-    $outerAttrs = '';
     if ($smsStatus === \Sms\SmsStatus::SCHEDULED && $scheduledAt !== null) {
         $seconds = strtotime($scheduledAt) - time();
         $content = trim($icon . ' ' . ents($remoteId));
         $content .= ' ' . ($seconds > 0 ? 'in ' . _formatDuration($seconds, short: true) : format_datetime($scheduledAt));
+    }
 
-        // Add polling when the provider matches and a delivery ID is available
-        if ($deliveryId !== null && $providerKey !== null && $currentProviderKey === $providerKey) {
-            // Thundering-herd gate in call_sms_info handles coalescing.
-            $pollSecs = smsScheduledPollIntervalSecs($scheduledAt);
-            if ($pollSecs !== null) {
-                $batchParam = $batch ? '&amp;batch=1' : '';
-                $outerAttrs = ' data-on-interval__duration.' . $pollSecs . 's="@get(\'?call=sms_info&amp;id=' . $deliveryId . $batchParam . '\')"';
-            }
+    // Thundering-herd gate in call_sms_info handles coalescing.
+    $outerAttrs = '';
+    $pollable = $deliveryId !== null && $providerKey !== null && $currentProviderKey === $providerKey;
+    $pollSecs = $pollable && !$smsStatus->isFinal() ? smsDeliveryPollIntervalSecs($sentAt) : null;
+    if ($pollSecs !== null) {
+        $get = '@get(\'?call=sms_info&amp;id=' . $deliveryId . ($batch ? '&amp;batch=1' : '') . '\')';
+        $outerAttrs = ' data-on-interval__duration.' . $pollSecs . 's="' . $get . '"';
+        if (strtotime((string) $sentAt) <= time()) {
+            $outerAttrs .= ' data-init="' . $get . '"';
         }
     }
 

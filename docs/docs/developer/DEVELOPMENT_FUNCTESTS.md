@@ -183,9 +183,9 @@ flaky tests rather than one saturated pool. Things that keep it healthy:
   queues behind the previous one — a convoy that pins children for 30s each.
   Any new long-running or HTTP-calling handler must do the same.
 - **`functest_databases_setup` cancels `scheduled` deliveries.** Each scheduled
-  batch renders a polling span that fires `?call=sms_info` as often as every 2
-  seconds for the first hour past its send time
-  (`smsScheduledPollIntervalSecs()`), so leftovers from specs that schedule
+  batch (like any delivery not yet final, 'sent' included) renders a polling
+  span that fires `?call=sms_info` with a backoff interval from every 2 seconds,
+  for up to 24h past its send time (`smsDeliveryPollIntervalSecs()`), so leftovers from specs that schedule
   sends would otherwise grow the polling load with every run. Since the job
   reloads the demo data (which has none) before every suite, this is a guard,
   not normally needed.

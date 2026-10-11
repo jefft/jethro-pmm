@@ -122,24 +122,33 @@ The modal body is a `<form onsubmit="return false">` with a hidden
 
 ## Delivery-status polling (`?call=sms_info`)
 
-Scheduled/pending deliveries render polling spans
-(`renderSmsDeliveryStatusIndicator()` / `renderSmsDeliveryStatusIcon()` in
+Every delivery whose status may still change (`!SmsStatus::isFinal()` —
+scheduled, queued, sending, in-progress, **sent**, unknown) renders a polling
+span (`renderSmsDeliveryStatusIndicator()` / `renderSmsDeliveryStatusIcon()` in
 `include/jethro_sms.php`) that `@get('?call=sms_info&id=N')` on a
-`data-on-interval`; the response morphs the whole batch's status spans by
-`id`, re-arming each with a fresh interval.  Three throttles keep this from
-storming:
+`data-on-interval`, plus once on render (`data-init`) when past its send
+time; the response morphs the whole batch's status spans by `id`, re-arming
+each with a fresh interval.  'sent' is polled because delivery confirmation
+(✓✓) or a late carrier failure arrives after the gateway accepts the message.
+Spans stop polling once final, or `STATUS_POLL_WINDOW_SECS` (24h) after the
+send time.  Throttles that keep this from storming:
 
-1. **Interval backoff** — `smsScheduledPollIntervalSecs()` shrinks the
-   interval approaching the send time (tenth of remaining, floor 2s, cap
-   300s), grows it again at the same rate once past due, and stops polling
-   (static span) once more than an hour overdue.  Without the past-due
-   branch, stale "scheduled" deliveries polled at the 2s floor forever
-   (see `docs/sms/improvements/54-scheduled-poll-backoff.md`).
-2. **Thundering-herd gate** — only the lowest-ID scheduled delivery per
-   `sms_id` performs the upstream lookup; sibling polls return empty.
-3. **Session-cached status map** — `Call_SMS_Info` caches the
-   `listRecentDeliveries()` result (as plain arrays) in `SessionSmsCache`
-   for 10s, coalescing a page of pollers into one upstream call.
+1. **Interval backoff** — `smsDeliveryPollIntervalSecs()` counts from the send
+   time (`scheduled_send_at`, else `sms.created`): it shrinks approaching it
+   (tenth of remaining, floor 2s, cap 300s), grows again at the same rate once
+   past, and stops polling (static span) 24h after it.  Without the stop,
+   stale deliveries — and carriers that never send a delivery receipt — would
+   poll forever (see `docs/sms/improvements/54-scheduled-poll-backoff.md`).
+2. **Thundering-herd gate** (Messages page, `&batch=1`) — only the lowest-ID
+   non-final delivery per `sms_id` performs the upstream lookup; sibling polls
+   return empty.  A delivery already final in the DB is not gated and renders
+   its stored status without a provider call (its span may be stale if the
+   poll that resolved it lost its response).
+3. **One list call per poll** — `Call_SMS_Info` asks the provider once
+   (`listRecentDeliveries()` over the polling window) and resolves the polled
+   delivery and its siblings from that; per-message `updateDelivery()` is only
+   the fallback for providers without `BATCH_DELIVERY_QUERY`.  The result is
+   not cached between polls.
 
 ## Per-recipient overrides
 

@@ -512,13 +512,11 @@ JethroSMS.markRecipientStatuses = function(recipients, rowClass, buttonMessage, 
 }
 
 /**
- * SMS delivery status polling.
- *
- * renderSmsDeliveryStatusIndicator() emits data-on:load="@get(...)"
- * for non-final statuses (scheduled, queued, etc.). Datastar fetches
- * the updated HTML; if the status is still non-final, the replacement
- * span carries data-on:load again, creating a polling chain that stops
- * naturally when the status becomes final (delivered / failed / cancelled).
+ * SMS delivery status polling needs no JS here: the status renderers in
+ * include/jethro_sms.php emit Datastar data-on-interval (plus data-init past
+ * the send time) for every delivery not yet final, 'sent' included; the
+ * replacement span re-arms the interval until the status is final or 24h
+ * have passed. See jethro-sms/docs/reference/SMS_DATASTAR.md.
  */
 $(document).ready(function() {
 	JethroSMS.init();

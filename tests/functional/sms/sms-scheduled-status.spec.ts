@@ -42,6 +42,8 @@ test.describe("SMS status after the send cool-off", () => {
         expect(title).toMatch(/^scheduled/);
       }
     }).toPass({ timeout: to(15000) });
+    const cancelLink = row.locator("[id^='sms-cancel-'] a");
+    await expect(cancelLink).toHaveCount(1);
 
     // After the send time the page's own polling picks up the provider's
     // status — no reload. Titles read "<status>: <send time>". Under suite
@@ -57,5 +59,8 @@ test.describe("SMS status after the send cool-off", () => {
         intervals: [2000],
       })
       .toEqual(["sent", "sent"]);
+    // The send has gone, so the poll that turned it 'sent' also clears the
+    // Cancel link rendered while it was scheduled.
+    await expect(cancelLink).toHaveCount(0);
   });
 });

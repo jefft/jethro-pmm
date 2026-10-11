@@ -43,6 +43,8 @@ const SMS_SCENARIOS = [
   "sms-shared-mobile",
   // Default 30s cool-off: 'scheduled' on the Messages page, then 'sent' via polling.
   "sms-scheduled-status",
+  // A sent message is polled on to delivered (not left at ✓).
+  "sms-delivered-status",
 ];
  
 export default defineConfig({

@@ -155,6 +155,7 @@ class View_persons__messages extends View
                                 providerKey: $dprovider,
                                 currentProviderKey: $currentProviderKey,
                                 batch: true,
+                                sentAt: $send['scheduled_send_at'] ?? $send['created'] ?? null,
                             );
                                 ?>
                                 <a href="/?view=persons&amp;personid=<?php echo $pid; ?>#message_<?php echo (int)$smsId; ?>"
@@ -181,14 +182,15 @@ class View_persons__messages extends View
                         <?php echo '$' . number_format($cost, 2); ?>
                     </td>
                     <td class="sms-history-actions action-cell">
+                        <?php // Always present, so status polls (Call_SMS_Info) can clear it once the send has gone. ?>
+                        <span id="sms-cancel-<?php echo (int)$smsId; ?>">
                         <?php if ($hasScheduled): ?>
-                            <span id="sms-cancel-<?php echo (int)$smsId; ?>">
                             <a href="#"
                                data-on:click="@post('?call=sms_cancel&sms_id=<?php echo (int)$smsId; ?>')">
                                 <?php echo count($sendDeliveries) > 1 ? 'Cancel all' : 'Cancel'; ?>
                             </a>
-                            </span>
                         <?php endif; ?>
+                        </span>
                     </td>
                 </tr>
                 <?php
