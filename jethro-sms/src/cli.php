@@ -141,17 +141,6 @@ function exitWithError(string $msg): never
 }
 
 /**
- * Resolve a raw sender string to a SmsSender (PhoneNumber or SenderID).
- */
-function resolveSender(string $raw): \Sms\SmsSender
-{
-	if (preg_match('/^\d+$/', $raw)) {
-		return new PhoneNumber($raw);
-	}
-	return new SenderID($raw);
-}
-
-/**
  * Resolve one --to argument to a recipient, or null to skip it (a warning
  * has already been printed). Delegates to the host resolver when present;
  * standalone accepts phone numbers only.
@@ -193,7 +182,7 @@ function handleSms(CliEnvironment $env, array $args): void
 		exitWithError("<message> is required for 'sms' action.\n");
 	}
 
-	$sender = resolveSender($from);
+	$sender = \Sms\senderFromString($from) ?? exitWithError("--from=<sender> must not be blank.");
 
 	$recipients = [];
 	foreach ($to as $toArg) {

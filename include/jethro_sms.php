@@ -202,10 +202,11 @@ function getSmsProvider(bool $tfa = false, bool $logToDb = true): \Result
 	}
 
 	// OverridingSmsProvider sits outside DbLoggingSmsProvider so the DB layer
-	// sees the cooloff-modified $sendAt.  userInitiated mirrors logToDb —
-	// system-initiated sends (2FA, reminders) skip the cooloff undo window.
+	// sees the cooloff-modified $sendAt.  Only web sends by a user are
+	// user-initiated: system sends (2FA, CLI scripts such as roster
+	// reminders) skip the cooloff undo window even though they are logged.
 	// userMobile is what the _USER_MOBILE_ sender token resolves to.
-	$provider = new \Sms\OverridingSmsProvider($provider, userInitiated: $logToDb, userMobile: getCurrentUserMobileNumber());
+	$provider = new \Sms\OverridingSmsProvider($provider, userInitiated: $logToDb && PHP_SAPI !== 'cli', userMobile: getCurrentUserMobileNumber());
 
 	// Not memoized — takes ~50 µs and called ~8 times in a worst-case page load.
 	return \Result::success($provider);
@@ -453,7 +454,7 @@ function getRecipientsFromRequest(): SmsRequestRecipients
 /**
  * Convert person records from the database into JethroSmsRecipient objects.
  *
- * @param array{}[] $personRecords  Array of person rows (must have 'id' and 'mobile_tel' keys)
+ * @param array<int, array<string, mixed>> $personRecords  Person rows KEYED BY PERSON ID (the key is used as personId); each must have 'mobile_tel'
  * @return JethroSmsRecipient[]
  */
 function getRecipientsFromPersonRecords(array $personRecords): array
@@ -609,10 +610,7 @@ function getSenderFromRequest(): ?SmsSender
 
     // SMS_SENDER constant: trusted configuration, accept as-is.
     if (defined('SMS_SENDER') && $sender === SMS_SENDER) {
-        if (is_numeric($sender)) {
-            return new PhoneNumber((string) $sender);
-        }
-        return new SenderID((string) $sender);
+        return \Sms\senderFromString((string) $sender);
     }
 
     // Explicit request value (not _USER_MOBILE_, not SMS_SENDER, not a

@@ -15,16 +15,16 @@ namespace Sms;
 /**
  * Tagged union summarising the outcome of an SMS send for display and logging.
  *
- * Produced by SmsBatchDelivery::sendSummary() — the batch holds the full per-recipient
+ * Produced by sendSummary() (functions.php) — the batch holds the full per-recipient
  * detail (SmsDelivery[]), and the summary aggregates it into success/failure groups
  * for callers that only need the high-level outcome.
  *
  * Callers needing per-recipient status codes, credits, or remote IDs should access
- * $batch->results directly rather than calling sendSummary().
+ * $batch->deliveries directly rather than calling sendSummary().
  *
  * Use match(true) with instanceof to handle each case:
  *
- *   $summary = $batch->sendSummary($recipients);
+ *   $summary = sendSummary($batch->deliveries, $recipients);
  *   match (true) {
  *       $summary instanceof AllSent        => ...,
  *       $summary instanceof PartialSuccess => ...,

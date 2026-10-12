@@ -488,13 +488,11 @@ class User_System extends Abstract_User_System
 		if ($senderStr === '' && ifdef('SMS_SENDER', '') !== '_USER_MOBILE_') {
 			$senderStr = (string) ifdef('SMS_SENDER', '');
 		}
-		if ($senderStr === '') {
+		$sender = \Sms\senderFromString($senderStr);
+		if ($sender === null) {
 			$this->_2faLog('Cannot send 2FA: set 2FA_SENDER_ID (or a literal SMS_SENDER; _USER_MOBILE_ cannot be resolved before login)');
 			return false;
 		}
-		$sender = is_numeric($senderStr)
-			? new \Sms\PhoneNumber($senderStr)
-			: new \Sms\SenderID($senderStr);
 		$smsRecipients = Jethro\Sms\getRecipientsFromPersonRecords([$recipient['id'] ?? 0 => $recipient]);
 		$result = Jethro\Sms\sendSms((string)$msg, $smsRecipients, $sender, logToDb: false);
 
