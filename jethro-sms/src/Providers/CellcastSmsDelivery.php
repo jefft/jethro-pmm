@@ -21,9 +21,13 @@ readonly class CellcastSmsDelivery extends SmsDelivery
 	{
 		$msgStatus = $rawItem['jobInfo']['data']['messageData']['status'] ?? null;
 		$isScheduled = $msgStatus === 'queued' || $msgStatus === 'pending';
+		// testMode: set only by CellcastFakeHttpClient — nothing was sent, and the
+		// fake remote ID can never be polled or cancelled upstream.
+		$status = !empty($rawItem['testMode']) ? SmsStatus::TEST_MESSAGE
+			: ($isScheduled ? SmsStatus::SCHEDULED : SmsStatus::SENT);
 		parent::__construct(
 			recipient: $recipient,
-			status: $isScheduled ? SmsStatus::SCHEDULED : SmsStatus::SENT,
+			status: $status,
 			remoteId: isset($rawItem['MessageId']) && $rawItem['MessageId'] !== ''
 				? (string) $rawItem['MessageId']
 				: null,
