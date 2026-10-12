@@ -161,7 +161,8 @@ $assignees=$view->getAssignees($start_date, $end_date);
 
 if ($sendsms) { // make the sms message!
 	require_once JETHRO_ROOT.'/include/jethro_sms.php';
-	$smsSenderNumber = $smsfrom ? new \Sms\PhoneNumber($smsfrom) : null;
+	// SMS_FROM may be a phone number or an alphanumeric Sender ID (e.g. "StBarnabas").
+	$smsSenderNumber = \Sms\senderFromString((string) $smsfrom);
 	$smsSender = $smsSenderNumber ?? Jethro\Sms\getSenderFromRequest();
 	if ($smsSender === null) {
 		fwrite(STDERR, "No sender configured. Set SMS_FROM in the ini file, or set SMS_SENDER_OPTIONS/SMS_SENDER in conf.php.\n");
@@ -174,7 +175,10 @@ if ($sendsms) { // make the sms message!
 	}
 	$coordinator=new Person($roster_coordinator_id);
 	$sql = 'SELECT person.* FROM person WHERE person.id='.(int)$roster_coordinator_id;
-	$coordinator = $GLOBALS['db']->queryAll($sql);
+	$coordinator = array_column($GLOBALS['db']->queryAll($sql), null, 'id');  // keyed by person ID, as getRecipientsFromPersonRecords() expects
+
+	$nameLookup = [];        // person ID => name, for formatSendSummary()
+	$sms_notification = '';
 
 	if (count($assignees) > 0) {
 
@@ -200,7 +204,7 @@ if ($sendsms) { // make the sms message!
 			$smsroster .= "\n";
 		}
 
-		$assignees = array_merge($assignees, $coordinator);
+		$assignees = $assignees + $coordinator;  // not array_merge(): it renumbers the person-ID keys
 
 		$sms_message = $pre_message . $smsroster . "\n" .  $post_message;
 		$sms_message = str_replace('<br>', "\n", $sms_message);
@@ -222,16 +226,14 @@ if ($sendsms) { // make the sms message!
 			fwrite(STDERR, $sms_message);  // Alert CLI user
 		}
 		// Build a name lookup from person records (keyed by person ID)
-		$nameLookup = [];
-		foreach ($assignees as $person) {
-			$pid = (int)($person['id'] ?? 0);
+		foreach ($assignees as $pid => $person) {
+			$pid = (int)$pid;
 			if ($pid) {
 				$nameLookup[$pid] = ($person['first_name'] ?? '') . ' ' . ($person['last_name'] ?? '');
 			}
 		}
 
 		// now, actually send the messages!
-		$notification_sms = '';
 		if (!empty($assignees))  {
 			$smsRecipients = Jethro\Sms\getRecipientsFromPersonRecords($assignees);
 			$sendWrapper = Jethro\Sms\sendSms($sms_message, $smsRecipients, $smsSender);
@@ -239,7 +241,7 @@ if ($sendsms) { // make the sms message!
 				fwrite(STDERR, $sendWrapper->getError() . "\n");
 			} else {
 				$batch = $sendWrapper->getValue();
-				$summary = $batch->sendSummary($smsRecipients);
+				$summary = \Sms\sendSummary($batch->deliveries, $smsRecipients);
 				$sms_notification = Jethro\Sms\formatSendSummary($summary, $nameLookup, $roster_name);
 				if ($summary instanceof \Sms\Failed) {
 					fwrite(STDERR, $sms_notification);
@@ -255,14 +257,14 @@ if ($sendsms) { // make the sms message!
 			exit(1);
 		}
 		$batch = $sendWrapper->getValue();
-		$summary = $batch->sendSummary(Jethro\Sms\getRecipientsFromPersonRecords($coordinator));
+		$summary = \Sms\sendSummary($batch->deliveries, Jethro\Sms\getRecipientsFromPersonRecords($coordinator));
 		if ($summary instanceof \Sms\Failed) {
-			fwrite(STDERR, Jethro\Sms\formatSendSummary($summary, [], 'notification'));
+			fwrite(STDERR, Jethro\Sms\formatSendSummary($summary, $nameLookup, 'notification'));
 			exit(1);
 		}
 		if (!empty($verbose)) {
 			echo "$sms_notification\n";
-			echo Jethro\Sms\formatSendSummary($summary, [], 'notification') . "\n";
+			echo Jethro\Sms\formatSendSummary($summary, $nameLookup, 'notification') . "\n";
 		}
 	}
 }

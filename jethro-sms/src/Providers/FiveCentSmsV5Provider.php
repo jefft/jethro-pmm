@@ -467,16 +467,15 @@ class FiveCentSmsV5Provider implements SmsProvider
     public function getSenderNumbers(): \Result
     {
         // fetchSendersFromApi() is session-cached (shared with getSenderIds()).
-        // Filter to approved phone numbers only (digit-only, ≥7 chars,
-        // acmaApproved true), then convert to PhoneNumber objects.
+        // Filter to approved phone numbers only (see \Sms\senderFromString()),
+        // then convert to PhoneNumber objects.
         return $this->fetchSendersFromApi()->map(
             fn (array $senderIds) => array_values(array_map(
                 static fn (SenderID $s) => new PhoneNumber($s->value),
                 array_filter(
                     $senderIds,
                     static fn (SenderID $s) => $s->acmaApproved === true
-                        && \ctype_digit($s->value)
-                        && \strlen($s->value) >= 7,
+                        && \Sms\senderFromString($s->value) instanceof PhoneNumber,
                 ),
             ))
         );
@@ -941,7 +940,7 @@ class FiveCentSmsV5Provider implements SmsProvider
     }
 
     /**
-     * Exclude phone-number-like SenderIDs (all-digit, ≥7 chars).
+     * Exclude phone-number-like SenderIDs (see \Sms\senderFromString()).
      *
      * Phone numbers are returned separately by getSenderNumbers().
      *
@@ -952,7 +951,7 @@ class FiveCentSmsV5Provider implements SmsProvider
     {
         return array_values(array_filter(
             $senderIds,
-            static fn(SenderID $s) => !(\ctype_digit($s->value) && \strlen($s->value) >= 7),
+            static fn(SenderID $s) => !(\Sms\senderFromString($s->value) instanceof PhoneNumber),
         ));
     }
 

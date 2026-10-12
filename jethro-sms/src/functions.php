@@ -34,6 +34,38 @@ function statusFromV5Code(int $code, string $statusText): SmsStatus
     };
 }
 
+/**
+ * Parse a configured/typed sender string (SMS_SENDER, 2FA_SENDER_ID, an ini
+ * SMS_FROM, a CLI --from) into a PhoneNumber or an alphanumeric SenderID.
+ *
+ * Phone-number-like = after trimming and removing spaces and one leading '+',
+ * all digits and at least 7 long ('0412 345 678', '+61412345678').
+ * Anything else — 'StBarnabas', short codes like '12345' — is a SenderID,
+ * kept verbatim (trimmed).  Empty/whitespace-only returns null so callers can
+ * fall back to another sender source.
+ *
+ * Also used by FiveCentSmsV5Provider to split its sender list into numbers
+ * and Sender IDs, so configured and provider-listed senders agree.
+ *
+ * Unit tests: jethro-sms/tests/values/test_sender_from_string.php
+ * @see docs/docs/developer/reference/sms/smsarchitecture.md
+ */
+function senderFromString(string $raw): ?SmsSender
+{
+    $raw = trim($raw);
+    if ($raw === '') {
+        return null;
+    }
+    $digits = str_replace(' ', '', $raw);
+    if (str_starts_with($digits, '+')) {
+        $digits = substr($digits, 1);
+    }
+    if (ctype_digit($digits) && \strlen($digits) >= 7) {
+        return new PhoneNumber($digits);
+    }
+    return new SenderID($raw);
+}
+
 // ---------------------------------------------------------------------------
 // finishStoppedSend — a multi-request send that stopped part-way
 // ---------------------------------------------------------------------------
