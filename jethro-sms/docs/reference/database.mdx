@@ -133,6 +133,14 @@ Before 2.40, each SMS send created a `person_note` + `_abstract_note` row
 (subject `'SMS Sent'`). The `2026-upgrade-to-2.40-sms.sql` migration converts
 these into `sms` + `smsdelivery` rows and removes the old note records.
 
+### Global search ("messages")
+
+`View__Mixed_Search::searchMessages()` (`views/view_0_mixed_search.class.php`)
+matches `COALESCE(smsdelivery.body, sms.body) LIKE %search%` for non-bulk sends
+only: those with exactly one row in `_smsdelivery` (bulk-ness counts every
+delivery). Rows are read through the restricted `smsdelivery` view. Offered only
+when the `SMS` feature is enabled and the user has `PERM_VIEWSMS`; searchtype `m`.
+
 ## See Also
 
 - [Status Codes](./status-codes)
