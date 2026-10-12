@@ -49,10 +49,14 @@ final readonly class CellcastFakeHttpClient extends FakeHttpClient
                         ? 'Message scheduled successfully (test mode — request not actually sent)'
                         : 'SMS Sent Successfully (test mode — request not actually sent)',
                     'testMode' => true,
+                    // testMode marks each item so CellcastSmsDelivery records it as
+                    // TEST_MESSAGE (final): fake IDs are unknown upstream, so a
+                    // SCHEDULED/SENT status would never resolve and Cancel would linger.
                     'data' => ['queueResponse' => array_map(
                         fn($c) => array_filter([
                             'Number' => $c,
                             'MessageId' => 'fake_' . bin2hex(random_bytes(8)),
+                            'testMode' => true,
                             'jobInfo' => $isScheduled ? ['data' => ['messageData' => ['status' => 'queued']]] : null,
                         ], fn($v) => $v !== null),
                         $contacts,

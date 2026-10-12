@@ -30,7 +30,7 @@ enum SmsStatus: string
     /** Message is in the process of being sent (in-flight). */
     case SENDING = 'sending';
 
-    /** Test mode message (FiveCent dry-run) — terminal, not a real send. */
+    /** Test mode message (FiveCent dry-run, CellcastFakeHttpClient) — terminal, not a real send. */
     case TEST_MESSAGE = 'test-message';
 
     /** Not sent: the number is on the provider's opt-out list (OptOutSmsProvider). Terminal; in-memory only — DbLoggingSmsProvider never records these deliveries, so the smsdelivery.status ENUM has no such value. */
