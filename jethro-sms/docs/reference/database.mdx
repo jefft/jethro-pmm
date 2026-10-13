@@ -87,15 +87,17 @@ the base table.
 
 | View | Base table | Filter |
 |---|---|---|
-| `person` | `_person` | Current user's congregation + group restrictions via `getCurrentUserID()` |
-| `person_group` | `_person_group` | Group restrictions via `getCurrentUserID()` |
-| `member` | `_person` + `_family` | Flattened join; visible only when the current user shares a member-sharing group with the person |
+| `person` | `_person` | Current user's congregation + group restrictions via `getCurrentUserID()`; unrestricted in a members-area session (`getCurrentMemberID()`) |
+| `person_group` | `_person_group` | Group restrictions via `getCurrentUserID()`; shared groups only in a members-area session |
+| `member` | `_person` + `_family` | Flattened join; visible only when the current member (`getCurrentMemberID()`) shares a member-sharing group or family with the person |
 | `abstract_note` | `_abstract_note` | Assignee is current user AND status is 'pending', OR user has permission bits 48 |
 | `smsdelivery` | `_smsdelivery` | Deliveries to persons visible through `person`, plus those with no person (raw numbers) |
 
 The views use `getCurrentUserID()`, a MySQL stored function that returns the
-session variable `@current_user_id`. In CLI/testing contexts, set it before
-querying through views:
+session variable `@current_user_id` (staff account), and `getCurrentMemberID()`
+(`@current_member_id`, members area) — see
+`docs/docs/developer/reference/db-session-identity.md`. In CLI/testing contexts,
+set it before querying through views:
 
 ```sql
 SET @current_user_id = 1;
