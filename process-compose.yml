@@ -95,6 +95,17 @@ processes:
     command: |
       set -eu
       devbox.d/bin/jethro_load_demodata jethro_functest
+      # Members-area regression fixture for members.spec.ts (#1173, #1433):
+      # give 'kidscare' (Magdalena Luther, person 185, staff visibility
+      # restricted to congregation 3) a member login with the standard demo
+      # password.  Her family spans congregations and Martin Luther (#4) is
+      # rostered, which is what members.spec.ts exercises.  Keep in sync with
+      # /tmp/bugtrigger.sql (manual repro on other demo-data installs).
+      mariadb jethro_functest -e "UPDATE _person SET member_password=(SELECT password FROM staff_member WHERE id=1), email='magdalena.luther@example.org' WHERE id=185"
+      # 'smallgroupleader' (Nathanial Adams, person 170, restricted to groups
+      # 9+11): the whole Adams family is outside those groups, and he is an
+      # adult, so members.spec.ts can assert the family edit form renders.
+      mariadb jethro_functest -e "UPDATE _person SET member_password=(SELECT password FROM staff_member WHERE id=1) WHERE id=170"
       devbox.d/bin/mariadb_recreate_db jethro_functest_walkthrough jethro_functest_smsmockserver
       # Cancel any SMS deliveries still 'scheduled'. Each one renders a Datastar
       # polling span (?call=sms_info, backing off from every 2s per batch, for
