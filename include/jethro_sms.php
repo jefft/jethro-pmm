@@ -1310,30 +1310,24 @@ function phoneNumberInList(\Sms\PhoneNumber $number, array $numbers): bool
  * @param \Sms\SendSummary $sendResult The result from send()
  * @param array<int, string> $nameLookup Person ID => "First Last" map (may be empty)
  * @param string $contextLabel e.g. "roster" or "notification"
- * @param int[] $omitFromSent Person IDs left out of the "sent successfully" list (e.g. a coordinator who
- *                            only received a copy). Failures are always listed.
  * @return string Human-readable summary
  */
-function formatSendSummary(\Sms\SendSummary $sendResult, array $nameLookup, string $contextLabel = 'SMS', array $omitFromSent = []): string
+function formatSendSummary(\Sms\SendSummary $sendResult, array $nameLookup, string $contextLabel = 'SMS'): string
 {
 	if ($sendResult instanceof \Sms\Failed) {
 		return "Unable to send {$contextLabel}\n\n".$sendResult->error."\n";
 	}
 
 	$nameOf = fn(JethroSmsRecipient $r) => $nameLookup[$r->personId] ?? 'Person #'.$r->personId;
-	$sentNames = fn(array $recipients) => array_map($nameOf, array_filter(
-		$recipients,
-		fn(JethroSmsRecipient $r) => !in_array($r->personId, $omitFromSent, true),
-	));
 
 	if ($sendResult instanceof \Sms\AllSent) {
 		$out = "Sent {$contextLabel} successfully to:\n";
-		return $out.implode(', ', $sentNames($sendResult->recipients)).".\n\n";
+		return $out.implode(', ', array_map($nameOf, $sendResult->recipients)).".\n\n";
 	}
 
 	if ($sendResult instanceof \Sms\PartialSuccess) {
 		$out = "Sent {$contextLabel} successfully to:\n";
-		$out .= implode(', ', $sentNames($sendResult->successes)).".\n\n";
+		$out .= implode(', ', array_map($nameOf, $sendResult->successes)).".\n\n";
 		$out .= "Failed to send {$contextLabel} to:\n";
 		$out .= implode(', ', array_map($nameOf, $sendResult->failures)).".\n\n";
 		return $out;
