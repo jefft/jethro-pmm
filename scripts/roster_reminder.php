@@ -173,11 +173,13 @@ if ($sendsms) { // make the sms message!
 	if (!ctype_digit($roster_coordinator_id)) {
 		throw new \RuntimeException("ROSTER_COORDINATOR_ID must be an integer ID referencing a _person record");
 	}
-	$coordinator=new Person($roster_coordinator_id);
 	$sql = 'SELECT person.* FROM person WHERE person.id='.(int)$roster_coordinator_id;
 	$coordinator = array_column($GLOBALS['db']->queryAll($sql), null, 'id');  // keyed by person ID, as getRecipientsFromPersonRecords() expects
 
 	$nameLookup = [];        // person ID => name, for formatSendSummary()
+	foreach ($coordinator as $pid => $person) {
+		$nameLookup[(int)$pid] = $person['first_name'] . ' ' . $person['last_name'];
+	}
 	$sms_notification = '';
 
 	if (count($assignees) > 0) {
@@ -227,18 +229,16 @@ if ($sendsms) { // make the sms message!
 		}
 
 		// now, actually send the messages!
-		if (!empty($assignees))  {
-			$smsRecipients = Jethro\Sms\getRecipientsFromPersonRecords($assignees);
-			$sendWrapper = Jethro\Sms\sendSms($sms_message, $smsRecipients, $smsSender);
-			if ($sendWrapper->isFailure()) {
-				fwrite(STDERR, $sendWrapper->getError() . "\n");
-			} else {
-				$batch = $sendWrapper->getValue();
-				$summary = \Sms\sendSummary($batch->deliveries, $smsRecipients);
-				$sms_notification = Jethro\Sms\formatSendSummary($summary, $nameLookup, $roster_name);
-				if ($summary instanceof \Sms\Failed) {
-					fwrite(STDERR, $sms_notification);
-				}
+		$smsRecipients = Jethro\Sms\getRecipientsFromPersonRecords($assignees);
+		$sendWrapper = Jethro\Sms\sendSms($sms_message, $smsRecipients, $smsSender);
+		if ($sendWrapper->isFailure()) {
+			fwrite(STDERR, $sendWrapper->getError() . "\n");
+		} else {
+			$batch = $sendWrapper->getValue();
+			$summary = \Sms\sendSummary($batch->deliveries, $smsRecipients);
+			$sms_notification = Jethro\Sms\formatSendSummary($summary, $nameLookup, $roster_name);
+			if ($summary instanceof \Sms\Failed) {
+				fwrite(STDERR, $sms_notification);
 			}
 		}
 	}
