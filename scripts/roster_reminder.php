@@ -204,10 +204,6 @@ if ($sendsms) { // make the sms message!
 			$smsroster .= "\n";
 		}
 
-		// The coordinator gets a copy, but is only listed in the summary if actually rostered.
-		$omitFromSummary = array_map('intval', array_keys(array_diff_key($coordinator, $assignees)));
-		$assignees = $assignees + $coordinator;  // not array_merge(): it renumbers the person-ID keys
-
 		$sms_message = $pre_message . $smsroster . "\n" .  $post_message;
 		$sms_message = str_replace('<br>', "\n", $sms_message);
 		$sms_message = str_replace('<BR>', "\n", $sms_message);
@@ -244,7 +240,7 @@ if ($sendsms) { // make the sms message!
 			} else {
 				$batch = $sendWrapper->getValue();
 				$summary = \Sms\sendSummary($batch->deliveries, $smsRecipients);
-				$sms_notification = Jethro\Sms\formatSendSummary($summary, $nameLookup, $roster_name, $omitFromSummary);
+				$sms_notification = Jethro\Sms\formatSendSummary($summary, $nameLookup, $roster_name);
 				if ($summary instanceof \Sms\Failed) {
 					fwrite(STDERR, $sms_notification);
 				}
