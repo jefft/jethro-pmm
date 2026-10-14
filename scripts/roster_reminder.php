@@ -178,6 +178,9 @@ if ($sendsms) { // make the sms message!
 		}
 		$sql = 'SELECT person.* FROM person WHERE person.id='.(int)$roster_coordinator_id;
 		$coordinator = array_column($GLOBALS['db']->queryAll($sql), null, 'id');
+		if ($coordinator === []) {
+			throw new \RuntimeException("No person found with ROSTER_COORDINATOR_ID {$roster_coordinator_id} (deleted, or not visible to this account)");
+		}
 	}
 
 	$nameLookup = [];        // person ID => name, for formatSendSummary()
@@ -233,19 +236,26 @@ if ($sendsms) { // make the sms message!
 
 		// now, actually send the messages!
 		$smsRecipients = Jethro\Sms\getRecipientsFromPersonRecords($assignees);
-		$sendWrapper = Jethro\Sms\sendSms($sms_message, $smsRecipients, $smsSender);
-		if ($sendWrapper->isFailure()) {
-			$sms_notification = "Unable to send {$roster_name}\n\n" . $sendWrapper->getError() . "\n";
+		if ($smsRecipients === []) {
+			// Everyone rostered lacks a mobile number, so there is nobody to send to.
+			$sms_notification = "No SMS Notification was sent for " . $roster_name . ". Nobody rostered has a mobile number.\n";
 			fwrite(STDERR, $sms_notification);
 			$smsReminderFailed = true;
 		} else {
-			$batch = $sendWrapper->getValue();
-			$summary = \Sms\sendSummary($batch->deliveries, $smsRecipients);
-			$sms_notification = Jethro\Sms\formatSendSummary($summary, $nameLookup, $roster_name);
-			// Partial failures (e.g. a bad mobile number) are reported in the summary but aren't script errors.
-			if ($summary instanceof \Sms\Failed) {
+			$sendWrapper = Jethro\Sms\sendSms($sms_message, $smsRecipients, $smsSender);
+			if ($sendWrapper->isFailure()) {
+				$sms_notification = "Unable to send {$roster_name}\n\n" . $sendWrapper->getError() . "\n";
 				fwrite(STDERR, $sms_notification);
 				$smsReminderFailed = true;
+			} else {
+				$batch = $sendWrapper->getValue();
+				$summary = \Sms\sendSummary($batch->deliveries, $smsRecipients);
+				$sms_notification = Jethro\Sms\formatSendSummary($summary, $nameLookup, $roster_name);
+				// Partial failures (e.g. a bad mobile number) are reported in the summary but aren't script errors.
+				if ($summary instanceof \Sms\Failed) {
+					fwrite(STDERR, $sms_notification);
+					$smsReminderFailed = true;
+				}
 			}
 		}
 	}
