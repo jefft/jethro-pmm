@@ -85,7 +85,7 @@ if ($sendemail) {
 	$phpMail=getvar('PHP_MAIL', 0);
 }
 if ($sendsms) {
-	$roster_coordinator_id=getvar('ROSTER_COORDINATOR_ID');
+	$roster_coordinator_id = getvar('ROSTER_COORDINATOR_ID', '');  // optional: '' means no summary SMS
 	$smsfrom = getvar('SMS_FROM');
 }
 $include_roster_content=getvar('INCLUDE_ROSTER_CONTENT', 1);
@@ -171,11 +171,14 @@ if ($sendsms) { // make the sms message!
 	}
 	$sms_notification = "No SMS Notification was sent for " . $roster_name . ". There were no people assigned.\n";
 
-	if (!ctype_digit($roster_coordinator_id)) {
-		throw new \RuntimeException("ROSTER_COORDINATOR_ID must be an integer ID referencing a _person record");
+	$coordinator = [];  // keyed by person ID, as getRecipientsFromPersonRecords() expects
+	if ($roster_coordinator_id !== '') {
+		if (!ctype_digit($roster_coordinator_id)) {
+			throw new \RuntimeException("ROSTER_COORDINATOR_ID must be an integer ID referencing a _person record");
+		}
+		$sql = 'SELECT person.* FROM person WHERE person.id='.(int)$roster_coordinator_id;
+		$coordinator = array_column($GLOBALS['db']->queryAll($sql), null, 'id');
 	}
-	$sql = 'SELECT person.* FROM person WHERE person.id='.(int)$roster_coordinator_id;
-	$coordinator = array_column($GLOBALS['db']->queryAll($sql), null, 'id');  // keyed by person ID, as getRecipientsFromPersonRecords() expects
 
 	$nameLookup = [];        // person ID => name, for formatSendSummary()
 	foreach ($coordinator as $pid => $person) {
