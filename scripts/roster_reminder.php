@@ -143,10 +143,10 @@ if (count($roster_array) > 2) {
 	if ($rds) $roster_date = ' ('.implode(', ', $rds).')';
 }
 
-// Template substitution for PRE_MESSAGE / POST_MESSAGE.  Three tokens are available:
-//   {roster_date}       - e.g. "Sunday, 29 April" or "Sunday, 29 April, Friday, 3 April"
-//   {roster_date_short} - e.g. "29 Apr" (no year or day name; keeps SMS messages short)
-//   {roster_day_of_week}       - e.g. "Sunday" or "Sunday, Friday"
+// Template substitution for PRE_MESSAGE / POST_MESSAGE / EMAIL_SUBJECT.  Three tokens are available:
+//   {roster_date}         - e.g. "Sunday, 29 April" or "Friday, 3 April or Sunday, 5 April"
+//   {roster_date_short}   - e.g. "29 Apr" or "3 Apr/5 Apr" (no year or day name; keeps SMS messages short)
+//   {roster_day_of_week}  - e.g. "Sunday" or "Friday or Sunday"
 // See roster_reminder_sample.ini for examples.
 $roster_date_full  = implode(' or ', array_map(fn($d) => date('l, j F', strtotime($d)), $rds));
 $roster_date_short = implode('/', array_map(fn($d) => date('j M',    strtotime($d)), $rds));
