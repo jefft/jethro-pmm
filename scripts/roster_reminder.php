@@ -180,7 +180,6 @@ if ($sendsms) { // make the sms message!
 	foreach ($coordinator as $pid => $person) {
 		$nameLookup[(int)$pid] = $person['first_name'] . ' ' . $person['last_name'];
 	}
-	$sms_notification = '';
 
 	if (count($assignees) > 0) {
 
@@ -232,7 +231,8 @@ if ($sendsms) { // make the sms message!
 		$smsRecipients = Jethro\Sms\getRecipientsFromPersonRecords($assignees);
 		$sendWrapper = Jethro\Sms\sendSms($sms_message, $smsRecipients, $smsSender);
 		if ($sendWrapper->isFailure()) {
-			fwrite(STDERR, $sendWrapper->getError() . "\n");
+			$sms_notification = "Unable to send {$roster_name}\n\n" . $sendWrapper->getError() . "\n";
+			fwrite(STDERR, $sms_notification);
 		} else {
 			$batch = $sendWrapper->getValue();
 			$summary = \Sms\sendSummary($batch->deliveries, $smsRecipients);
