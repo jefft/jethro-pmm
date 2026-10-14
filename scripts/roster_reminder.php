@@ -157,6 +157,7 @@ $pre_message  = str_replace($tokens, $replacements, $pre_message);
 $post_message = str_replace($tokens, $replacements, $post_message);
 if ($sendemail) $email_subject = str_replace($tokens, $replacements, $email_subject);
 
+$smsReminderFailed = false;  // true if the SMS reminder reached nobody; makes the script exit 1 at the end
 $assignees=$view->getAssignees($start_date, $end_date);
 
 if ($sendsms) { // make the sms message!
@@ -233,12 +234,15 @@ if ($sendsms) { // make the sms message!
 		if ($sendWrapper->isFailure()) {
 			$sms_notification = "Unable to send {$roster_name}\n\n" . $sendWrapper->getError() . "\n";
 			fwrite(STDERR, $sms_notification);
+			$smsReminderFailed = true;
 		} else {
 			$batch = $sendWrapper->getValue();
 			$summary = \Sms\sendSummary($batch->deliveries, $smsRecipients);
 			$sms_notification = Jethro\Sms\formatSendSummary($summary, $nameLookup, $roster_name);
+			// Partial failures (e.g. a bad mobile number) are reported in the summary but aren't script errors.
 			if ($summary instanceof \Sms\Failed) {
 				fwrite(STDERR, $sms_notification);
+				$smsReminderFailed = true;
 			}
 		}
 	}
@@ -449,4 +453,9 @@ function roster_raw_mail_from(string $from_address, string $from_name): array
 			exit(1);
 		}
 	}
+}
+
+// Exit nonzero (after notifying the coordinator) if the SMS reminder failed to send to anyone.
+if ($smsReminderFailed) {
+	exit(1);
 }
