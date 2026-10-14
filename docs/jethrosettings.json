@@ -619,7 +619,7 @@
     "SMS_MAX_LENGTH": {
       "type": "number",
       "label": "Sms Max Length",
-      "description": "Character limit for SMS messages. SMS is billed per 160 chars per person, so this is best set to 160 (1x), 306 (2x), 459 (3x), 612 (4x), 765 (5x) etc",
+      "description": "Character limit for SMS messages sent from the web UI (scripts such as roster reminders are not limited). SMS is billed per 160 chars per person, so this is best set to 160 (1x), 306 (2x), 459 (3x), 612 (4x), 765 (5x) etc",
       "explanation": "SMSes are billed per 160 characters (or 70 if emojis / unicode are present), so setting SMS_MAX_LENGTH to 160 keeps costs down by enforcing brevity. To allow longer messages increase SMS_MAX_LENGTH to 306 (2x SMS segments), 459 (3x), 612 (4x), 765 (5x) etc.",
       "default": 160,
       "note": ""

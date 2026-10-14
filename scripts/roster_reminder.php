@@ -218,11 +218,6 @@ if ($sendsms) { // make the sms message!
 			bam("Recipients: " . implode(', ', $recipientNames));
 			exit;
 		}
-		if (strlen($sms_message) > SMS_MAX_LENGTH) {
-			$assignees = $coordinator;
-			$sms_message = 'Roster message is too long for SMS ('.strlen($sms_message).'>'.SMS_MAX_LENGTH.'). Increase SMS size limit.';
-			fwrite(STDERR, $sms_message);  // Alert CLI user
-		}
 		// Build a name lookup from person records (keyed by person ID)
 		foreach ($assignees as $pid => $person) {
 			$pid = (int)$pid;
