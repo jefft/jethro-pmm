@@ -5,7 +5,7 @@ sidebar_position: 5
 # SMS File Layout
 
 The SMS subsystem was restructured to one-class-per-file (2026-07-03). Old
-monoliths (`jethro-sms/src/sms.php`, `sms_cellcast.php`, `sms_smsbroadcast.php`,
+monoliths (`jethro-sms/src/sms.php`, `sms_cellcast.php`,
 `templater.php`) are BC loaders only.
 
 ## Source directories
@@ -13,7 +13,7 @@ monoliths (`jethro-sms/src/sms.php`, `sms_cellcast.php`, `sms_smsbroadcast.php`,
 | Directory | What's there |
 |---|---|
 | `jethro-sms/src/` | Pure layer: `SmsProvider`, `SmsCapability`, `SmsStatus`, decorators, value objects, HTTP, Result monad, statusline maths |
-| `jethro-sms/src/Providers/` | Concrete providers: `FiveCentSmsV5Provider`, `CellcastSmsProvider`, `SmsBroadcastSmsProvider`, `FiveCentSmsV4Provider`, `TemplateSmsProvider` |
+| `jethro-sms/src/Providers/` | Concrete providers: `FiveCentSmsV5Provider`, `CellcastSmsProvider`, `FiveCentSmsV4Provider`, `TemplateSmsProvider` |
 | `include/Jethro/Sms/` | Bridge value objects: `JethroSmsRecipient`, `JethroSmsDelivery`, `JethroSmsDeliveryBatch`, `SmsRequestRecipients`, `SessionSmsCache`, `SmsStatusIcon` |
 | `include/Jethro/Sms/Providers/` | Bridge decorators: `DbLoggingSmsProvider` |
 | `include/jethro_sms.php` | Bridge functions: `getSmsProvider()` factory, send pipeline, request parsing, UI rendering |

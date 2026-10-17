@@ -16,7 +16,6 @@ use \Sms\{
 use Sms\Providers\TemplateSmsProvider;
 use Sms\Providers\FiveCentSmsV5Provider;
 use Sms\Providers\CellcastSmsProvider;
-use Sms\Providers\SmsBroadcastSmsProvider;
 
 require_once __DIR__ . '/../../src/load.php';
 
@@ -45,20 +44,6 @@ test('CellcastSmsProvider getDeferredSendMaxDelay() → 24 hours (86400)', funct
     );
     $delay = $p->getDeferredSendMaxDelay();
     assert_eq($delay, 86400, 'Expected 24 hours (86400 seconds)');
-});
-
-// ---------------------------------------------------------------------------
-// SmsBroadcastSmsProvider → null (unspecified)
-// ---------------------------------------------------------------------------
-
-test('SmsBroadcastSmsProvider getDeferredSendMaxDelay() → null', function () {
-    $p = new SmsBroadcastSmsProvider(
-        url: 'https://example.com',
-        username: 'u',
-        password: 'p',
-    );
-    $delay = $p->getDeferredSendMaxDelay();
-    assert_eq($delay, null, 'Expected null (unspecified)');
 });
 
 // ---------------------------------------------------------------------------
@@ -114,17 +99,12 @@ test('OverridingSmsProvider (decorator) delegates getDeferredSendMaxDelay() corr
 test('Providers with DEFERRED_SEND capability are consistent with getDeferredSendMaxDelay()', function () {
     $v5 = new FiveCentSmsV5Provider(url: 'https://example.com', keyId: 'k', keySecret: 's');
     $cellcast = new CellcastSmsProvider(apiToken: 'tok', url: 'https://example.com');
-    $broadcast = new SmsBroadcastSmsProvider(url: 'https://example.com', username: 'u', password: 'p');
 
     // Providers that declare DEFERRED_SEND
     assert_true($v5->hasCapability(SmsCapability::DEFERRED_SEND), 'v5 must have DEFERRED_SEND');
     assert_true($cellcast->hasCapability(SmsCapability::DEFERRED_SEND), 'cellcast must have DEFERRED_SEND');
-    assert_true($broadcast->hasCapability(SmsCapability::DEFERRED_SEND), 'broadcast must have DEFERRED_SEND');
 
     // v5 and cellcast have finite max delays
     assert_true($v5->getDeferredSendMaxDelay() > 0, 'v5 delay must be positive');
     assert_true($cellcast->getDeferredSendMaxDelay() > 0, 'cellcast delay must be positive');
-
-    // broadcast is unspecified
-    assert_eq($broadcast->getDeferredSendMaxDelay(), null, 'broadcast delay must be null');
 });

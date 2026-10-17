@@ -26,8 +26,6 @@ require_once __DIR__ . '/Providers/FiveCentSmsV4Provider.php';
 require_once __DIR__ . '/Providers/FiveCentSmsV5Provider.php';
 require_once __DIR__ . '/Providers/CellcastFakeHttpClient.php';
 require_once __DIR__ . '/Providers/FiveCentSmsV5FakeHttpClient.php';
-require_once __DIR__ . '/Providers/SmsBroadcastFakeHttpClient.php';
 require_once __DIR__ . '/Providers/TemplateFakeHttpClient.php';
 require_once __DIR__ . '/Providers/FiveCentSmsDelivery.php';
-require_once __DIR__ . '/Providers/SmsBroadcastSmsDelivery.php';
 require_once __DIR__ . '/functions.php';

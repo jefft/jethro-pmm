@@ -2,7 +2,7 @@
 
 Provider-agnostic PHP SMS engine, extracted from [Jethro PMM](https://jethro.org.au).
 
-- **Providers**: 5CentSMS v5, Cellcast, SMS Broadcast, plus a generic
+- **Providers**: 5CentSMS v5, Cellcast, plus a generic
   HTTP-template provider (and the deprecated 5CentSMS v4 shape).
 - **`SmsProvider` interface** with capability flags, decorators
   (`TokenExpandingSmsProvider`, `DeduplicatingSmsProvider` — one message per

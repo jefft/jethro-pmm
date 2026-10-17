@@ -31,14 +31,3 @@ final readonly class FiveCentSmsV5FakeHttpClient extends FakeHttpClient
         ];
     }
 }
-
-/**
- * Fake HTTP client for SMS Broadcast.
- *
- * SmsBroadcast uses POST for both sending messages (action=send) and
- * querying balance (action=balance).  In test mode, send POSTs return a
- * mocked success response with per-recipient OK lines; balance POSTs
- * fall through to the real client.
- * @see FakeHttpClient
- * @see SmsBroadcastSmsProvider
- */

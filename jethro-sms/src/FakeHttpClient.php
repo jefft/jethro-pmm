@@ -24,7 +24,6 @@ namespace Sms;
  *
  * Subclasses:
  *  - {@see CellcastFakeHttpClient} — returns realistic JSON for Cellcast API calls
- *  - {@see SmsBroadcastFakeHttpClient} — lets balance POSTs through, fakes sends
  *  - {@see TemplateFakeHttpClient} — returns 'OK' for all POSTs (template-based providers)
  *  - {@see FiveCentSmsV5FakeHttpClient} — delegates (v5 handles test via request body)
  */

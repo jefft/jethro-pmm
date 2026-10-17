@@ -25,13 +25,12 @@ configs use absolute URLs, so the resolution is a no-op.
 |---|---|
 | FiveCentSMS v5 | `jethro-sms/src/Providers/FiveCentSmsV5Provider.php` (class docblock) |
 | Cellcast | `jethro-sms/src/Providers/CellcastSmsProvider.php` (class docblock) |
-| SMS Broadcast | `jethro-sms/src/Providers/SmsBroadcastSmsProvider.php` |
 | Template / v4 | `jethro-sms/src/Providers/TemplateSmsProvider.php` |
 
 ## Provider Selection
 
-`SMS_PROVIDER` — FQN, short key (`'5centsmsv5'`, `'cellcast'`,
-`'smsbroadcast'`), or `'auto'`. When unset or `'auto'`, auto-detection
+`SMS_PROVIDER` — FQN, short key (`'5centsmsv5'`, `'cellcast'`), or
+`'auto'`. When unset or `'auto'`, auto-detection
 iterates providers by `usagePreference()` descending. See
 [Provider auto-detection](./providers#auto-detection).
 

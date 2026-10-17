@@ -98,7 +98,7 @@ class Sms extends DB_Object
 	{
 		require_once JETHRO_ROOT . '/include/jethro_sms.php';
 		$defaultPrice = 'CASE ' . $tableAlias . '.provider';
-		foreach (['5centsmsv5', '5csmsv5', 'cellcast', 'smsbroadcast', '5csmsv4'] as $key) {
+		foreach (['5centsmsv5', '5csmsv5', 'cellcast', '5csmsv4'] as $key) {
 			$defaultPrice .= " WHEN '" . $key . "' THEN " . number_format(\Jethro\Sms\defaultSegmentCost($key), 5, '.', '');
 		}
 		$defaultPrice .= ' ELSE 0 END';

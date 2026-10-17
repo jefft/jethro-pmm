@@ -184,7 +184,7 @@ interface SmsProvider
     /**
      * Human-readable description of this provider for admin status panels.
      *
-     * Examples: "5CentSMS (v5)", "SMS Broadcast", "https://my-gateway.example.com/api"
+     * Examples: "5CentSMS (v5)", "Cellcast", "https://my-gateway.example.com/api"
      */
     public function getDescription(): string;
 

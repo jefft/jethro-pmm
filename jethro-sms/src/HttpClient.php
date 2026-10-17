@@ -243,8 +243,8 @@ final readonly class LoggingHttpClient implements HttpClient
  * Replace credential values with '****' so verbose request logs can be
  * shared. Covers every way providers send credentials: an Authorization
  * header (Cellcast bearer token), JSON fields (5CentSMS key-id/key-secret),
- * and form/query parameters (SMS Broadcast and template providers'
- * password, apikey, token, …). A field is treated as a credential when its
+ * and form/query parameters (template providers' password, apikey, token, …).
+ * A field is treated as a credential when its
  * name contains key, secret, pass or token.
  *
  * Unit tests: jethro-sms/tests/values/test_redact_credentials.php

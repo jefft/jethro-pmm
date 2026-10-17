@@ -145,14 +145,14 @@ function failedEntryDeliveries(array $entry, SmsStatus $status, string $detail):
  * Callers needing per-recipient detail should use the raw SmsDelivery[]
  * directly rather than calling this function.
  *
- * Example with SMS Broadcast results:
+ * Example with FiveCentSMS v5 results:
  *
  *   $results = [
- *     new SmsBroadcastSmsDelivery(new PhoneNumber("0491570157"), "OK:61491570157:1252164015"),
- *     new SmsBroadcastSmsDelivery(new PhoneNumber("0491570158"), "BAD:61491570158:Blocked"),
+ *     new FiveCentSmsDelivery(new PhoneNumber("0491570157"), '{"destination":"0491570157","status":1002,"status_text":"Delivered","id":"abc123","credits":1}'),
+ *     new FiveCentSmsDelivery(new PhoneNumber("0491570158"), '{"destination":"0491570158","status":1003,"status_text":"Failed"}'),
  *   ];
  *   $summary = sendSummary($results, $recipients);
- *   // → PartialSuccess(recipients: [0491570157], failures: [0491570158], remoteId: "1252164015")
+ *   // → PartialSuccess(recipients: [0491570157], failures: [0491570158], remoteId: "abc123")
  *
  * Decision tree:
  *   - Empty results → Failed("No results returned from provider")

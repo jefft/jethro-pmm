@@ -109,10 +109,9 @@ use Sms\Providers\TemplateSmsProvider;
  *
  * Auto-detects the raw provider class from constants if SMS_PROVIDER is
  * not set:
- *   1. SMS_SMSBROADCAST_USERNAME + SMS_SMSBROADCAST_PASSWORD → SmsBroadcastSmsProvider
- *   2. SMS_5CENTSMS_APIKEY_ID + SMS_5CENTSMS_APIKEY → FiveCentSmsV5Provider
- *   3. SMS_CELLCAST_APIKEY → CellcastSmsProvider
- *   4. SMS_HTTP_URL → FiveCentSmsV4Provider
+ *   1. SMS_5CENTSMS_APIKEY_ID + SMS_5CENTSMS_APIKEY → FiveCentSmsV5Provider
+ *   2. SMS_CELLCAST_APIKEY → CellcastSmsProvider
+ *   3. SMS_HTTP_URL → FiveCentSmsV4Provider
  *
  * The returned provider chain is (outermost first):
  *   OverridingSmsProvider → DbLoggingSmsProvider → TokenExpandingSmsProvider → RawProvider
@@ -2637,7 +2636,6 @@ function defaultSegmentCost(string $providerKey): float
 	$class = match ($providerKey) {
 		'5centsmsv5' => \Sms\Providers\FiveCentSmsV5Provider::class,
 		'cellcast' => \Sms\Providers\CellcastSmsProvider::class,
-		'smsbroadcast' => \Sms\Providers\SmsBroadcastSmsProvider::class,
 		'5csmsv4' => \Sms\Providers\TemplateSmsProvider::class,
 		default => null,
 	};

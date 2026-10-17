@@ -85,10 +85,9 @@ define('2FA_ENABLED', true);
 
 // Fully qualified class name or short key of the SMS provider to use.
 // If not defined here, the 'SMS_PROVIDER' setting in the admin System Configuration
-// page is used (default: 'Auto-detect'). Short keys: '5centsmsv5', 'cellcast', 'smsbroadcast'.
+// page is used (default: 'Auto-detect'). Short keys: '5centsmsv5', 'cellcast'.
 //   \Sms\Providers\FiveCentSmsV5Provider::class    — https://5centsms.com.au modern (v5) JSON API
 //   \Sms\Providers\CellcastSmsProvider::class      — https://cellcast.com JSON API
-//   \Sms\Providers\SmsBroadcastSmsProvider::class  — https://smsbroadcast.com.au API (works but not recommended)
 //   \Sms\Providers\FiveCentSmsV4Provider::class    — https://5centsms.com.au legacy (v4) API (deprecated — use v5)
 //   \Sms\Providers\TemplateSmsProvider::class      — generic HTTP POST template gateway (use only if you know what you're doing)
 // define('SMS_PROVIDER', '');
@@ -117,20 +116,6 @@ define('2FA_ENABLED', true);
 
 // API base URL (optional; defaults to https://api.cellcast.com)
 // define('SMS_CELLCAST_URL', '');
-
-// =====================================================================
-// SMS Broadcast (smsbroadcast.com.au)
-//   Supports scheduling; does NOT support cancellation or delivery status polling.
-// =====================================================================
-
-// API username (required)
-// define('SMS_SMSBROADCAST_USERNAME', '');
-
-// API password (required)
-// define('SMS_SMSBROADCAST_PASSWORD', '');
-
-// API endpoint URL (optional; defaults to https://www.smsbroadcast.com.au/api-adv.php)
-// define('SMS_SMSBROADCAST_URL', '');
 
 // =====================================================================
 // Common SMS settings (apply to all providers)

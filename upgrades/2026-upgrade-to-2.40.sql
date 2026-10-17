@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS `_smsdelivery` (
 	`remote_id` VARCHAR(255) NULL DEFAULT NULL COMMENT 'Upstream SMS provider message ID for this recipient',
 	`raw_response` TEXT NULL DEFAULT NULL COMMENT 'Raw upstream provider response for this recipient (send response or status query)',
 	`body` TEXT NULL DEFAULT NULL COMMENT 'Expanded message body for this recipient, or NULL if the batch message was used',
-	`provider` ENUM('5centsmsv5','cellcast','smsbroadcast','5csmsv4') NULL DEFAULT NULL COMMENT 'SMS provider that sent this delivery',
+	`provider` ENUM('5centsmsv5','cellcast','5csmsv4') NULL DEFAULT NULL COMMENT 'SMS provider that sent this delivery',
 	`delivered_at` DATETIME NULL DEFAULT NULL COMMENT 'When the carrier confirmed delivery (from upstream status check)',
 	`status` ENUM('queued','sent','delivered','failed','in-progress','scheduled','cancelled','sending','test-message','unknown') NOT NULL DEFAULT 'sending' COMMENT 'Delivery status',
 	`segments_used` INT NULL DEFAULT NULL COMMENT 'SMS segments charged, as reported by the provider; NULL if not reported',
@@ -61,7 +61,7 @@ SET @old = (SELECT 1 FROM information_schema.COLUMNS
     AND COLUMN_NAME = 'provider' AND COLUMN_TYPE LIKE '%5csmsv5%'
     AND COLUMN_TYPE NOT LIKE '%5centsmsv5%');
 SET @stmt = IF(@old = 1,
-    'ALTER TABLE `_smsdelivery` MODIFY COLUMN `provider` ENUM(''5centsmsv5'',''5csmsv5'',''cellcast'',''smsbroadcast'',''5csmsv4'') NULL DEFAULT NULL',
+    'ALTER TABLE `_smsdelivery` MODIFY COLUMN `provider` ENUM(''5centsmsv5'',''5csmsv5'',''cellcast'',''5csmsv4'') NULL DEFAULT NULL',
     'SELECT 1');
 PREPARE stmt FROM @stmt;
 EXECUTE stmt;
@@ -196,14 +196,13 @@ VALUES
 	('SMS_SEGMENT_COST', 'text', '', 'Your price per SMS segment in dollars, e.g. 0.029. Used for the compose cost estimate, and recorded with each new send when the provider does not report its own price (Cellcast does). Blank = provider default.', @sms_base + 44),
 	('SMS_BALANCE_LOW_THRESHOLD', 'int', '0', 'Notify a staff member when SMS account balance drops below this amount (0 = disabled)', @sms_base + 50),
 	('SMS_BALANCE_LOW_NOTIFICANT_PERSON_ID', 'person', '', 'Person ID of the staff member to notify when SMS balance is low', @sms_base + 55),
-	('SMS_PROVIDER', 'select{"":"Auto-detect (based on settings)","5centsmsv5":"5CentSMS v5","cellcast":"Cellcast","smsbroadcast":"SMS Broadcast"}', '', 'Which SMS provider to use for sending', @sms_base + 60),
+	('SMS_PROVIDER', 'select{"":"Auto-detect (based on settings)","5centsmsv5":"5CentSMS v5","cellcast":"Cellcast"}', '', 'Which SMS provider to use for sending', @sms_base + 60),
 	('SMS_5CENTSMS_APIKEY_ID', 'text', '', 'FiveCent SMS v5 API key ID', @sms_base + 65),
 	('SMS_5CENTSMS_APIKEY', 'text', '', 'FiveCent SMS v5 API key secret', @sms_base + 70),
 	('SMS_CELLCAST_APIKEY', 'text', '', 'Cellcast API bearer token', @sms_base + 75),
 	('SMS_SEND_COOLOFF', 'int', '30', 'Undo window: seconds an immediate SMS is held, cancellable, before dispatch. 0 to disable. Only with providers that can schedule and cancel (5CentSMS v5, Cellcast); other providers, 2FA codes and reminders send immediately.', @sms_base + 33),
 	('SMS_SHORTEN_URLS', 'bool', false, 'Whether the ''Shorten URLs'' checkbox is checked by default when sending an SMS', @sms_base + 28),
 	('SMS_UNICODE_PERMITTED', 'select{"when_free":"When it costs nothing extra","true":"Permitted (may cost extra)","false":"Not permitted"}', 'when_free', 'Whether to permit emojis and other unicode in SMSes', @sms_base + 20);
-
 
 UPDATE setting SET note = 'Character limit for SMS messages. SMS is billed per 160 chars per person, so this is best set to 160 (1x), 306 (2x), 459 (3x), 612 (4x), 765 (5x) etc' WHERE symbol = 'SMS_MAX_LENGTH';
 

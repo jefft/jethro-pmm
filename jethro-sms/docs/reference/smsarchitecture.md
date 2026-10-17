@@ -52,7 +52,7 @@ Why the layering matters:
 - The statusline and preview maths and renderers are in `Sms\` (`src/sms_statusline.php`). The bridge builds the Jethro-state snapshot for them with `Jethro\Sms\makeStatuslineConfig()`.
 - `TokenExpandingSmsProvider` receives URL-shortener closures by injection, so the package never calls Jethro's shortener directly.
 - `\Result` has its canonical definition in `jethro-sms/src/result.php`, which `include/general.php` also requires.
-- `src/sms.php`, `src/sms_cellcast.php` and `src/templater.php` are left over from the pre-split monoliths and are **out of date**. `sms.php` does not load the dedup and opt-out decorators or the Cellcast and SMS Broadcast providers. `sms_cellcast.php` requires paths that moved into `Providers/`. Use `load.php`.
+- `src/sms.php`, `src/sms_cellcast.php` and `src/templater.php` are left over from the pre-split monoliths and are **out of date**. `sms.php` does not load the dedup and opt-out decorators or the Cellcast provider. `sms_cellcast.php` requires paths that moved into `Providers/`. Use `load.php`.
 
 ## Provider chain
 
@@ -66,7 +66,7 @@ The three middle decorators are added **only when `$logToDb` is true**. 2FA send
 
 **Every send is a batch.** `send()` takes an array of *entries* (`[{message, recipients[]}, …]`) together with one sender, `$sendAt` and `$preview`. A single message is a batch with one entry. The whole send action, including per-recipient message overrides, passes through the chain in **one** `send()` call.
 
-1. **Raw provider** (5CentSMS v5, Cellcast, SMS Broadcast, Template, v4). It is built with `fromConstants($tfa, …)` and given a `SessionSmsCache` keyed by a config fingerprint: xxh3 of the class name plus every `getConstants()` name=value pair. A change to the settings therefore invalidates the cache.
+1. **Raw provider** (5CentSMS v5, Cellcast, Template, v4). It is built with `fromConstants($tfa, …)` and given a `SessionSmsCache` keyed by a config fingerprint: xxh3 of the class name plus every `getConstants()` name=value pair. A change to the settings therefore invalidates the cache.
 2. **`TokenExpandingSmsProvider`** walks the entries.
    - **Known variables** (`firstname`, `lastname`, `fullname`, from `getAvailableTokens()`): an entry whose message uses one is split into one entry per recipient with the expanded text. Person data comes from the injected token resolver.
    - **Shared numbers**: when an entry carries `logicalRecipients` (see step 3), the expansion is done **per number** instead, with token values joined by " & " ("Hi Alice & Bob, …").
@@ -102,13 +102,12 @@ The three middle decorators are added **only when `$logToDb` is true**. 2FA send
 
 ## Provider selection
 
-`SMS_PROVIDER` accepts a short key (`'5centsmsv5'`, `'cellcast'`, `'smsbroadcast'`), a fully-qualified class name, or `'auto'`/undefined. In auto mode, `Sms\providerCandidates()` sorts the providers by `usagePreference()` (descending), and the first one whose *required* `getConstants()` are all defined wins:
+`SMS_PROVIDER` accepts a short key (`'5centsmsv5'`, `'cellcast'`), a fully-qualified class name, or `'auto'`/undefined. In auto mode, `Sms\providerCandidates()` sorts the providers by `usagePreference()` (descending), and the first one whose *required* `getConstants()` are all defined wins:
 
 | Preference | Provider | Required constants |
 |---|---|---|
 | 10 | `FiveCentSmsV5Provider` | `SMS_5CENTSMS_APIKEY_ID`, `SMS_5CENTSMS_APIKEY` |
 | 9 | `CellcastSmsProvider` | `SMS_CELLCAST_APIKEY` |
-| -1 | `SmsBroadcastSmsProvider` | `SMS_SMSBROADCAST_PASSWORD` |
 | -1 | `FiveCentSmsV4Provider` (deprecated; extends Template) | `SMS_HTTP_HEADER_TEMPLATE`, **and** `SMS_HTTP_URL` must be exactly `https://www.5centsms.com.au/api/v4/sms` or `…/api/v4` |
 | -2 | `TemplateSmsProvider` (generic HTTP catch-all) | `SMS_HTTP_URL`, `SMS_HTTP_POST_TEMPLATE`, `SMS_HTTP_RESPONSE_OK_REGEX` |
 
@@ -126,24 +125,24 @@ Other cross-cutting constants (`SMS_SEND_COOLOFF`, `SMS_SHORTEN_URLS`, …) are 
 
 `Sms\SmsCapability` is an enum of feature flags. Callers gate UI and behaviour on `hasCapability()` before calling the matching method.
 
-| Capability | Method | v5 | Cellcast | SMS Broadcast |
-|---|---|---|---|---|
-| `GET_BALANCE` | `getBalance()` | ✓ | ✓ | ✓ |
-| `GET_SENDER_IDS` | `getSenderIds()` | ✓ | ✓ (business names) | |
-| `DEFERRED_SEND` | `send(…, $sendAt)` | ✓ | ✓ | ✓ |
-| `DEFERRED_SEND_CANCEL` | `cancel()` | ✓ | ✓ | |
-| `REGISTER_SENDER_NUMBER` | `registerSenderNumber()` | ✓ | ✓ | |
-| `REGISTER_SENDER_ID` | `registerSenderId()` | ✓ | ✓ | |
-| `LIST_OPT_OUTS` | `listOptOuts()` | ✓ | ✓ | |
-| `REMOVE_OPT_OUT` | `removeOptOut()` | ✓ | | |
-| `BATCH_DELIVERY_QUERY` | `listRecentDeliveries()` | ✓ | ✓ | |
-| `LIST_HISTORY` | used by `synchronizeHistory()` | ✓ | ✓ | |
+| Capability | Method | v5 | Cellcast |
+|---|---|---|---|
+| `GET_BALANCE` | `getBalance()` | ✓ | ✓ |
+| `GET_SENDER_IDS` | `getSenderIds()` | ✓ | ✓ (business names) |
+| `DEFERRED_SEND` | `send(…, $sendAt)` | ✓ | ✓ |
+| `DEFERRED_SEND_CANCEL` | `cancel()` | ✓ | ✓ |
+| `REGISTER_SENDER_NUMBER` | `registerSenderNumber()` | ✓ | ✓ |
+| `REGISTER_SENDER_ID` | `registerSenderId()` | ✓ | ✓ |
+| `LIST_OPT_OUTS` | `listOptOuts()` | ✓ | ✓ |
+| `REMOVE_OPT_OUT` | `removeOptOut()` | ✓ | |
+| `BATCH_DELIVERY_QUERY` | `listRecentDeliveries()` | ✓ | ✓ |
+| `LIST_HISTORY` | used by `synchronizeHistory()` | ✓ | ✓ |
 
 v4 has `GET_BALANCE` only. Template has `GET_BALANCE` only when a balance URL is configured.
 
 - `getSenderIds(bool $getAll = false)` returns only ACMA-approved sender IDs unless `$getAll` is true.
 - `listRecentDeliveries(?int $since = null)` returns delivery statuses since a timestamp (default: the last 24 h) from one paginated upstream query. Providers without the capability return `[]`, and callers then fall back to per-delivery `updateDelivery()`.
-- `getDeferredSendMaxDelay(): ?int` is how far ahead a send may be scheduled: 365 days for v5, 24 h for Cellcast, and `null` (no limit) for SMS Broadcast and Template. Callers use it as the `max` on schedule inputs and validate against it server-side.
+- `getDeferredSendMaxDelay(): ?int` is how far ahead a send may be scheduled: 365 days for v5, 24 h for Cellcast, and `null` (no limit) for Template. Callers use it as the `max` on schedule inputs and validate against it server-side.
 
 ## Senders
 
@@ -299,7 +298,7 @@ Some small types share a file with a related interface (e.g. `PhoneNumber` lives
 | `RegistrationStep`, `FormField` | `src/RegistrationStep.php`, `src/FormField.php` | Registration state-machine output |
 | `SmsStatuslineConfig` | `src/SmsStatuslineConfig.php` | Config snapshot for the statusline maths |
 | `HttpClient` (interface), `HttpRequest`, `HttpResponse`, `NativeHttpClient`, `LoggingHttpClient` | `src/HttpClient.php` | HTTP seam. `NativeHttpClient` is cURL-based and caps identical repeated requests. `LoggingHttpClient` is a verbose decorator |
-| `FakeHttpClient` (abstract) | `src/FakeHttpClient.php` | Base for the per-provider fakes in `src/Providers/` (Cellcast, v5, SMS Broadcast, Template) |
+| `FakeHttpClient` (abstract) | `src/FakeHttpClient.php` | Base for the per-provider fakes in `src/Providers/` (Cellcast, v5, Template) |
 | `SmsCache` (interface) | `src/SmsCache.php` | Cross-request provider cache |
 | `Templater` | `src/Templater.php` | s-expression `%(fn arg)%` engine |
 | `JethroSmsRecipient` | `include/Jethro/Sms/` | `SmsRecipient` with a person ID |
@@ -343,10 +342,6 @@ Auth: Bearer token. In test mode the HTTP client is wrapped in `CellcastFakeHttp
 | `registerSenderNumber()` | `POST /api/v1/customNumber/add`, then `POST /api/v1/customNumber/verifyCustomNumber` |
 | `registerSenderId()` | `POST /api/v1/business/add` |
 
-### SMS Broadcast
-
-`POST https://www.smsbroadcast.com.au/api-adv.php` handles sending, and the same endpoint with `action=balance` returns the balance. Auth is username and password in a URL-encoded body, and responses are line-based text. `getSenderIds()`, `getSenderNumbers()` and `listRecentDeliveries()` return empty lists. `updateDelivery()` and `cancel()` return failures.
-
 ## Unit tests
 
 There is one runner: `php tests/unit/run.php [filter]` (e.g. `sms/cellcast`). `tests/unit/sms` is a symlink to `jethro-sms/tests/`, so the package's tests run as part of Jethro's suite. The package has no runner of its own: `composer test` in `jethro-sms/composer.json` points at a `tests/run.php` that doesn't exist.
@@ -356,7 +351,7 @@ jethro-sms/tests/     (run via tests/unit/run.php)
   cancel/       SmsDeliveryBatch cancel() contract
   cellcast/     registration, send/balance parsing, delivery updates
   overriding/   sender allowlist, cooloff, SMS_SENDER mismatch, _USER_MOBILE_
-  providers/    v5 / Template / SMS Broadcast parsing, deferred-send max delay
+  providers/    v5 / Template parsing, deferred-send max delay
   statusline/   GSM/UCS-2 segment maths, URL shortening, renderStatusline()/renderPreviewPanel()
   summary/      sendSummary() shared-mobile attribution
   token/        token expansion, known-token trigger, partial failure, templater

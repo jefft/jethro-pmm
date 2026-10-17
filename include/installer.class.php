@@ -411,7 +411,7 @@ class Installer
 			(@rank:=@rank+5, '',                         'SMS_BALANCE_LOW_THRESHOLD','Notify a staff member when SMS account balance drops below this amount (0 = disabled)','int','0'),
 			(@rank:=@rank+5, '',                         'SMS_BALANCE_LOW_NOTIFICANT_PERSON_ID','Person ID of the staff member to notify when SMS balance is low','person',''),
 			-- Synced with upgrades/2026-upgrade-to-2.40.sql:116 — provider selection with auto-detect
-			(@rank:=@rank+5, '',                         'SMS_PROVIDER','Which SMS provider to use for sending','select{\"\":\"Auto-detect (based on settings)\",\"5centsmsv5\":\"5CentSMS v5\",\"cellcast\":\"Cellcast\",\"smsbroadcast\":\"SMS Broadcast\"}',''),
+			(@rank:=@rank+5, '',                         'SMS_PROVIDER','Which SMS provider to use for sending','select{\"\":\"Auto-detect (based on settings)\",\"5centsmsv5\":\"5CentSMS v5\",\"cellcast\":\"Cellcast\"}',''),
 			(@rank:=@rank+5, '',                         'SMS_5CENTSMS_APIKEY_ID','FiveCent SMS v5 API key ID','text',''),
 			(@rank:=@rank+5, '',                         'SMS_5CENTSMS_APIKEY','FiveCent SMS v5 API key secret','text',''),
 			(@rank:=@rank+5, '',                         'SMS_CELLCAST_APIKEY','Cellcast API bearer token','text',''),

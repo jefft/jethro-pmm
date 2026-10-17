@@ -1,6 +1,6 @@
 {
     "name": "jethro/jethro-sms",
-    "description": "Provider-agnostic SMS engine and CLI: 5CentSMS v5, Cellcast, SMS Broadcast; token expansion, segment/cost maths, opaque sender-registration state machines.",
+    "description": "Provider-agnostic SMS engine and CLI: 5CentSMS v5, Cellcast; token expansion, segment/cost maths, opaque sender-registration state machines.",
     "type": "library",
     "license": "GPL-3.0-or-later",
     "require": {

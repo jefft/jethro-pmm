@@ -29,7 +29,6 @@ Capabilities are checked via `hasCapability(SmsCapability)`. See
 |---|---|---|---|---|---|---|---|---|
 | `FiveCentSmsV5Provider` | key-id + key-secret in JSON body | JSON | ✓ | ✓ (DELETE) | ✓ (`GET /v5/sms/{id}`) | ✓ | ✓ | ✓ |
 | `CellcastSmsProvider` | Bearer token header | JSON | ✓ | ✓ (POST cancel) | ✓ (`GET /api/v2/report/message/{id}`) | ✓ | ✓ | ✓ |
-| `SmsBroadcastSmsProvider` | username + password | URL-encoded, line-based | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ |
 | `FiveCentSmsV4Provider` | header template | URL-encoded | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ |
 | `TemplateSmsProvider` | configurable | URL-encoded | ✗ | ✗ | ✗ | optional | ✗ | ✗ |
 
@@ -52,12 +51,6 @@ Sender number registration uses OTP verification. Sender ID registration
 submits to `/api/v1/business/add`.
 
 Test mode: `CellcastFakeHttpClient` returns realistic JSON for all endpoints.
-
-## SmsBroadcastSmsProvider
-
-`jethro-sms/src/Providers/SmsBroadcastSmsProvider.php` — key:
-`'smsbroadcast'`, preference: -1. Supports GET_BALANCE and DEFERRED_SEND
-only. Segment cost: 7000 millicents (7.0¢). No max delay.
 
 ## FiveCentSmsV4Provider
 
@@ -85,11 +78,10 @@ providers by `usagePreference()` descending:
 |---|---|---|
 | 10 | `FiveCentSmsV5Provider` | `SMS_5CENTSMS_APIKEY_ID`, `SMS_5CENTSMS_APIKEY` |
 | 9 | `CellcastSmsProvider` | `SMS_CELLCAST_APIKEY` |
-| -1 | `SmsBroadcastSmsProvider` | `SMS_SMSBROADCAST_PASSWORD` |
 | -1 | `FiveCentSmsV4Provider` | `SMS_HTTP_URL` (must match v4 endpoint) |
 | -2 | `TemplateSmsProvider` | `SMS_HTTP_URL` |
 
-Short keys: `'5centsmsv5'`, `'cellcast'`, `'smsbroadcast'`.
+Short keys: `'5centsmsv5'`, `'cellcast'`.
 Providers with negative preference are excluded from the "not configured"
 error help text.
 
