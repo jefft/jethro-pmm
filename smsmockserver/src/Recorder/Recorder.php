@@ -44,7 +44,8 @@ final class Recorder
         } finally {
             foreach ($this->toCancel as $id) {
                 $cancel = $this->cases->cancelRequest($id);
-                $this->http($cancel['method'], $cancel['path'], [], $cancel['body'], $this->cases->authHeaders());
+                [$headers, $body] = $this->credentials(true, $cancel['body']);
+                $this->http($cancel['method'], $cancel['path'], [], $body, $headers);
             }
         }
         return $recorded;
@@ -55,10 +56,12 @@ final class Recorder
     {
         $path = $this->fill($case['path']);
         $query = $this->fill($case['query'] ?? []);
+        // The record keeps the case's own body: credentials are added to the
+        // request actually sent, never written to disk.
         $body = isset($case['body']) ? $this->fill($case['body']) : null;
-        $headers = ($case['auth'] ?? true) ? $this->cases->authHeaders() : [];
+        [$headers, $sentBody] = $this->credentials($case['auth'] ?? true, $body);
 
-        [$status, $raw] = $this->http($case['method'], $path, $query, $body, $headers);
+        [$status, $raw] = $this->http($case['method'], $path, $query, $sentBody, $headers);
         $reply = json_decode($raw);
         if ($reply === null && trim($raw) !== 'null') {
             $reply = $raw; // not JSON: compare the text
@@ -139,12 +142,28 @@ final class Recorder
         if (!\is_string($value)) {
             return $value;
         }
-        return preg_replace_callback('/\{(\w+)\}/', function (array $m) {
-            if (!isset($this->vars[$m[1]])) {
+        // A lone placeholder keeps the variable's type (e.g. v5's `schedule`
+        // is a Unix timestamp, not a string).
+        if (preg_match('/^\{(\w+)\}$/', $value, $m)) {
+            if (!\array_key_exists($m[1], $this->vars)) {
                 throw new \RuntimeException("Unknown placeholder {{$m[1]}}");
             }
             return $this->vars[$m[1]];
+        }
+        return preg_replace_callback('/\{(\w+)\}/', function (array $m) {
+            if (!\array_key_exists($m[1], $this->vars)) {
+                throw new \RuntimeException("Unknown placeholder {{$m[1]}}");
+            }
+            return (string) $this->vars[$m[1]];
         }, $value);
+    }
+
+    /** @return array{list<string>, ?array} Headers and body to send, credentials included */
+    private function credentials(bool $auth, ?array $body): array
+    {
+        if (!$auth) return [[], $body];
+        $fields = $this->cases->authBodyFields();
+        return [$this->cases->authHeaders(), $fields === [] ? $body : array_merge($fields, $body ?? [])];
     }
 
     private static function dig(mixed $value, string $dotted): mixed

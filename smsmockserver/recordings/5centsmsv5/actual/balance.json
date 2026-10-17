@@ -1,0 +1,16 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/balance"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "balance": {
+                "credits": "<int>",
+                "postpaid": false
+            },
+            "error": ""
+        }
+    }
+}

@@ -20,8 +20,8 @@ final class FiveCentSmsProfile
 
     private function __construct(
         public readonly Profile $profile,
-        /** @var list<string> Sender numbers/IDs already approved on the account (GET /senderid) */
-        public array $approvedSenders = [],
+        /** @var list<array<string,mixed>> GET /senderid items (senderid, status, and any ACMA fields) */
+        public array $senders = [],
         /** @var list<string> Opted-out numbers, international form (GET /optouts) */
         public array $optOuts = [],
     ) {}
@@ -46,7 +46,9 @@ final class FiveCentSmsProfile
      */
     public function preRegisterNumbers(array $numbers): void
     {
-        array_push($this->approvedSenders, ...$numbers);
+        foreach ($numbers as $n) {
+            $this->senders[] = ['senderid' => $n, 'status' => 'approved'];
+        }
     }
 
     /**
@@ -56,7 +58,21 @@ final class FiveCentSmsProfile
      */
     public function setSenderIds(array $ids): void
     {
-        array_push($this->approvedSenders, ...$ids);
+        foreach ($ids as $id) {
+            $this->senders[] = ['senderid' => $id, 'status' => 'approved'];
+        }
+    }
+
+    /**
+     * Full GET /senderid entries, to mirror a live account's list exactly
+     * (statuses pending/unverified/approved/acma_approved, ACMA fields).
+     * `id` and `shared` are filled in when omitted.
+     *
+     * @param list<array<string,mixed>> $items
+     */
+    public function setSenders(array $items): void
+    {
+        array_push($this->senders, ...$items);
     }
 
     /**

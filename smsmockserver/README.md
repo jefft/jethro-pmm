@@ -27,8 +27,11 @@ against any base URL and writes one pair of files per case:
 
 - `<case>.json`: the request and reply **normalised** for diffing: keys sorted,
   lists reduced to their distinct item shapes, numbers to `<int>`, volatile
-  strings to their format (`<uuid>`, `<Y-m-d H:i:s>`, `<msisdn 614…>`). Status
-  codes, booleans and literal strings (statuses, error messages) are kept.
+  strings to their format (`<uuid>`, `<24-hex>`, `<Y-m-d H:i:s>`,
+  `<msisdn 614…>`, `<next_page>`). Status codes, booleans and literal strings
+  (statuses, error messages) are kept; per-account values are tokenised
+  (`acma_additional_details` to `<text>`, an alphanumeric `senderid` to
+  `<sender-id>`).
 - `<case>.raw.json`: the reply as received, phone numbers masked.
 
 Credentials come from the environment and are never written. A message a run
@@ -48,10 +51,16 @@ provider announces API changes), review the diff, then fix the mock:
 ```bash
 MOBILEMESSAGE_USERNAME=… MOBILEMESSAGE_PASSWORD=… MOBILEMESSAGE_TEST_NUMBER=04… \
   smsmockserver/bin/record mobilemessage https://api.mobilemessage.com.au smsmockserver/recordings/mobilemessage/actual
+FIVECENTSMS_APIKEY_ID=… FIVECENTSMS_APIKEY=… FIVECENTSMS_TEST_NUMBER=04… FIVECENTSMS_TEST_SENDER=614… \
+  smsmockserver/bin/record 5centsmsv5 https://www.5centsms.com.au/api/v5 smsmockserver/recordings/5centsmsv5/actual
 jj diff smsmockserver/recordings      # what the live API changed
 ```
 
-`MOBILEMESSAGE_TEST_NUMBER` must be a number you own; it is also the sender
-unless `MOBILEMESSAGE_TEST_SENDER` names another sender on the account. Without
-`--send` nothing is delivered: the one send is scheduled a day ahead, then
-cancelled. Only MobileMessage is recorded so far.
+`*_TEST_NUMBER` must be a number you own (the only one you may test with);
+MobileMessage also uses it as the sender unless `MOBILEMESSAGE_TEST_SENDER`
+names another sender on the account. 5CentSMS takes its credentials in the
+JSON body of every request (GETs and DELETEs included), needs
+`FIVECENTSMS_TEST_SENDER` to be an approved sender, and defaults it to the
+test number in international form. Without `--send` nothing is delivered:
+the one send is scheduled a day ahead, then cancelled. Recorded so far:
+MobileMessage and 5CentSMS v5.

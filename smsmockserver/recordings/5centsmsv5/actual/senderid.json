@@ -1,0 +1,40 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/senderid"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "error": "",
+            "senderids": [
+                {
+                    "acma_additional_details": "<text>",
+                    "acma_details_id": "<24-hex>",
+                    "id": "<24-hex>",
+                    "senderid": "<sender-id>",
+                    "shared": false,
+                    "status": "acma_approved"
+                },
+                {
+                    "id": "<24-hex>",
+                    "senderid": "<msisdn 614…>",
+                    "shared": false,
+                    "status": "approved"
+                },
+                {
+                    "id": "<24-hex>",
+                    "senderid": "<msisdn 614…>",
+                    "shared": false,
+                    "status": "pending"
+                },
+                {
+                    "id": "<24-hex>",
+                    "senderid": "<msisdn 614…>",
+                    "shared": false,
+                    "status": "unverified"
+                }
+            ]
+        }
+    }
+}

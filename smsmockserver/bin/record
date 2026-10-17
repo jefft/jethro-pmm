@@ -11,6 +11,7 @@
  * Credentials come from the environment (see the provider's cases class).
  * Typical use:
  *   bin/record mobilemessage https://api.mobilemessage.com.au recordings/mobilemessage/actual
+ *   bin/record 5centsmsv5 https://www.5centsms.com.au/api/v5 recordings/5centsmsv5/actual
  *   bin/record mobilemessage http://127.0.0.1:8089/smsmockserver/tests/functional/smsmock/recording-mobilemessage recordings/mobilemessage/mockresults
  *   diff -ru --exclude='*.raw.json' recordings/mobilemessage/actual recordings/mobilemessage/mockresults
  */
@@ -19,21 +20,23 @@ declare(strict_types=1);
 
 require __DIR__ . '/../autoload.php';
 
+use SmsMockServer\Recorder\FiveCentSmsCases;
 use SmsMockServer\Recorder\MobileMessageCases;
 use SmsMockServer\Recorder\Recorder;
 
 $send = in_array('--send', $argv, true);
 $args = array_values(array_diff(array_slice($argv, 1), ['--send']));
 if (count($args) !== 3) {
-    fwrite(STDERR, "Usage: bin/record <provider> <base-url> <out-dir> [--send]\nProviders: mobilemessage\n");
+    fwrite(STDERR, "Usage: bin/record <provider> <base-url> <out-dir> [--send]\nProviders: 5centsmsv5, mobilemessage\n");
     exit(2);
 }
 [$provider, $baseUrl, $outDir] = $args;
 
 try {
     $cases = match ($provider) {
+        '5centsmsv5' => FiveCentSmsCases::fromEnv(),
         'mobilemessage' => MobileMessageCases::fromEnv(),
-        default => throw new \RuntimeException("Unknown provider '$provider' (known: mobilemessage)"),
+        default => throw new \RuntimeException("Unknown provider '$provider' (known: 5centsmsv5, mobilemessage)"),
     };
     $count = (new Recorder($cases, rtrim($baseUrl, '/'), rtrim($outDir, '/'), $send))->run();
 } catch (\RuntimeException $e) {

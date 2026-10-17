@@ -50,6 +50,11 @@ final class MobileMessageCases implements ProviderCases
         return ['Authorization: Basic ' . base64_encode($this->username . ':' . $this->password)];
     }
 
+    public function authBodyFields(): array
+    {
+        return [];
+    }
+
     public function vars(): array
     {
         return [

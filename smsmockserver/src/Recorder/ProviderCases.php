@@ -23,6 +23,14 @@ interface ProviderCases
     /** @return list<string> Header lines that authenticate a request */
     public function authHeaders(): array;
 
+    /**
+     * Credential fields some providers require in the JSON body (5CentSMS v5
+     * sends key-id/key-secret on every request, GETs and DELETEs included).
+     *
+     * @return array<string, string>
+     */
+    public function authBodyFields(): array;
+
     /** @return array<string, string> Placeholder values, e.g. the test number */
     public function vars(): array;
 

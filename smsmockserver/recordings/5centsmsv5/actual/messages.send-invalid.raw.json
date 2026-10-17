@@ -1,0 +1,17 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/sms",
+        "body": {
+            "sender": "614xxxxxxxx",
+            "message": "x",
+            "test": false
+        }
+    },
+    "response": {
+        "status": 400,
+        "body": {
+            "error": "Failed (Invalid Destination)"
+        }
+    }
+}

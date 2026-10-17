@@ -1,0 +1,64 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/senderid"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "error": "",
+            "senderids": [
+                {
+                    "senderid": "614xxxxxxxx",
+                    "status": "pending",
+                    "id": "67ff4a9ab78dd1b7590c22a4",
+                    "shared": false
+                },
+                {
+                    "senderid": "614xxxxxxxx",
+                    "status": "unverified",
+                    "id": "68004149a20dbf30e607321c",
+                    "shared": false
+                },
+                {
+                    "senderid": "614xxxxxxxx",
+                    "status": "approved",
+                    "id": "6a26c6ce62a44ac1ef060c2b",
+                    "shared": false
+                },
+                {
+                    "senderid": "614xxxxxxxx",
+                    "status": "unverified",
+                    "id": "6a26cb2d4eaa1d50e409a262",
+                    "shared": false
+                },
+                {
+                    "senderid": "CoastEC",
+                    "status": "acma_approved",
+                    "acma_details_id": "6ac5fabca6ce8cfa9e0aad63",
+                    "id": "6ac5fb44184ad2699b09e485",
+                    "shared": false,
+                    "acma_additional_details": "CoastEC = Coast Evangelical Church = https://coastec.net.au"
+                },
+                {
+                    "senderid": "614xxxxxxxx",
+                    "status": "approved",
+                    "id": "6acc1ceb15d1c4fabd0df42c",
+                    "shared": false
+                },
+                {
+                    "senderid": "614xxxxxxxx",
+                    "status": "approved",
+                    "id": "6acf08273c44a4178f03349d",
+                    "shared": false
+                },
+                {
+                    "senderid": "614xxxxxxxx",
+                    "status": "unverified",
+                    "id": "6ad168bb4fd1e7c1240bbaec",
+                    "shared": false
+                }
+            ]
+        }
+    }
+}

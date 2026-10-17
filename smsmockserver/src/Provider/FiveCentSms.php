@@ -51,6 +51,8 @@ final class FiveCentSms implements ProviderInterface
                 $this->handleGetSenderIdV5($ctx);
             case $method === 'GET' && $path === '/optouts':
                 $this->handleOptOutsV5($ctx);
+            case $method === 'DELETE' && preg_match('#^/optouts/([^/]+)$#', $path, $m):
+                $this->handleDeleteOptOutV5($ctx, $m[1]);
 
             case $method === 'POST' && $path === '/api/v1/sendSms':
                 $this->handleSend($ctx);
@@ -295,7 +297,9 @@ final class FiveCentSms implements ProviderInterface
     {
         $balance = $ctx->profileHooks?->balance ?? 5000;
         \SmsMockServer\Util::json(200, [
-            'balance' => ['credits' => $balance],
+            // Live shape (recorded 2026-10): postpaid flag beside the credits.
+            'error' => '',
+            'balance' => ['postpaid' => false, 'credits' => $balance],
         ]);
     }
 
@@ -310,6 +314,11 @@ final class FiveCentSms implements ProviderInterface
         $sender = $body['sender'] ?? '';
         $schedule = isset($body['schedule']) ? (int)$body['schedule'] : null;
 
+        // Recorded live: a request without recipients is rejected outright.
+        if (trim((string) $to) === '') {
+            \SmsMockServer\Util::json(400, ['error' => 'Failed (Invalid Destination)']);
+        }
+
         $scheduledAt = ($schedule !== null && $schedule > 0)
             ? (new \DateTimeImmutable())->setTimestamp($schedule)
             : null;
@@ -317,7 +326,8 @@ final class FiveCentSms implements ProviderInterface
         $numbers = array_filter(array_map('trim', explode(',', (string)$to)));
         $results = [];
         foreach ($numbers as $number) {
-            $remoteId = '5cv5_' . \SmsMockServer\Util::randomHex(6);
+            // Live IDs are 24 hex characters.
+            $remoteId = \SmsMockServer\Util::randomHex(12);
             $pending = new \SmsMockServer\PendingSMS();
             $pending->provider = '5centsms';
             $pending->sender = $sender;
@@ -330,9 +340,11 @@ final class FiveCentSms implements ProviderInterface
             }
 
             $createdAt = $scheduledAt ?? $ctx->now;
+            // Live stores recipient and sender in international form; lookups
+            // and history return that, while the send reply echoes the request.
             $ctx->store->insertMessage(
                 $ctx->profileName, '5centsms', $remoteId,
-                $sender, $number, $message,
+                self::international($sender), self::international($number), $message,
                 $createdAt,
                 scheduledSendAt: $scheduledAt,
                 forcedStatus: $pending->forcedStatus(),
@@ -340,16 +352,25 @@ final class FiveCentSms implements ProviderInterface
             );
 
             [$code, $text] = $this->v5StatusCode($ctx->state, $pending, $ctx->now);
-            $results[] = [
+            $results[] = array_filter([
                 'destination' => $number,
                 'id' => $remoteId,
                 'status' => $code,
                 'status_text' => $text,
                 'credits' => 1,
-            ];
+                // Recorded live: a scheduled send echoes its schedule time.
+                'schedule' => $scheduledAt?->getTimestamp(),
+            ], fn($v) => $v !== null);
         }
 
         \SmsMockServer\Util::json(200, ['error' => '', 'messages' => $results]);
+    }
+
+    /** Australian local numbers become 614…; sender IDs pass through. */
+    private static function international(string $n): string
+    {
+        $digits = preg_replace('/^\+/', '', trim($n));
+        return preg_match('/^0\d{9}$/', $digits) ? '61' . substr($digits, 1) : $digits;
     }
 
 
@@ -364,7 +385,8 @@ final class FiveCentSms implements ProviderInterface
     {
         $row = $ctx->store->getMessageByRemoteId('5centsms', $remoteId);
         if ($row === null) {
-            \SmsMockServer\Util::json(404, ['error' => 'SMS not found']);
+            // Recorded live: an unknown ID is answered with this, not a 404.
+            \SmsMockServer\Util::json(400, ['error' => 'Failed (Unauthorised)']);
         }
 
         \SmsMockServer\Util::json(200, [
@@ -376,16 +398,24 @@ final class FiveCentSms implements ProviderInterface
     // ── v5 List SMS ────────────────────────────────────────────────────
 
     /** GET /sms handler for FiveCentSmsV5Provider format.
-     *  Live shape (probed 2026-10): {count, error:"", messages:[item…],
-     *  next_page} — same item shape as GET /sms/{id}. */
+     *  Live shape (recorded 2026-10): {count, error:"", messages:[item…],
+     *  next_page:"/api/v5/sms?after=<cursor>"}, one page of 100; the cursor is
+     *  the newest-last id, and an empty `after` marks the last page. */
     private function handleListSmsV5(Ctx $ctx): void
     {
         $rows = $ctx->store->listMessagesForScope($ctx->profileName, '5centsms');
+        $after = (string) ($_GET['after'] ?? '');
+        if ($after !== '') {
+            $i = array_search($after, array_column($rows, 'remote_id'), true);
+            $rows = $i === false ? [] : array_slice($rows, $i + 1);
+        }
+        $page = array_slice($rows, 0, 100);
+        $hasMore = count($rows) > 100;
         \SmsMockServer\Util::json(200, [
-            'count' => count($rows),
+            'count' => count($page),
             'error' => '',
-            'messages' => array_map(fn(array $row) => $this->v5MessageItem($ctx, $row), $rows),
-            'next_page' => '',
+            'messages' => array_map(fn(array $row) => $this->v5MessageItem($ctx, $row), $page),
+            'next_page' => '/api/v5/sms?after=' . ($hasMore ? $page[count($page) - 1]['remote_id'] : ''),
         ]);
     }
 
@@ -401,14 +431,17 @@ final class FiveCentSms implements ProviderInterface
             \SmsMockServer\State::MSG_CANCELLED => [1007, 'Cancelled'],
             default                             => [1003, 'Failed'],
         };
-        $deliveryTs = $ctx->state->deliveryTs($status, $row['created_at'], $ctx->now);
+        $deliveryTs = $status === \SmsMockServer\State::MSG_DELIVERED
+            ? $ctx->state->deliveryTs($status, $row['created_at'], $ctx->now)
+            : null;
         return [
             'destination'        => $row['destination'],
             'sender'             => $row['sender'],
             'id'                 => $row['remote_id'],
             'status'             => $code,
             'status_text'        => $text,
-            'message_text'       => $row['body'],
+            // Recorded live: a cancelled message's text is cleared.
+            'message_text'       => $status === \SmsMockServer\State::MSG_CANCELLED ? '' : $row['body'],
             'credits'            => 1,
             'send_timestamp'     => strtotime($row['created_at']),
             'delivery_timestamp' => $deliveryTs ?? '',
@@ -419,12 +452,31 @@ final class FiveCentSms implements ProviderInterface
 
     // ── v5 Delete SMS ──────────────────────────────────────────────────
 
-    /** DELETE /sms/{id} handler for FiveCentSmsV5Provider format. */
+    /** DELETE /sms/{id} handler for FiveCentSmsV5Provider format.
+     *  Recorded live: cancelling a scheduled message answers with a string
+     *  status; cancelling it again is not an error but a DELETED stub. */
     private function handleDeleteSmsV5(Ctx $ctx, string $remoteId): void
     {
         $row = $ctx->store->getMessageByRemoteId('5centsms', $remoteId);
         if ($row === null) {
             \SmsMockServer\Util::json(404, ['error' => 'SMS not found']);
+        }
+
+        $status = $ctx->state->deriveMessage($row, $ctx->now);
+        if ($status === \SmsMockServer\State::MSG_CANCELLED) {
+            \SmsMockServer\Util::json(200, [
+                'error' => '',
+                'messages' => [
+                    'destination' => '',
+                    'id' => $remoteId,
+                    'status' => 1007,
+                    'status_text' => 'Cancelled',
+                    'message_text' => 'DELETED',
+                ],
+            ]);
+        }
+        if ($status !== \SmsMockServer\State::MSG_SCHEDULED) {
+            \SmsMockServer\Util::json(400, ['error' => 'Message not found or already delivered.']);
         }
 
         $ctx->store->markMessageCancelled((int) $row['id'], $ctx->now);
@@ -433,7 +485,7 @@ final class FiveCentSms implements ProviderInterface
             'messages' => [
                 'destination' => $row['destination'],
                 'id' => $remoteId,
-                'status' => 1007,       // CANCELLED
+                'status' => '1007',       // Recorded live: a string here, unlike the lookups.
                 'status_text' => 'Cancelled',
             ],
         ]);
@@ -500,18 +552,41 @@ final class FiveCentSms implements ProviderInterface
     private function handleGetSenderIdV5(Ctx $ctx): void
     {
         $out = [];
-        foreach (FiveCentSmsProfile::get($ctx->profileName)?->approvedSenders ?? [] as $sender) {
-            $out[$sender] = ['senderid' => $sender, 'status' => 'approved'];
+        foreach (FiveCentSmsProfile::get($ctx->profileName)?->senders ?? [] as $sender) {
+            $out[$sender['senderid']] = self::senderIdItem($sender);
         }
         $rows = $ctx->store->listRegistrationsForScope($ctx->profileName, '5centsms');
         foreach ($rows as $row) {
             if ($row['kind'] !== 'senderid') continue;
-            $out[$row['value']] ??= [
+            $out[$row['value']] ??= self::senderIdItem([
                 'senderid' => $row['value'],
                 'status' => $ctx->state->deriveApproval($row, $ctx->now),
-            ];
+            ]);
         }
-        \SmsMockServer\Util::json(200, ['senderids' => array_values($out)]);
+        \SmsMockServer\Util::json(200, ['error' => '', 'senderids' => array_values($out)]);
+    }
+
+    /** One GET /senderid item. Recorded live: items carry an id and a shared
+     *  flag; acma_approved ones also carry acma_details_id and
+     *  acma_additional_details. */
+    private static function senderIdItem(array $item): array
+    {
+        return $item + [
+            'id' => substr(md5((string) $item['senderid']), 0, 24),
+            'shared' => false,
+        ];
+    }
+
+    /** DELETE /optouts/{number}. Recorded live: 400 "Number not found" for a
+     *  number that isn't listed; the documented success reply is below. */
+    private function handleDeleteOptOutV5(Ctx $ctx, string $number): void
+    {
+        $number = self::international(urldecode($number));
+        $listed = \in_array($number, FiveCentSmsProfile::get($ctx->profileName)?->optOuts ?? [], true);
+        if (!$listed) {
+            \SmsMockServer\Util::json(400, ['error' => 'Number not found']);
+        }
+        \SmsMockServer\Util::json(200, ['error' => '', 'message' => 'Success']);
     }
 
     /** GET /optouts?after= handler, recorded live shape (see

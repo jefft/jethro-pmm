@@ -21,6 +21,12 @@ const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
 // Credentials the mock accepts, and a recipient in the same format the live
 // recording used.
 const MOCK_ENV: Record<string, Record<string, string>> = {
+  "5centsmsv5": {
+    FIVECENTSMS_APIKEY_ID: "mock",
+    FIVECENTSMS_APIKEY: "mock",
+    FIVECENTSMS_TEST_NUMBER: "0491570158",
+    FIVECENTSMS_TEST_SENDER: "61491570158",
+  },
   mobilemessage: {
     MOBILEMESSAGE_USERNAME: "mock",
     MOBILEMESSAGE_PASSWORD: "mock",

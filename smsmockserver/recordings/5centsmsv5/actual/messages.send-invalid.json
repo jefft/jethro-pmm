@@ -1,0 +1,17 @@
+{
+    "request": {
+        "body": {
+            "message": "x",
+            "sender": "<msisdn 614…>",
+            "test": false
+        },
+        "method": "POST",
+        "path": "/sms"
+    },
+    "response": {
+        "status": 400,
+        "body": {
+            "error": "Failed (Invalid Destination)"
+        }
+    }
+}
