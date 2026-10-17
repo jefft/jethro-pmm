@@ -53,6 +53,8 @@ MOBILEMESSAGE_USERNAME=… MOBILEMESSAGE_PASSWORD=… MOBILEMESSAGE_TEST_NUMBER=
   smsmockserver/bin/record mobilemessage https://api.mobilemessage.com.au smsmockserver/recordings/mobilemessage/actual
 FIVECENTSMS_APIKEY_ID=… FIVECENTSMS_APIKEY=… FIVECENTSMS_TEST_NUMBER=04… FIVECENTSMS_TEST_SENDER=614… \
   smsmockserver/bin/record 5centsmsv5 https://www.5centsms.com.au/api/v5 smsmockserver/recordings/5centsmsv5/actual
+CELLCAST_APIKEY=… CELLCAST_TEST_NUMBER=04… CELLCAST_TEST_SENDER=614… \
+  smsmockserver/bin/record cellcast https://api.cellcast.com smsmockserver/recordings/cellcast/actual
 jj diff smsmockserver/recordings      # what the live API changed
 ```
 
@@ -61,6 +63,8 @@ MobileMessage also uses it as the sender unless `MOBILEMESSAGE_TEST_SENDER`
 names another sender on the account. 5CentSMS takes its credentials in the
 JSON body of every request (GETs and DELETEs included), needs
 `FIVECENTSMS_TEST_SENDER` to be an approved sender, and defaults it to the
-test number in international form. Without `--send` nothing is delivered:
-the one send is scheduled a day ahead, then cancelled. Recorded so far:
-MobileMessage and 5CentSMS v5.
+test number in international form. Cellcast authenticates with a Bearer token
+(`CELLCAST_APIKEY`) and needs `CELLCAST_TEST_SENDER` to be an active custom
+number; both default the sender to the test number in international form.
+Without `--send` nothing is delivered: the one send is scheduled a day ahead,
+then cancelled. Recorded so far: Cellcast, MobileMessage and 5CentSMS v5.

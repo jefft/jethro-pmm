@@ -1,0 +1,33 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/api/v1/apiClient/getOptout",
+        "query": {
+            "page": "1",
+            "size": "100"
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "meta": {
+                "code": 200,
+                "status": "SUCCESS"
+            },
+            "message": "You have 0 optout contact(s)",
+            "data": {
+                "items": [],
+                "total": 0,
+                "limit": 100,
+                "current": 1,
+                "totalPages": 1,
+                "pagingCounter": 1,
+                "hasPrevPage": false,
+                "hasNextPage": false,
+                "prevPage": null,
+                "nextPage": null
+            },
+            "error": {}
+        }
+    }
+}

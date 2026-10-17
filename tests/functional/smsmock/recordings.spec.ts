@@ -21,6 +21,11 @@ const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
 // Credentials the mock accepts, and a recipient in the same format the live
 // recording used.
 const MOCK_ENV: Record<string, Record<string, string>> = {
+  cellcast: {
+    CELLCAST_APIKEY: "mock",
+    CELLCAST_TEST_NUMBER: "0491570158",
+    CELLCAST_TEST_SENDER: "61491570158",
+  },
   "5centsmsv5": {
     FIVECENTSMS_APIKEY_ID: "mock",
     FIVECENTSMS_APIKEY: "mock",

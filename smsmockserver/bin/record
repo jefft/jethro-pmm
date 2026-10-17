@@ -20,6 +20,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../autoload.php';
 
+use SmsMockServer\Recorder\CellcastCases;
 use SmsMockServer\Recorder\FiveCentSmsCases;
 use SmsMockServer\Recorder\MobileMessageCases;
 use SmsMockServer\Recorder\Recorder;
@@ -27,7 +28,7 @@ use SmsMockServer\Recorder\Recorder;
 $send = in_array('--send', $argv, true);
 $args = array_values(array_diff(array_slice($argv, 1), ['--send']));
 if (count($args) !== 3) {
-    fwrite(STDERR, "Usage: bin/record <provider> <base-url> <out-dir> [--send]\nProviders: 5centsmsv5, mobilemessage\n");
+    fwrite(STDERR, "Usage: bin/record <provider> <base-url> <out-dir> [--send]\nProviders: 5centsmsv5, cellcast, mobilemessage\n");
     exit(2);
 }
 [$provider, $baseUrl, $outDir] = $args;
@@ -35,8 +36,9 @@ if (count($args) !== 3) {
 try {
     $cases = match ($provider) {
         '5centsmsv5' => FiveCentSmsCases::fromEnv(),
+        'cellcast' => CellcastCases::fromEnv(),
         'mobilemessage' => MobileMessageCases::fromEnv(),
-        default => throw new \RuntimeException("Unknown provider '$provider' (known: 5centsmsv5, mobilemessage)"),
+        default => throw new \RuntimeException("Unknown provider '$provider' (known: 5centsmsv5, cellcast, mobilemessage)"),
     };
     $count = (new Recorder($cases, rtrim($baseUrl, '/'), rtrim($outDir, '/'), $send))->run();
 } catch (\RuntimeException $e) {

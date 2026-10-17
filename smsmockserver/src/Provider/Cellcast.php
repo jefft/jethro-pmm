@@ -98,9 +98,19 @@ final class Cellcast implements ProviderInterface
         $sender = $body['sender'] ?? '';
         $scheduleAt = Util::parseScheduleAt($body['scheduleAt'] ?? null);
 
+        // Recorded live: one validation error covers a missing message or bad contacts.
+        if (trim((string) $message) === '' || !\is_array($contacts) || $contacts === []) {
+            Util::json(400, [
+                'code' => 400,
+                'message' => '"message" is required and Contacts must either start with 61 or +61 and be exactly 11 digits long (e.g., 614xxxxxxxx or +614xxxxxxxx), or be 9 digits without the area code (e.g., 4xxxxxxxx)',
+                'stack' => 'APIError: validation failed',
+            ]);
+        }
+
         $queueResponse = [];
         foreach ($contacts as $dest) {
-            $remoteId = 'cc_' . Util::randomHex(6);
+            // Live IDs are 24 hex characters.
+            $remoteId = Util::randomHex(12);
             $pending = new PendingSMS();
             $pending->sender = $sender;
             $pending->destination = (string) $dest;
@@ -119,23 +129,28 @@ final class Cellcast implements ProviderInterface
                 $pending->forcedStatus(), $pending->forcedReason(),
             );
 
-            $status = $scheduleAt !== null ? 'queued' : 'sent';
             $queueResponse[] = [
-                'Number' => $dest,
+                // Recorded live: Number as sent, Contact in national form.
+                'Contact' => self::national((string) $dest),
                 'MessageId' => $remoteId,
-                'jobInfo' => ['data' => ['messageData' => ['status' => $status]]],
+                'Number' => (string) $dest,
+                // The provider reads jobInfo.data.messageData.status to decide
+                // SCHEDULED (queued/pending) vs SENT.
+                'jobInfo' => ['data' => ['messageData' => [
+                    'status' => $scheduleAt !== null ? 'queued' : 'sent',
+                ]]],
             ];
         }
 
-        $resp = [
-            'status' => true,
-            'message' => 'SMS Sent Successfully',
-            'data' => ['queueResponse' => $queueResponse],
-        ];
-        if ($scheduleAt !== null) {
-            $resp['data']['scheduleAt'] = $scheduleAt->format('Y-m-d H:i:s');
-        }
-        Util::json(200, $resp);
+        Util::json(200, self::appEnvelope('Request is being processed', [
+            'queueResponse' => $queueResponse,
+            'message' => 'success register all valid contacts to queue',
+            'invalidContacts' => [],
+            'unsubscribeContacts' => [],
+            'totalValidContact' => \count($queueResponse),
+            'totalInvalidContact' => 0,
+            'totalUnsubscribeContact' => 0,
+        ]));
     }
 
     // ── Cancel ─────────────────────────────────────────────────────────
@@ -146,19 +161,9 @@ final class Cellcast implements ProviderInterface
         $messageId = $body['messageId'] ?? '';
 
         $row = $ctx->store->getMessageByRemoteId('cellcast', $messageId);
-        if ($row === null) {
-            Util::json(200, [
-                'status' => false, 'message' => 'message not found',
-                'data' => [], 'error' => ['error' => 'message not found'],
-            ]);
-        }
-
-        $status = $ctx->state->deriveMessage($row, $ctx->now);
-        if ($status === State::MSG_CANCELLED) {
-            Util::json(200, [
-                'status' => false, 'message' => 'message not found',
-                'data' => [], 'error' => ['error' => 'message not found'],
-            ]);
+        // Recorded live: unknown or already-cancelled ids are a 404 status:false.
+        if ($row === null || $ctx->state->deriveMessage($row, $ctx->now) === State::MSG_CANCELLED) {
+            Util::json(404, self::appEnvelope('message not found', [], status: false, error: ['error' => 'message not found']));
         }
 
         if ($ctx->profileHooks?->onCancelHook !== null) {
@@ -166,24 +171,21 @@ final class Cellcast implements ProviderInterface
         }
 
         $ctx->store->markMessageCancelled((int) $row['id'], $ctx->now);
-        Util::json(200, [
-            'status' => true, 'message' => 'Job removed successfully',
-            'data' => ['message' => 'Job removed successfully'],
-        ]);
+        Util::json(200, self::appEnvelope('Job removed successfully', ['message' => 'Job removed successfully']));
     }
 
     // ── Account / Balance ──────────────────────────────────────────────
 
     private function handleAccount(Ctx $ctx): void
     {
+        // Recorded live: a fractional sms_balance, and a meta envelope.
         $balance = $ctx->profileHooks?->balance ?? 12345;
-        // Real shape (probed 2026-10): meta.status upper-case, account fields beside the balance.
-        Util::json(200, [
-            'meta' => ['code' => 200, 'status' => 'SUCCESS'],
-            'message' => 'Account details',
-            'data' => ['account_name' => 'Mock Account', 'account_email' => 'mock@example.com', 'sms_balance' => $balance, 'mms_balance' => 0],
-            'error' => [],
-        ]);
+        Util::json(200, self::metaEnvelope("Here's your account", [
+            'account_name' => 'Mock Account',
+            'account_email' => 'mock@example.com',
+            'sms_balance' => $balance,
+            'mms_balance' => 20,
+        ]));
     }
 
     // ── GetOptout ──────────────────────────────────────────────────────
@@ -241,7 +243,7 @@ final class Cellcast implements ProviderInterface
     {
         $cp = CellcastProfile::get($ctx->profileName);
         if ($cp !== null && $cp->senders !== []) {
-            Util::json(200, self::envelope('Custom numbers listed', array_map(self::customNumberItem(...), $cp->senders)));
+            Util::json(200, self::appEnvelope('Custom number listed succesfully', array_map(self::customNumberItem(...), $cp->senders)));
         }
 
         // Dynamic mode: defaults + the profile's pre-registered numbers + approved registrations
@@ -278,7 +280,7 @@ final class Cellcast implements ProviderInterface
             $out[] = ['number' => $row['value'], 'name' => $row['display_name']];
         }
 
-        Util::json(200, self::envelope('Custom numbers listed', array_map(self::customNumberItem(...), $out)));
+        Util::json(200, self::appEnvelope('Custom number listed succesfully', array_map(self::customNumberItem(...), $out)));
     }
 
     // ── Add CustomNumber ───────────────────────────────────────────────
@@ -451,7 +453,7 @@ final class Cellcast implements ProviderInterface
      */
     private function handleGetBusiness(Ctx $ctx): void
     {
-        Util::json(200, ['status' => true, 'message' => 'Business listed succesfully', 'data' => $this->businessNames($ctx), 'error' => []]);
+        Util::json(200, self::appEnvelope('Business listed succesfully', array_map(self::businessItem(...), $this->businessNames($ctx))));
     }
 
     /**
@@ -491,25 +493,14 @@ final class Cellcast implements ProviderInterface
     {
         $row = $ctx->store->getMessageByRemoteId('cellcast', $messageId);
         if ($row === null) {
-            Util::json(500, [
-                'status' => false,
-                'message_type' => 'error',
-                'message' => 'Something went wrong!',
-                'data' => [],
-                'error' => ['message' => 'Cast to ObjectId failed for value "' . $messageId . '" at path "_id"'],
-            ]);
+            // Recorded live: an unknown id is a 404 status:false.
+            Util::json(404, self::appEnvelope('Message not found', [], status: false, error: ['message' => 'Message not found']));
         }
-
-        $item = $this->reportItem($ctx, $row);
-        $item['send_time'] = $item['scheduleAt'] ?? $item['createdAt'];
-        $item['updatedAt'] = $item['send_time'];
-        unset($item['scheduleAt']);
-        Util::json(200, self::envelope('Success', $item));
+        Util::json(200, self::appEnvelope('Success', self::lookupItem($ctx, $row)));
     }
 
     /**
-     * GET /api/v2/report/message. Real shape (probed 2026-10; see
-     * jethro-sms/docs/reference/_cellcast/report/message/GET.md): the standard
+     * GET /api/v2/report/message. Real shape (recorded 2026-10): the standard
      * envelope with a paginated `data: {items, total, limit, current,
      * totalPages, …}`.
      */
@@ -521,9 +512,9 @@ final class Cellcast implements ProviderInterface
 
         $total = count($rows);
         $totalPages = max(1, (int) ceil($total / $limit));
-        $items = array_map(fn(array $row) => $this->reportItem($ctx, $row), array_slice($rows, ($page - 1) * $limit, $limit));
+        $items = array_map(fn(array $row) => self::listItem($ctx, $row), array_slice($rows, ($page - 1) * $limit, $limit));
 
-        Util::json(200, self::envelope('Success', [
+        Util::json(200, self::appEnvelope('Success', [
             'items'         => $items,
             'total'         => $total,
             'limit'         => $limit,
@@ -537,27 +528,196 @@ final class Cellcast implements ProviderInterface
         ]));
     }
 
-    /** One message as the report endpoints list it. @param array<string, mixed> $row @return array<string, mixed> */
-    private function reportItem(Ctx $ctx, array $row): array
+    /** One message as GET /api/v2/report/message/{id} returns it (recorded
+     *  2026-10): data.send_time and data.updatedAt, plus scheduleAt. */
+    private static function lookupItem(Ctx $ctx, array $row): array
     {
-        $scheduleAt = $row['scheduled_send_at'] !== null
-            ? (new \DateTimeImmutable($row['scheduled_send_at']))->format(\DateTimeInterface::RFC3339)
-            : null;
+        $status = $ctx->state->deriveMessage($row, $ctx->now);
+        $sendTime = self::isoMs($row['scheduled_send_at'] ?? $row['created_at']);
         return [
-            '_id'        => $row['remote_id'],
-            'status'     => self::cellcastStatusString($ctx->state->deriveMessage($row, $ctx->now)),
-            'message'    => $row['body'],
-            'sender'     => $row['sender'],
-            'receiver'   => $row['destination'],
-            'createdAt'  => (new \DateTimeImmutable($row['created_at']))->format(\DateTimeInterface::RFC3339),
-            'scheduleAt' => $scheduleAt,
+            '_id' => $row['remote_id'],
+            'createdAt' => self::isoMs($row['created_at']),
+            'creditAmount' => 1.3,
+            'message' => $row['body'],
+            'receiver' => self::national($row['destination']),
+            'replyMessage' => null,
+            'replyStop' => false,
+            'scheduleAt' => $row['scheduled_send_at'] !== null ? $sendTime : null,
+            'send_time' => $sendTime,
+            'sender' => $row['sender'],
+            'smsDetail' => [
+                'deductibleCredit' => 1.3,
+                'messagelength' => \strlen($row['body']),
+                'smscount' => 1,
+            ],
+            'status' => self::cellcastStatusString($status),
+            'updatedAt' => $sendTime,
         ];
     }
 
-    /** A custom (sender) number as GET /api/v1/customNumber lists it. @param array{number:string,name:string} $n @return array<string, mixed> */
+    /** One message as GET /api/v2/report/message lists it (recorded 2026-10). */
+    private static function listItem(Ctx $ctx, array $row): array
+    {
+        $status = $ctx->state->deriveMessage($row, $ctx->now);
+        return [
+            '_id' => $row['remote_id'],
+            'campaign_type' => 'notification',
+            'createdAt' => self::isoMs($row['created_at']),
+            'creditAmount' => 1.3,
+            'gateway_count' => 1,
+            'message' => $row['body'],
+            'receiver' => self::national($row['destination']),
+            'replyMessage' => null,
+            'replyStop' => false,
+            'request_from' => 'API',
+            'request_name' => 'mock',
+            'scheduleAt' => $row['scheduled_send_at'] !== null ? self::isoMs($row['scheduled_send_at']) : null,
+            'sender' => $row['sender'],
+            'smsDetail' => [
+                '_id' => substr(md5($row['remote_id']), 0, 24),
+                'costpersms' => 0.047,
+                'deductibleCredit' => 1.3,
+                'messagelength' => \strlen($row['body']),
+                'smscount' => 1,
+            ],
+            'status' => self::cellcastStatusString($status),
+        ];
+    }
+
+    /**
+     * A business name as GET /api/v1/business lists it. Recorded live
+     * 2026-10: the full registration document (ACMA fields, company and
+     * contact details, status history).
+     *
+     * @param array{businessname:string,status:string,acmaStatus:string,isDeleted:bool} $b
+     * @return array<string, mixed>
+     */
+    private static function businessItem(array $b): array
+    {
+        $at = '2026-01-01T00:00:00.000Z';
+        $id = substr(md5('business:' . $b['businessname']), 0, 24);
+        $user = substr(md5('business-user'), 0, 24);
+        return [
+            '__v' => 0,
+            '_id' => $id,
+            'acmaApprovalEmailSentAt' => $at,
+            'acmaChatbotId' => '00000000-0000-4000-8000-000000000000',
+            'acmaReason' => '',
+            'acmaReminderEmailSentAt' => $at,
+            'acmaStatus' => $b['acmaStatus'],
+            'acmaSubmissionEmailSentAt' => $at,
+            'allocatedUsers' => [],
+            'approvedBy' => $user,
+            'businessname' => $b['businessname'],
+            'companyInformation' => [
+                'abn' => '00000000000',
+                'address' => '1 Mock Street',
+                'name' => 'Mock Company',
+                'website' => 'https://example.com/',
+            ],
+            'createdAt' => $at,
+            'createdBy' => $user,
+            'descriptionInternal' => 'Mock internal description',
+            'isDefault' => false,
+            'isDeleted' => $b['isDeleted'],
+            'lastStatusWebhookAt' => $at,
+            'ownership' => true,
+            'purposeOfUse' => 'Service SMS',
+            'registrationStatus' => 'ACTIVE',
+            'registrationStatusLabel' => 'Active',
+            'requestedAt' => $at,
+            'requestorContact' => [
+                'email' => 'mock@example.com',
+                'firstName' => 'Mock',
+                'lastName' => 'User',
+                'phoneNumber' => '0400000001',
+                'position' => 'Ministry Worker',
+            ],
+            'status' => $b['status'],
+            'statusHistory' => [
+                ['_id' => substr(md5('history-1'), 0, 24), 'changedAt' => $at, 'changedBy' => $user, 'note' => '', 'reason' => '', 'source' => 'admin', 'status' => 'PENDING_ACMA_APPROVAL'],
+                ['_id' => substr(md5('history-2'), 0, 24), 'changedAt' => $at, 'changedBy' => $user, 'source' => 'customer', 'status' => 'PENDING_CELLCAST_REVIEW'],
+                ['changedAt' => $at, 'reason' => '', 'source' => 'webhook', 'status' => 'ACMA_APPROVED'],
+                ['changedAt' => $at, 'reason' => '', 'source' => 'webhook', 'status' => 'PENDING_ACMA_APPROVAL'],
+                ['changedAt' => $at, 'reason' => 'Customer has not taken any actions', 'source' => 'webhook', 'status' => 'PENDING_ACMA_APPROVAL'],
+                ['changedAt' => $at, 'reason' => 'Customer has verified Sender ID, but it was sent for review', 'source' => 'webhook', 'status' => 'PENDING_ACMA_APPROVAL'],
+            ],
+            'statusNotes' => '',
+            'submittedToAcmaAt' => $at,
+            'updatedAt' => $at,
+            'user' => $user,
+        ];
+    }
+
+    /** A custom (sender) number as GET /api/v1/customNumber lists it. Recorded
+     *  live: a full Mongo document, not just the number and label.
+     *  @param array{number:string,name:string} $n @return array<string, mixed> */
     private static function customNumberItem(array $n): array
     {
-        return ['_id' => 'cn_' . substr(sha1($n['number']), 0, 12), 'status' => 'active', 'deleted' => false, 'name' => $n['name'], 'number' => $n['number']];
+        $id = substr(md5($n['number']), 0, 24);
+        return [
+            '__v' => 0,
+            '_id' => $id,
+            'allocatedUsers' => [],
+            'approvedAt' => '2026-01-01T00:00:00.000Z',
+            'createdAt' => '2026-01-01T00:00:00.000Z',
+            'createdBy' => $id,
+            'deleted' => false,
+            'isDefault' => false,
+            'name' => $n['name'],
+            'number' => $n['number'],
+            'status' => 'active',
+            'updatedAt' => '2026-01-01T00:00:00.000Z',
+            'user' => $id,
+        ];
+    }
+
+    /** The {meta, message, data, error} envelope of the account/opt-out endpoints. @return array<string, mixed> */
+    private static function metaEnvelope(string $message, mixed $data): array
+    {
+        return ['meta' => ['code' => 200, 'status' => 'SUCCESS'], 'message' => $message, 'data' => $data, 'error' => []];
+    }
+
+    /**
+     * The app envelope most Cellcast v1/v2 endpoints wrap their data in.
+     * Recorded live 2026-10.
+     *
+     * @return array<string, mixed>
+     */
+    private static function appEnvelope(string $message, mixed $data, bool $status = true, array $error = []): array
+    {
+        return [
+            'app_type' => 'web',
+            'app_version' => '1.0',
+            'maintainence' => 0,
+            'new_version' => 0,
+            'force_update' => 0,
+            'invalid_token' => 0,
+            'refresh_token' => '',
+            'show_message' => 0,
+            'is_enc' => false,
+            'status' => $status,
+            'message' => $message,
+            'message_type' => 'toast',
+            'data' => $data,
+            'error' => $error,
+        ];
+    }
+
+    /** National form Cellcast reports: 614xxxxxxxx or 04xxxxxxxx → 4xxxxxxxx. */
+    private static function national(string $number): string
+    {
+        $digits = preg_replace('/^\+/', '', trim($number));
+        $digits = preg_replace('/^61(?=4\d{8}$)/', '', $digits);
+        return preg_replace('/^0(?=4\d{8}$)/', '', $digits);
+    }
+
+    /** A timestamp as the live API writes it (millisecond ISO). */
+    private static function isoMs(string $timestamp): string
+    {
+        return (new \DateTimeImmutable($timestamp, new \DateTimeZone(date_default_timezone_get())))
+            ->setTimezone(new \DateTimeZone('UTC'))
+            ->format('Y-m-d\TH:i:s.v\Z');
     }
 
     /** The envelope most Cellcast v1/v2 endpoints wrap their data in. @return array<string, mixed> */

@@ -11,14 +11,18 @@ namespace SmsMockServer\Recorder;
  * - numbers become "<int>" / "<float>" (balances, counts and costs differ
  *   between accounts); booleans and null stay literal;
  * - strings keep their value unless they are volatile, in which case only
- *   their format is kept: "<uuid>", "<24-hex>", "<Y-m-d H:i:s>", "<msisdn
- *   614…>", "<next_page>", … Literal strings (statuses, error messages)
- *   must match exactly.
- * - two keys hold per-account values rather than API contract:
- *   `acma_additional_details` ("<text>") and an alphanumeric `senderid`
- *   ("<sender-id>"); phone-number values are tokenised by format anyway.
+ *   their format is kept: "<uuid>", "<24-hex>", "<iso-ms>", "<Y-m-d H:i:s>",
+ *   "<msisdn 614…>", "<next_page>", "<email>", "<url>", … Literal strings
+ *   (statuses, error messages) must match exactly.
+ * - keys in TEXT_KEYS hold per-account values rather than API contract and
+ *   normalise to "<text>"; an alphanumeric `senderid` becomes "<sender-id>".
+ * - empty objects become [] (clients decode associatively, where it is the
+ *   same empty array).
+ * - Cellcast's queue `jobInfo` keeps only data.messageData.status, the one
+ *   part the client uses; the rest is vendor bookkeeping.
  *
- * Input is json_decode()d without $associative, so {} and [] stay distinct.
+ * Input is json_decode()d without $associative, so a non-empty {} stays an
+ * object; empty ones become [] as noted above.
  */
 final class Normaliser
 {
@@ -26,23 +30,45 @@ final class Normaliser
     private const FORMATS = [
         '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i' => '<uuid>',
         '/^[0-9a-f]{24}$/i' => '<24-hex>',
+        '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/' => '<iso-ms>',
         '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/' => '<Y-m-d H:i:s>',
         '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/' => '<Y-m-d\TH:i:s\Z>',
         '/^\d{4}-\d{2}-\d{2}$/' => '<Y-m-d>',
         '/^614\d{8}$/' => '<msisdn 614…>',
         '/^04\d{8}$/' => '<msisdn 04…>',
+        '/^4\d{8}$/' => '<msisdn 4…>',
+        '/^[^@\s]+@[^@\s]+\.[^@\s]+$/' => '<email>',
+        '/^https?:\/\//' => '<url>',
         '#^/?api/v5/[a-z]+/?\?after=[0-9a-f]*$#i' => '<next_page>',
+    ];
+
+    /**
+     * Keys whose string values are account/people data rather than API
+     * contract, so only their presence and type are compared.
+     */
+    public const TEXT_KEYS = [
+        'account_name', 'account_email', 'businessname', 'descriptionInternal',
+        'purposeOfUse', 'name', 'firstName', 'lastName', 'email', 'abn',
+        'website', 'address', 'acma_additional_details', 'request_name', 'stack',
     ];
 
     public static function normalise(mixed $value, ?string $key = null): mixed
     {
         if ($value instanceof \stdClass) {
+            // Cellcast's queue bookkeeping: only messageData.status is contract
+            // (it decides SCHEDULED vs SENT); the rest is vendor internals.
+            if ($key === 'jobInfo') {
+                return (object) ['data' => (object) ['messageData' => (object) [
+                    'status' => self::normalise($value->data->messageData->status ?? null, 'status'),
+                ]]];
+            }
             $out = [];
             foreach (get_object_vars($value) as $itemKey => $item) {
                 $out[$itemKey] = self::normalise($item, $itemKey);
             }
             ksort($out, SORT_STRING);
-            return (object) $out;
+            // Clients decode associatively, where {} and [] are the same empty array.
+            return $out === [] ? [] : (object) $out;
         }
         if (\is_array($value)) {
             $items = [];
@@ -63,7 +89,7 @@ final class Normaliser
             if (preg_match('#^(/.*/)([0-9a-f]{24}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$#i', $value, $m)) {
                 return $m[1] . (\strlen($m[2]) === 24 ? '<24-hex>' : '<uuid>');
             }
-            if ($key === 'acma_additional_details') return '<text>';
+            if (\in_array($key, self::TEXT_KEYS, true)) return '<text>';
             if ($key === 'senderid') return '<sender-id>';
         }
         return $value;

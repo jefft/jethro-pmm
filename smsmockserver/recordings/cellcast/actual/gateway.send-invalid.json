@@ -1,0 +1,19 @@
+{
+    "request": {
+        "body": {
+            "contacts": [],
+            "countryCode": "<int>",
+            "sender": "<msisdn 614…>"
+        },
+        "method": "POST",
+        "path": "/api/v1/gateway"
+    },
+    "response": {
+        "status": 400,
+        "body": {
+            "code": "<int>",
+            "message": "\"message\" is required and Contacts must either start with 61 or +61 and be exactly 11 digits long (e.g., 614xxxxxxxx or +614xxxxxxxx), or be 9 digits without the area code (e.g., 4xxxxxxxx)",
+            "stack": "<text>"
+        }
+    }
+}

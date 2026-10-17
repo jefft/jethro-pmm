@@ -1,0 +1,41 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/api/v1/customNumber"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "app_type": "web",
+            "app_version": "1.0",
+            "data": [
+                {
+                    "__v": "<int>",
+                    "_id": "<24-hex>",
+                    "allocatedUsers": [],
+                    "approvedAt": "<iso-ms>",
+                    "createdAt": "<iso-ms>",
+                    "createdBy": "<24-hex>",
+                    "deleted": false,
+                    "isDefault": false,
+                    "name": "<text>",
+                    "number": "<msisdn 614…>",
+                    "status": "active",
+                    "updatedAt": "<iso-ms>",
+                    "user": "<24-hex>"
+                }
+            ],
+            "error": [],
+            "force_update": "<int>",
+            "invalid_token": "<int>",
+            "is_enc": false,
+            "maintainence": "<int>",
+            "message": "Custom number listed succesfully",
+            "message_type": "toast",
+            "new_version": "<int>",
+            "refresh_token": "",
+            "show_message": "<int>",
+            "status": true
+        }
+    }
+}

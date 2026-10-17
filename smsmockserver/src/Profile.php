@@ -73,8 +73,8 @@ class Profile
     public string $provider = '';
     public string $name = '';
 
-    /** @var int|null Override balance returned by account endpoints. */
-    public ?int $balance = null;
+    /** @var float|int|null Override balance returned by account endpoints. */
+    public float|int|null $balance = null;
 
     /** @var \DateInterval|int|null Override delivery delay. */
     public mixed $deliveryDelay = null;

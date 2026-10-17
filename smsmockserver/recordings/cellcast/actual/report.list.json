@@ -1,0 +1,66 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/api/v2/report/message",
+        "query": {
+            "campType": "sms",
+            "fromDate": "<Y-m-d>",
+            "limit": "100",
+            "page": "1"
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "app_type": "web",
+            "app_version": "1.0",
+            "data": {
+                "current": "<int>",
+                "hasNextPage": false,
+                "hasPrevPage": false,
+                "items": [
+                    {
+                        "_id": "<24-hex>",
+                        "campaign_type": "notification",
+                        "createdAt": "<iso-ms>",
+                        "creditAmount": "<float>",
+                        "gateway_count": "<int>",
+                        "message": "Jethro smsmockserver recording: scheduled, then cancelled",
+                        "receiver": "<msisdn 4…>",
+                        "replyMessage": null,
+                        "replyStop": false,
+                        "request_from": "API",
+                        "request_name": "<text>",
+                        "scheduleAt": "<iso-ms>",
+                        "sender": "<msisdn 614…>",
+                        "smsDetail": {
+                            "_id": "<24-hex>",
+                            "costpersms": "<float>",
+                            "deductibleCredit": "<float>",
+                            "messagelength": "<int>",
+                            "smscount": "<int>"
+                        },
+                        "status": "scheduled"
+                    }
+                ],
+                "limit": "<int>",
+                "nextPage": null,
+                "pagingCounter": "<int>",
+                "prevPage": null,
+                "total": "<int>",
+                "totalPages": "<int>"
+            },
+            "error": [],
+            "force_update": "<int>",
+            "invalid_token": "<int>",
+            "is_enc": false,
+            "maintainence": "<int>",
+            "message": "Success",
+            "message_type": "toast",
+            "new_version": "<int>",
+            "refresh_token": "",
+            "show_message": "<int>",
+            "status": true
+        }
+    }
+}

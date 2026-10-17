@@ -1,0 +1,41 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/api/v1/customNumber"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "app_type": "web",
+            "app_version": "1.0",
+            "maintainence": 0,
+            "new_version": 0,
+            "force_update": 0,
+            "invalid_token": 0,
+            "refresh_token": "",
+            "show_message": 0,
+            "is_enc": false,
+            "status": true,
+            "message": "Custom number listed succesfully",
+            "message_type": "toast",
+            "data": [
+                {
+                    "_id": "6a26b5742cdc1e58929bbdcd",
+                    "status": "active",
+                    "isDefault": false,
+                    "deleted": false,
+                    "allocatedUsers": [],
+                    "name": "<redacted>",
+                    "number": "614xxxxxxxx",
+                    "user": "6a1d0cc1d792c9604d00c4f1",
+                    "approvedAt": "2026-06-08T12:28:36.690Z",
+                    "createdBy": "6a1d0cc1d792c9604d00c4f1",
+                    "createdAt": "2026-06-08T12:28:36.691Z",
+                    "updatedAt": "2026-06-08T12:28:36.691Z",
+                    "__v": 0
+                }
+            ],
+            "error": {}
+        }
+    }
+}

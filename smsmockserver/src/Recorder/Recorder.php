@@ -6,7 +6,9 @@ namespace SmsMockServer\Recorder;
  * Runs a provider's cases against a base URL — the live API or this mock —
  * and writes one pair of files per case:
  *   <name>.json      request and reply normalised (Normaliser), for diffing
- *   <name>.raw.json  the reply as received, phone numbers masked
+ *   <name>.raw.json  the reply as received, phone numbers masked and
+ *                    account/people values (names, emails, business details)
+ *                    blanked, as are vendor-internal queue blobs
  * Credentials are never written. Messages a run scheduled are cancelled
  * when it ends, even if a case fails.
  */
@@ -84,10 +86,11 @@ final class Recorder
         }
         if (isset($case['onlyRunMessages']) && $reply instanceof \stdClass) {
             [$listPath, $idKey] = $case['onlyRunMessages'];
-            $reply->$listPath = array_values(array_filter(
-                (array) ($reply->$listPath ?? []),
+            $filtered = array_values(array_filter(
+                (array) self::dig($reply, $listPath),
                 fn($item) => \in_array((string) ($item->$idKey ?? ''), $this->runIds, true),
             ));
+            self::setPath($reply, $listPath, $filtered);
         }
 
         $request = array_filter([
@@ -178,6 +181,26 @@ final class Recorder
         return $value;
     }
 
+    /** Assign a dotted path in a decoded JSON document. */
+    private static function setPath(mixed &$doc, string $dotted, mixed $value): void
+    {
+        $keys = explode('.', $dotted);
+        $last = array_pop($keys);
+        $node = &$doc;
+        foreach ($keys as $key) {
+            if ($node instanceof \stdClass) {
+                $node = &$node->$key;
+            } else {
+                $node = &$node[(int) $key];
+            }
+        }
+        if ($node instanceof \stdClass) {
+            $node->$last = $value;
+        } else {
+            $node[(int) $last] = $value;
+        }
+    }
+
     private function clearOutDir(): void
     {
         if (is_dir($this->outDir)) {
@@ -194,11 +217,37 @@ final class Recorder
         if (!is_dir(\dirname($file))) {
             mkdir(\dirname($file), 0777, true);
         }
+        if ($maskNumbers) {
+            $document = self::redact($document);
+        }
         $json = json_encode($document, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         if ($maskNumbers) {
-            // Australian mobiles, local or international: keep the prefix only.
-            $json = preg_replace('/(?<!\d)(614|04)\d{8}(?!\d)/', '$1xxxxxxxx', $json);
+            // Australian mobiles, local, international or national: keep the prefix only.
+            $json = preg_replace('/(?<!\d)(614|04|4)\d{8}(?!\d)/', '$1xxxxxxxx', $json);
         }
         file_put_contents($file, $json . "\n");
+    }
+
+    /** Blank the account/people values the normalised files tokenise, so a
+     *  committed .raw.json carries no names, emails or business details. */
+    private static function redact(mixed $value): mixed
+    {
+        if ($value instanceof \stdClass) {
+            $out = new \stdClass();
+            foreach (get_object_vars($value) as $key => $item) {
+                if ($key === 'jobInfo') {
+                    $out->$key = '<redacted>';
+                } else {
+                    $out->$key = \in_array($key, Normaliser::TEXT_KEYS, true) && \is_scalar($item)
+                        ? '<redacted>'
+                        : self::redact($item);
+                }
+            }
+            return $out;
+        }
+        if (\is_array($value)) {
+            return array_map(self::redact(...), $value);
+        }
+        return $value;
     }
 }

@@ -1,0 +1,110 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/api/v1/business"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "app_type": "web",
+            "app_version": "1.0",
+            "data": [
+                {
+                    "__v": "<int>",
+                    "_id": "<24-hex>",
+                    "acmaApprovalEmailSentAt": "<iso-ms>",
+                    "acmaChatbotId": "<uuid>",
+                    "acmaReason": "",
+                    "acmaReminderEmailSentAt": "<iso-ms>",
+                    "acmaStatus": "ACMA_APPROVED",
+                    "acmaSubmissionEmailSentAt": "<iso-ms>",
+                    "allocatedUsers": [],
+                    "approvedBy": "<24-hex>",
+                    "businessname": "<text>",
+                    "companyInformation": {
+                        "abn": "<text>",
+                        "address": "<text>",
+                        "name": "<text>",
+                        "website": "<url>"
+                    },
+                    "createdAt": "<iso-ms>",
+                    "createdBy": "<24-hex>",
+                    "descriptionInternal": "<text>",
+                    "isDefault": false,
+                    "isDeleted": false,
+                    "lastStatusWebhookAt": "<iso-ms>",
+                    "ownership": true,
+                    "purposeOfUse": "<text>",
+                    "registrationStatus": "ACTIVE",
+                    "registrationStatusLabel": "Active",
+                    "requestedAt": "<iso-ms>",
+                    "requestorContact": {
+                        "email": "<email>",
+                        "firstName": "<text>",
+                        "lastName": "<text>",
+                        "phoneNumber": "<msisdn 04…>",
+                        "position": "Ministry Worker"
+                    },
+                    "status": "ACTIVE",
+                    "statusHistory": [
+                        {
+                            "_id": "<24-hex>",
+                            "changedAt": "<iso-ms>",
+                            "changedBy": "<24-hex>",
+                            "note": "",
+                            "reason": "",
+                            "source": "admin",
+                            "status": "PENDING_ACMA_APPROVAL"
+                        },
+                        {
+                            "_id": "<24-hex>",
+                            "changedAt": "<iso-ms>",
+                            "changedBy": "<24-hex>",
+                            "source": "customer",
+                            "status": "PENDING_CELLCAST_REVIEW"
+                        },
+                        {
+                            "changedAt": "<iso-ms>",
+                            "reason": "",
+                            "source": "webhook",
+                            "status": "ACMA_APPROVED"
+                        },
+                        {
+                            "changedAt": "<iso-ms>",
+                            "reason": "",
+                            "source": "webhook",
+                            "status": "PENDING_ACMA_APPROVAL"
+                        },
+                        {
+                            "changedAt": "<iso-ms>",
+                            "reason": "Customer has not taken any actions",
+                            "source": "webhook",
+                            "status": "PENDING_ACMA_APPROVAL"
+                        },
+                        {
+                            "changedAt": "<iso-ms>",
+                            "reason": "Customer has verified Sender ID, but it was sent for review",
+                            "source": "webhook",
+                            "status": "PENDING_ACMA_APPROVAL"
+                        }
+                    ],
+                    "statusNotes": "",
+                    "submittedToAcmaAt": "<iso-ms>",
+                    "updatedAt": "<iso-ms>",
+                    "user": "<24-hex>"
+                }
+            ],
+            "error": [],
+            "force_update": "<int>",
+            "invalid_token": "<int>",
+            "is_enc": false,
+            "maintainence": "<int>",
+            "message": "Business listed succesfully",
+            "message_type": "toast",
+            "new_version": "<int>",
+            "refresh_token": "",
+            "show_message": "<int>",
+            "status": true
+        }
+    }
+}

@@ -1,0 +1,110 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/api/v1/business"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "app_type": "web",
+            "app_version": "1.0",
+            "maintainence": 0,
+            "new_version": 0,
+            "force_update": 0,
+            "invalid_token": 0,
+            "refresh_token": "",
+            "show_message": 0,
+            "is_enc": false,
+            "status": true,
+            "message": "Business listed succesfully",
+            "message_type": "toast",
+            "data": [
+                {
+                    "_id": "6aab7bfe52d12d7fb3e16c49",
+                    "acmaStatus": "ACMA_APPROVED",
+                    "isDeleted": false,
+                    "isDefault": false,
+                    "allocatedUsers": [],
+                    "businessname": "<redacted>",
+                    "descriptionInternal": "<redacted>",
+                    "purposeOfUse": "<redacted>",
+                    "ownership": true,
+                    "companyInformation": {
+                        "name": "<redacted>",
+                        "abn": "<redacted>",
+                        "website": "<redacted>",
+                        "address": "<redacted>"
+                    },
+                    "requestorContact": {
+                        "firstName": "<redacted>",
+                        "lastName": "<redacted>",
+                        "position": "Ministry Worker",
+                        "phoneNumber": "04xxxxxxxx",
+                        "email": "<redacted>"
+                    },
+                    "user": "6a1d0cc1d792c9604d00c4f1",
+                    "requestedAt": "2026-09-17T05:34:54.124Z",
+                    "status": "ACTIVE",
+                    "statusHistory": [
+                        {
+                            "source": "customer",
+                            "_id": "6aab7bfe52d12d7fb3e16c4a",
+                            "status": "PENDING_CELLCAST_REVIEW",
+                            "changedAt": "2026-09-17T05:34:54.124Z",
+                            "changedBy": "6a1d0cc1d792c9604d00c4f1"
+                        },
+                        {
+                            "source": "admin",
+                            "_id": "6aab8ec152d12d7fb3f0248d",
+                            "status": "PENDING_ACMA_APPROVAL",
+                            "note": "",
+                            "reason": "",
+                            "changedAt": "2026-09-17T06:54:57.794Z",
+                            "changedBy": "67eb67c42150d1ab6fa521cc"
+                        },
+                        {
+                            "status": "PENDING_ACMA_APPROVAL",
+                            "reason": "Customer has not taken any actions",
+                            "changedAt": "2026-09-17T06:55:13.592Z",
+                            "source": "webhook"
+                        },
+                        {
+                            "status": "PENDING_ACMA_APPROVAL",
+                            "reason": "Customer has verified Sender ID, but it was sent for review",
+                            "changedAt": "2026-09-25T07:12:56.050Z",
+                            "source": "webhook"
+                        },
+                        {
+                            "status": "PENDING_ACMA_APPROVAL",
+                            "reason": "",
+                            "changedAt": "2026-10-02T04:14:39.549Z",
+                            "source": "webhook"
+                        },
+                        {
+                            "status": "ACMA_APPROVED",
+                            "reason": "",
+                            "changedAt": "2026-10-03T04:15:26.697Z",
+                            "source": "webhook"
+                        }
+                    ],
+                    "createdBy": "6a1d0cc1d792c9604d00c4f1",
+                    "createdAt": "2026-09-17T05:34:54.128Z",
+                    "updatedAt": "2026-10-03T04:15:27.919Z",
+                    "__v": 0,
+                    "acmaChatbotId": "9ba07fb2-35cf-4e34-8b14-0427afcfd7a6",
+                    "acmaReason": "",
+                    "acmaSubmissionEmailSentAt": "2026-09-17T06:54:57.794Z",
+                    "approvedBy": "67eb67c42150d1ab6fa521cc",
+                    "statusNotes": "",
+                    "submittedToAcmaAt": "2026-09-17T06:54:57.794Z",
+                    "lastStatusWebhookAt": "2026-10-03T04:15:26.634Z",
+                    "acmaReminderEmailSentAt": "2026-09-20T07:00:00.134Z",
+                    "acmaApprovalEmailSentAt": "2026-10-03T04:15:27.918Z",
+                    "registrationStatus": "ACTIVE",
+                    "registrationStatusLabel": "Active"
+                }
+            ],
+            "error": {}
+        }
+    }
+}

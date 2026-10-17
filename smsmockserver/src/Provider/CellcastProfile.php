@@ -57,7 +57,7 @@ final class CellcastProfile
         return $cp;
     }
 
-    public function setBalance(int $n): void
+    public function setBalance(float|int $n): void
     {
         $this->profile->balance = $n;
     }
