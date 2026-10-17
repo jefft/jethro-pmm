@@ -1,0 +1,34 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/v1/messages",
+        "query": {
+            "from": "<Y-m-d>",
+            "limit": "200",
+            "offset": "0",
+            "to": "<Y-m-d>"
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "limit": "<int>",
+            "offset": "<int>",
+            "results": [
+                {
+                    "cost": "1.00",
+                    "custom_ref": null,
+                    "message_content": "Jethro smsmockserver recording: scheduled a day ahead, then cancelled",
+                    "message_id": "<uuid>",
+                    "recipient_number": "<msisdn 614…>",
+                    "requested_at": "<Y-m-d H:i:s>",
+                    "scheduled_for": "<Y-m-d H:i:s>",
+                    "sender_id": "<msisdn 614…>",
+                    "status": "scheduled"
+                }
+            ],
+            "status": "complete",
+            "total": "<int>"
+        }
+    }
+}

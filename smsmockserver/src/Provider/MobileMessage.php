@@ -74,7 +74,7 @@ final class MobileMessage implements ProviderInterface
     {
         $messages = $body['messages'] ?? null;
         if (!\is_array($messages) || $messages === []) {
-            Util::json(400, ['error' => 'Missing or invalid "messages" parameter.']);
+            Util::json(400, ['error' => 'Missing or invalid "messages" parameter. It should be an array of messages.']);
         }
 
         $results = [];
@@ -113,7 +113,14 @@ final class MobileMessage implements ProviderInterface
                 'scheduled_for' => $scheduledAt === null ? null : self::utc($scheduledAt),
             ];
         }
-        Util::json(200, ['status' => 'complete', 'results' => $results]);
+        Util::json(200, [
+            'status' => 'complete',
+            // Echo the request's send options (false unless asked for).
+            'ignore_unsubscribes' => (bool) ($body['ignore_unsubscribes'] ?? false),
+            'shorten_urls' => (bool) ($body['shorten_urls'] ?? false),
+            'total_cost' => array_sum(array_column($results, 'cost')),
+            'results' => $results,
+        ]);
     }
 
     /** GET /v1/messages?message_id=: the message is results[0]. */
@@ -173,7 +180,8 @@ final class MobileMessage implements ProviderInterface
         }
         $row = $ctx->store->getMessageByRemoteId(self::PROVIDER, $messageId);
         if ($row === null) {
-            Util::json(404, ['error' => 'No message(s) found with the given ID or reference.']);
+            // Live wording differs from the lookup's 404.
+            Util::json(404, ['error' => 'Message not found.']);
         }
         if ($ctx->state->deriveMessage($row, $ctx->now) !== State::MSG_SCHEDULED) {
             // Live wording; the status code was not recorded.
@@ -194,13 +202,13 @@ final class MobileMessage implements ProviderInterface
      *  profile's senders, then numbers verified through POST /v1/senders. */
     private function handleSenders(Ctx $ctx): never
     {
-        $out = [self::SHARED_NUMBER => ['sender' => self::SHARED_NUMBER, 'type' => 'shared', 'is_default' => true]];
+        $out = [self::SHARED_NUMBER => ['sender' => self::SHARED_NUMBER, 'type' => 'shared', 'label' => 'Shared Number', 'is_default' => true]];
         foreach (MobileMessageProfile::get($ctx->profileName)?->senders ?? [] as $s) {
             $out[$s['sender']] = $s + ['is_default' => false];
         }
         foreach ($ctx->store->listRegistrationsForScope($ctx->profileName, self::PROVIDER) as $row) {
             if ($ctx->state->deriveApproval($row, $ctx->now) !== State::APPROVAL_APPROVED) continue;
-            $out[$row['value']] ??= ['sender' => $row['value'], 'type' => 'own', 'is_default' => false];
+            $out[$row['value']] ??= ['sender' => $row['value'], 'type' => 'own', 'label' => $row['display_name'], 'is_default' => false];
         }
         Util::json(200, ['status' => 'complete', 'results' => array_values($out)]);
     }

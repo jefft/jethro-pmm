@@ -92,6 +92,9 @@ export default defineConfig({
         metadata: { smsProvider },
       })),
     ),
+    // The mock answers as the live APIs did: bin/record against the mock,
+    // diffed with smsmockserver/recordings/<provider>/actual/. No browser.
+    { name: "smsmock-recordings", testMatch: ["smsmock/recordings.spec.ts"] },
     { name: "lookaround", testMatch: ["lookaround/lookaround.spec.ts"] },
     {
       name: "walkthrough",

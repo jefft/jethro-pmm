@@ -1,0 +1,15 @@
+{
+    "request": {
+        "method": "DELETE",
+        "path": "/v1/unsubscribes",
+        "query": {
+            "number": "<msisdn 614…>"
+        }
+    },
+    "response": {
+        "status": 400,
+        "body": {
+            "error": "\"number\" is required."
+        }
+    }
+}

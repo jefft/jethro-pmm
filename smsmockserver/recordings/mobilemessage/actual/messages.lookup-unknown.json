@@ -1,0 +1,15 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/v1/messages",
+        "query": {
+            "message_id": "<uuid>"
+        }
+    },
+    "response": {
+        "status": 404,
+        "body": {
+            "error": "No message(s) found with the given ID or reference."
+        }
+    }
+}

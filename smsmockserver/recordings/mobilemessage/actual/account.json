@@ -1,0 +1,14 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/v1/account"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "credit_balance": "<int>",
+            "credit_price": null,
+            "status": "complete"
+        }
+    }
+}

@@ -1,0 +1,28 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/v1/messages",
+        "query": {
+            "message_id": "d014bada-94a3-48e2-8c86-9ccc371ca499"
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "status": "complete",
+            "results": [
+                {
+                    "to": "614xxxxxxxx",
+                    "message": "Jethro smsmockserver recording: scheduled a day ahead, then cancelled",
+                    "sender": "614xxxxxxxx",
+                    "custom_ref": null,
+                    "status": "scheduled",
+                    "cost": "1.00",
+                    "message_id": "d014bada-94a3-48e2-8c86-9ccc371ca499",
+                    "requested_at": "2026-10-17 12:19:47",
+                    "scheduled_for": "2026-10-18 12:19:46"
+                }
+            ]
+        }
+    }
+}

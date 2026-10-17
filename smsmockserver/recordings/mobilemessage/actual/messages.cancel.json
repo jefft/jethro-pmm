@@ -1,0 +1,18 @@
+{
+    "request": {
+        "body": {
+            "message_id": "<uuid>"
+        },
+        "method": "DELETE",
+        "path": "/v1/messages"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "cancelled": true,
+            "credits_refunded": "<int>",
+            "message_id": "<uuid>",
+            "status": "complete"
+        }
+    }
+}

@@ -20,7 +20,7 @@ final class MobileMessageProfile
 
     private function __construct(
         public readonly Profile $profile,
-        /** @var list<array{sender:string,type:string}> Extra GET /v1/senders entries */
+        /** @var list<array{sender:string,type:string,label:string}> Extra GET /v1/senders entries */
         public array $senders = [],
         /** @var list<string> Unsubscribed numbers, international form (GET /v1/unsubscribes) */
         public array $optOuts = [],
@@ -42,23 +42,25 @@ final class MobileMessageProfile
      * test user's own mobile.
      *
      * @param list<string> $numbers International form, e.g. '61491570157'
+     * @param string $label As listed; the live account lists its own mobile as "Your Mobile"
      */
-    public function preRegisterNumbers(array $numbers): void
+    public function preRegisterNumbers(array $numbers, string $label = 'Your Mobile'): void
     {
         foreach ($numbers as $n) {
-            $this->senders[] = ['sender' => $n, 'type' => 'own'];
+            $this->senders[] = ['sender' => $n, 'type' => 'own', 'label' => $label];
         }
     }
 
     /**
-     * Alphanumeric Sender IDs on the account (type "alpha").
+     * Alphanumeric Sender IDs on the account (type "alpha"). Labelled with
+     * the ID itself: no account with one has been recorded.
      *
      * @param list<string> $ids e.g. ['Jethro']
      */
     public function setSenderIds(array $ids): void
     {
         foreach ($ids as $id) {
-            $this->senders[] = ['sender' => $id, 'type' => 'alpha'];
+            $this->senders[] = ['sender' => $id, 'type' => 'alpha', 'label' => $id];
         }
     }
 

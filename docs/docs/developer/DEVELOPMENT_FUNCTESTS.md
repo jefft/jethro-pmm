@@ -154,9 +154,9 @@ It's served through the **same** nginx/php-fpm as the rest of Jethro — see the
 regex location in `nginx.template` that matches `/tests/functional/sms/{profile}/(api|meta)/...` — with its own
 database, `jethro_functest_smsmockserver`.
 
-- Scenario `.conf` files point `SMS_CELLCAST_URL` / `SMS_5CENTSMS_URL` at
-  `/tests/functional/sms/{profile}` (Jethro-root-relative), e.g.
-  `/tests/functional/sms/sms-bulk`.
+- Scenario `.conf` files point `SMS_CELLCAST_URL` / `SMS_5CENTSMS_URL` /
+  `SMS_MOBILEMESSAGE_URL` at `/tests/functional/sms/{profile}`
+  (Jethro-root-relative), e.g. `/tests/functional/sms/sms-bulk`.
 - `tests/functional/sms/{profile}.smsmock.php` files define per-scenario behavior
   (forced failures, cooloff simulation, OTP requirements, sender-ID
   rejection, etc.) — see `src/Provider/*` and `src/Profile.php`.
@@ -165,6 +165,11 @@ database, `jethro_functest_smsmockserver`.
   `mockMeta(profile, endpoint)` helper in `tests/functional/sms/smsmock-url.ts`.
   `request.delete(mockMeta(...))` in a `beforeEach` is the standard way to
   reset captured state between tests.
+- The `smsmock-recordings` project checks the mock against recordings of
+  the live APIs (`smsmockserver/recordings/<provider>/actual/`): it replays
+  the same requests against the mock with `smsmockserver/bin/record` and
+  fails on any difference. See `smsmockserver/README.md` for re-recording
+  after a provider changes its API.
 
 ## Running
 
