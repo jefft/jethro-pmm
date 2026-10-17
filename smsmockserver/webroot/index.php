@@ -3,7 +3,7 @@
 /**
  * smsmockserver — PHP-based mock SMS server for Playwright functional tests.
  *
- * Simulates Cellcast and 5CentSMS v5 APIs. Listens on 127.0.0.1:8083
+ * Simulates Cellcast, 5CentSMS v5 and MobileMessage APIs. Listens on 127.0.0.1:8083
  * (PHP built-in server) or via FrankenPHP.
  *
  * Usage:
@@ -40,6 +40,7 @@ use SmsMockServer\State;
 use SmsMockServer\Store;
 use SmsMockServer\Provider\Cellcast;
 use SmsMockServer\Provider\FiveCentSms;
+use SmsMockServer\Provider\MobileMessage;
 
 // ── Bootstrap ─────────────────────────────────────────────────────────
 
@@ -48,6 +49,7 @@ Profile::loadProfiles(__DIR__ . '/../../tests/functional/');
 // Register built-in default profiles (no overrides — plain provider passthrough)
 (function () { $p = new Profile(); $p->balance = 12345; Profile::register('5centsms', '5centsms', $p); })();
 (function () { $p = new Profile(); $p->balance = 12345; Profile::register('cellcast', 'cellcast', $p); })();
+(function () { $p = new Profile(); $p->balance = 12345; Profile::register('mobilemessage', 'mobilemessage', $p); })();
 
 // Database connection
 // Socket-only (mariadb TCP is disabled in devbox): MYSQL_UNIX_PORT is passed
@@ -78,5 +80,5 @@ $tmpDir = getenv('TMPDIR') ?: sys_get_temp_dir();
 $meta = new Meta($tmpDir);
 
 // Router
-$router = new Router($store, $meta, $state, new Cellcast(), new FiveCentSms());
+$router = new Router($store, $meta, $state, new Cellcast(), new FiveCentSms(), new MobileMessage());
 $router->dispatch();

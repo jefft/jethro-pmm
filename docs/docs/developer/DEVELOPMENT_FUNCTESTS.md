@@ -130,22 +130,26 @@ discovery. Adding a new SMS scenario means adding to all three.
 **Provider matrix.** The scenarios in `PROVIDER_MATRIX` — the ones where
 provider differences reach the UI (schedule/cancel, cool-off, status
 lifecycle, send failure, opt-outs, sender registration, history) — run once
-per provider. Each also becomes a `<name>-v5` project that runs the **same**
-`.spec.ts` under `/tests/functional/sms/<name>-v5/`, so it loads
-`<name>-v5.conf` (`SMS_PROVIDER=5centsmsv5`) and the `<name>-v5` mock
-profile. Every matrix project sets `metadata.smsProvider`, and the specs stay
-provider-neutral through `tests/functional/sms/scenario.ts`:
-`mockProfile(test.info())` for `mockMeta()`, and `sentSms(test.info(), body)`,
-which parses the captured send request (Cellcast `contacts`/`scheduleAt` or
-v5 `to`/`schedule`) into recipients in local form and a send time in epoch ms.
-Branch on `scenarioProvider()` only where the providers' flows differ: e.g.
-Cellcast's OTP sender registration vs 5CentSMS's verification link.
+per provider: on Cellcast as `<name>`, and once per `MATRIX_PROVIDERS` entry
+(`v5` for 5CentSMS v5, `mobilemessage` for MobileMessage) as a
+`<name>-<suffix>` project that runs the **same** `.spec.ts` under
+`/tests/functional/sms/<name>-<suffix>/`, so it loads `<name>-<suffix>.conf`
+and the `<name>-<suffix>` mock profile. Every matrix project sets
+`metadata.smsProvider`, and the specs stay provider-neutral through
+`tests/functional/sms/scenario.ts`: `mockProfile(test.info())` for
+`mockMeta()`, and `sentSms(test.info(), body)`, which parses the captured
+send request (Cellcast `contacts`/`scheduleAt`, v5 `to`/`schedule`,
+MobileMessage `messages[].to`/`scheduled_for`) into recipients in local form
+and a send time in epoch ms. Branch on `scenarioProvider()` only where the
+providers genuinely differ: e.g. Cellcast's OTP sender registration vs the
+others' verification link, or MobileMessage stretching a short cool-off to
+its 61-second scheduling minimum.
 
 ### 7. Mock SMS server — `smsmockserver/`
 
 A small standalone PHP app (its own `composer.json`, autoloaded under
 `SmsMockServer\...` namespace) that fakes the real SMS provider HTTP
-APIs (Cellcast, 5CentSMS) so tests never hit the real internet.
+APIs (Cellcast, 5CentSMS, MobileMessage) so tests never hit the real internet.
 It's served through the **same** nginx/php-fpm as the rest of Jethro — see the
 regex location in `nginx.template` that matches `/tests/functional/sms/{profile}/(api|meta)/...` — with its own
 database, `jethro_functest_smsmockserver`.
@@ -235,10 +239,13 @@ grep -oE 'rt=[0-9.]+' .devbox/virtenv/nginx/access.log | sort -t= -k2 -rn | head
 4. If it needs custom mock-provider behavior, create
    `tests/functional/sms/<name>.smsmock.php`.
 5. If provider differences can change what it observes, also add it to
-   `PROVIDER_MATRIX`, create `<name>-v5.conf` and `<name>-v5.smsmock.php`
-   (`FiveCentSmsProfile::register('<name>-v5', …)`; point `SMS_5CENTSMS_URL`
-   at `/smsmockserver/tests/functional/sms/<name>-v5`, with no `/api/v1`
-   suffix, which would hit the mock's v4 routes), and keep the spec
+   `PROVIDER_MATRIX` and create a `<name>-<suffix>.conf` and
+   `<name>-<suffix>.smsmock.php` per `MATRIX_PROVIDERS` entry, registering
+   the profile with the provider's wrapper (`FiveCentSmsProfile` /
+   `MobileMessageProfile`). Point `SMS_5CENTSMS_URL` at
+   `/smsmockserver/tests/functional/sms/<name>-v5` with no `/api/v1` suffix
+   (which would hit the mock's v4 routes), and `SMS_MOBILEMESSAGE_URL` at
+   `/smsmockserver/tests/functional/sms/<name>-mobilemessage`. Keep the spec
    provider-neutral via `scenario.ts`.
 
 ## Role-based permission checks

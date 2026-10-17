@@ -1,7 +1,7 @@
 import { to } from "../timeouts.js";
 import { test, expect } from "../fixtures.js";
 import { mockMeta } from "./smsmock-url.js"
-import { mockProfile, sentSms } from "./scenario.js";
+import { mockProfile, scenarioProvider, sentSms } from "./scenario.js";
 import { login } from "../auth.js";
 
 test.describe("SMS cooloff delay", () => {
@@ -56,9 +56,12 @@ test.describe("SMS cooloff delay", () => {
     const sent = sentSms(test.info(), captured.json);
 
     expect(sent.scheduledAt, "cooloff should give immediate sends a send time").not.toBeNull();
-    // SMS_SEND_COOLOFF=3s → the send time should be 1-7s in the future
-    expect(sent.scheduledAt! - sendTime).toBeGreaterThan(1_000);
-    expect(sent.scheduledAt! - sendTime).toBeLessThan(7_000);
+    // SMS_SEND_COOLOFF=3s → the send time should be 1-7s in the future.
+    // MobileMessage sends anything scheduled ≤60s ahead at once, so its
+    // provider clamps the cool-off up to now+61s (its clock, whole seconds).
+    const [minAhead, maxAhead] = scenarioProvider(test.info()) === "mobilemessage" ? [60_000, 68_000] : [1_000, 7_000];
+    expect(sent.scheduledAt! - sendTime).toBeGreaterThan(minAhead);
+    expect(sent.scheduledAt! - sendTime).toBeLessThan(maxAhead);
 
     expect(sent.message).toBe(message);
     expect(sent.recipients).toEqual(["0491570158"]);

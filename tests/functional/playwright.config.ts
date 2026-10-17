@@ -48,9 +48,9 @@ const SMS_SCENARIOS = [
 ];
 
 // Provider-sensitive scenarios (schedule/cancel, cool-off, status lifecycle,
-// send failure, opt-outs, sender registration, history) also run against
-// 5CentSMS v5: the same spec, with its own <name>-v5.conf and mock profile.
-// sms/scenario.ts reads each project's metadata.smsProvider.
+// send failure, opt-outs, sender registration, history) also run against each
+// of MATRIX_PROVIDERS: the same spec, with its own <name>-<suffix>.conf and
+// mock profile. sms/scenario.ts reads each project's metadata.smsProvider.
 const PROVIDER_MATRIX = [
   "sms-schedule-and-cancel",
   "sms-cooloff",
@@ -60,6 +60,10 @@ const PROVIDER_MATRIX = [
   "sms-opted-out-recipient",
   "sms-sender-number-registration",
   "sms-admin-history-filters",
+];
+const MATRIX_PROVIDERS = [
+  { suffix: "v5", smsProvider: "5centsmsv5" },
+  { suffix: "mobilemessage", smsProvider: "mobilemessage" },
 ];
  
 export default defineConfig({
@@ -80,12 +84,14 @@ export default defineConfig({
       testMatch: [`sms/${name}.spec.ts`],
       ...(PROVIDER_MATRIX.includes(name) ? { metadata: { smsProvider: "cellcast" } } : {}),
     })),
-    ...PROVIDER_MATRIX.map((name) => ({
-      name: `${name}-v5`,
-      use: { baseURL: `${HOST}/tests/functional/sms/${name}-v5/` },
-      testMatch: [`sms/${name}.spec.ts`],
-      metadata: { smsProvider: "5centsmsv5" },
-    })),
+    ...MATRIX_PROVIDERS.flatMap(({ suffix, smsProvider }) =>
+      PROVIDER_MATRIX.map((name) => ({
+        name: `${name}-${suffix}`,
+        use: { baseURL: `${HOST}/tests/functional/sms/${name}-${suffix}/` },
+        testMatch: [`sms/${name}.spec.ts`],
+        metadata: { smsProvider },
+      })),
+    ),
     { name: "lookaround", testMatch: ["lookaround/lookaround.spec.ts"] },
     {
       name: "walkthrough",

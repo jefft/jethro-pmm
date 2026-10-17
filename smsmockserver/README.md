@@ -1,4 +1,4 @@
-SMSMockServer is technically an independent PHP webapp that mimics the APIs of SMS providers (currently 5CentSMS and Cellcast). It is used for functional testing the Jethro SMS implementation.
+SMSMockServer is technically an independent PHP webapp that mimics the APIs of SMS providers (currently 5CentSMS, Cellcast and MobileMessage). It is used for functional testing the Jethro SMS implementation.
 
 SMSMockServer is mounted at:
 

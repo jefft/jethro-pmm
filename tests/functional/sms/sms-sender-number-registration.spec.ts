@@ -1,16 +1,17 @@
 import { to } from "../timeouts.js";
 import { test, expect } from "../fixtures.js";
 import { mockMeta } from "./smsmock-url.js"
-import { mockProfile, scenarioProvider } from "./scenario.js";
+import { mockProfile, scenarioProvider, type ScenarioProvider } from "./scenario.js";
 import { login } from "../auth.js";
 
 // A persona per provider run: the runs are parallel, and the shared functest
 // database records a number as verified for the first person it is verified
 // for (DbLoggingSmsProvider::verifySenderNumber()). Each can send, and no
 // other scenario sends from or verifies its mobile.
-const SENDERS = {
+const SENDERS: Record<ScenarioProvider, { username: string; personid: number }> = {
   cellcast: { username: "smallgroupleader", personid: 170 },
   "5centsmsv5": { username: "bandleader", personid: 175 },
+  mobilemessage: { username: "rostersetter", personid: 61 },
 };
 
 test.describe("SMS sender number registration", () => {
@@ -65,14 +66,21 @@ test.describe("SMS sender number registration", () => {
 
     // 8. Datastar patches #sms-register-person_<id> with the provider's answer.
     await expect(registerStatus).not.toContainText("needs verifying", { timeout: to(5000) });
-    if (provider === "cellcast") {
-      // {"status": true, "message": "Custom number created"} (or "Number
-      // already exist in system" when already registered — e.g. parallel
-      // runs); Cellcast treats both as success.
-      await expect(registerStatus).toContainText(/created|verified|success|already exist/i, { timeout: to(5000) });
-    } else {
-      // 5CentSMS verifies out of band: it texts the number a link to click.
-      await expect(registerStatus).toContainText("Verification link sent to the number", { timeout: to(5000) });
+    switch (provider) {
+      case "cellcast":
+        // {"status": true, "message": "Custom number created"} (or "Number
+        // already exist in system" when already registered — e.g. parallel
+        // runs); Cellcast treats both as success.
+        await expect(registerStatus).toContainText(/created|verified|success|already exist/i, { timeout: to(5000) });
+        break;
+      case "5centsmsv5":
+        // 5CentSMS verifies out of band: it texts the number a link to click.
+        await expect(registerStatus).toContainText("Verification link sent to the number", { timeout: to(5000) });
+        break;
+      case "mobilemessage":
+        // So does MobileMessage, naming the number it texted (rostersetter's).
+        await expect(registerStatus).toContainText(/Verification link sent to (0|61)491571061\./, { timeout: to(5000) });
+        break;
     }
   });
 });
