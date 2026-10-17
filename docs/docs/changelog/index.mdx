@@ -36,7 +36,7 @@ Every person now has a [**Messages** tab](../user-manual/sms.mdx#person-messages
 
 When a SMS is sent, an associated Note (todo item) can be [created](../user-manual/sms.mdx#create-note). The Note and Message entry are bidirectionally linked.
 
-After upgrade, people's Messages tabs will be populated with what used to be 'SMS Sent' notes. Up to a year's worth of SMS history can also be fetched from 5CentSMS via the **Synchronize History** action in Admin → System Configuration → SMS Gateway (see [Recovering history from your SMS provider](../administration/config/sms.mdx#recovering-history-from-your-sms-provider)).
+After upgrade, people's Messages tabs will be populated with what used to be 'SMS Sent' notes. Up to a year's worth of SMS history can also be fetched from your SMS provider via the **Synchronize History** action in Admin → System Configuration → SMS Gateway (see [Recovering history from your SMS provider](../administration/config/sms.mdx#recovering-history-from-your-sms-provider)).
 
 <details>
     <summary>
@@ -79,7 +79,7 @@ People lacking **SMS - view all** can only see SMSes they personally sent.
 
 Provider configuration, balance, sender IDs and registered numbers are shown in the SMS Gateway status panel in Admin → System Configuration (see [Configuring a SMS Provider](../administration/config/sms.mdx#configuring-a-sms-provider)).
 
-The legacy `SMS_SEND_LOGFILE` log file is **not** imported. Recent sends that were never recorded as notes (e.g. roster reminders sent by cron) can be pulled from your SMS provider with the new **Synchronize History** action in Admin → System Configuration → SMS Gateway (5CentSMS v5 and Cellcast only). See [Recovering history from your SMS provider](../administration/config/sms.mdx#recovering-history-from-your-sms-provider).
+The legacy `SMS_SEND_LOGFILE` log file is **not** imported. Recent sends that were never recorded as notes (e.g. roster reminders sent by cron) can be pulled from your SMS provider with the new **Synchronize History** action in Admin → System Configuration → SMS Gateway (5CentSMS v5, Cellcast and MobileMessage). See [Recovering history from your SMS provider](../administration/config/sms.mdx#recovering-history-from-your-sms-provider).
 
 ### 5CentSMS v5 Support
 
@@ -97,6 +97,10 @@ Jethro now supports the **5CentSMS v5 JSON API** natively. Key capabilities unlo
 ### Cellcast Support
 
 [Cellcast](https://cellcast.com.au) is now fully supported (see [Cellcast configuration](../administration/config/sms.mdx#cellcast)).
+
+### MobileMessage Support
+
+[MobileMessage](https://www.mobilemessage.com.au) is now supported (see [MobileMessage configuration](../administration/config/sms.mdx#mobilemessage)). MobileMessage supports scheduling, cancellation, delivery status polling, batch history sync, balance checks, own-number verification via a link, and opt-out listing **and removal**. Alphanumeric Sender IDs are registered through the MobileMessage dashboard (ACMA registration), not through Jethro.
 
 
 ### SMS administration section.

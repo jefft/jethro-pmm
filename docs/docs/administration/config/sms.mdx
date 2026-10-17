@@ -49,6 +49,7 @@ Jethro sends SMSes via a SMS provider service, which you will need to sign up to
 
 - 5centSMS - https://5centsms.com.au
 - Cellcast - https://www.cellcast.com
+- MobileMessage - https://www.mobilemessage.com.au
 
 <SMSProviderCapabilities />
 
@@ -105,6 +106,22 @@ The SMS Gateway section should update:
 ![Screenshot](/img/admin-sms/admin_sysconfig_smsgateway_configured_cellcast_summary.png)
 
 Once configured, a new [Persons → Messages](../../user-manual/sms.mdx#messages-overview) page will appear showing SMS Send History.
+
+### MobileMessage
+
+1. Generate API credentials in your [MobileMessage dashboard](https://www.mobilemessage.com.au) under Settings → API
+2. Set 'Sms Mobilemessage Username' and 'Sms Mobilemessage Password' in the settings page, or set in `conf.php`:
+
+```php
+// API username from your MobileMessage dashboard, Settings → API (required)
+define('SMS_MOBILEMESSAGE_APIKEY_USERNAME', '<insert here>');
+// API password from your MobileMessage dashboard, Settings → API (required)
+define('SMS_MOBILEMESSAGE_APIKEY_PASSWORD', '<insert here>');
+   ```
+
+or via the System Configuration page.
+
+Jethro auto-detects the provider once both constants are set. Note the [send cool-off](../../user-manual/sms.mdx#send-cool-off) with MobileMessage is 61 seconds rather than 30, since the API only accepts schedules more than 60 seconds ahead.
 
 ## SMS settings
 
@@ -211,6 +228,12 @@ Discussed [above](#cellcast) — fill in these details to use https://cellcast.c
 
 <MultiSettings group="cellcast" />
 
+#### MobileMessage
+
+Discussed [above](#mobilemessage) — fill in these details to use https://mobilemessage.com.au.
+
+<MultiSettings group="mobileMessage" />
+
 
 
 ## Registering Sender IDs
@@ -222,7 +245,7 @@ A **Sender ID** is an alphanumeric name that appears as the message sender (e.g.
 Jethro's SMS form lets one pick the SMS 'sender', and defaults to registered Sender IDs plus the current user's mobile (see [SMS Senders](../../user-manual/sms#sms-sender)):
 
 
-In Australia, a Sender ID requires registration. A Sender ID must be 3-11 characters, and must relate to your business name. Both 5CentSMS v5 and Cellcast support sender ID registration, and this can be initiated through Jethro.
+In Australia, a Sender ID requires registration. A Sender ID must be 3-11 characters, and must relate to your business name. 5CentSMS v5 and Cellcast support sender ID registration through Jethro. For MobileMessage, register the Sender ID in its dashboard (it submits the ACMA registration there); once approved it appears in Jethro's sender list automatically.
 
 Go to Admin → System Configuration, and click 'SMS Gateway' go to the SMS configuration.
 
@@ -283,7 +306,7 @@ Sends that were never recorded as notes — for example roster reminders sent by
 
 Limitations:
 
-- Only **5CentSMS v5** and **Cellcast** support it. With 5CentSMS v4 it imports nothing.
+- Only **5CentSMS v5**, **Cellcast** and **MobileMessage** support it. With 5CentSMS v4 it imports nothing.
 - Without a **From** date it only fetches the last 24 hours. Set **From** to an early date (e.g. 2016-01-01) to import everything the provider still holds.
 - The provider does not say which Jethro user sent each message, so imported sends show the sender as `system`.
 - The provider's retention limits apply. 5CentSMS keeps roughly the last 12 months.

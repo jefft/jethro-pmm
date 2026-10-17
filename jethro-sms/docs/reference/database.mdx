@@ -68,7 +68,7 @@ Each `smsdelivery` row records what that delivery cost, at the time it was sent:
 
 | Column | Meaning | Set from |
 |---|---|---|
-| `segments_used` | SMS segments charged, i.e. SMS against the provider balance (one credit is one SMS segment) | 5CentSMS `credits`; Cellcast `smsDetail.smscount`. NULL when the provider doesn't report it (v4/template, rows logged before 2.40's cost tracking) |
+| `segments_used` | SMS segments charged, i.e. SMS against the provider balance (one credit is one SMS segment) | 5CentSMS `credits`; Cellcast `smsDetail.smscount`; MobileMessage `cost` (credits, on send results and lookups). NULL when the provider doesn't report it (v4/template, rows logged before 2.40's cost tracking) |
 | `per_segment_cost` | Dollars per segment | Cellcast `smsDetail.costpersms` (or `deductibleCredit / smscount`); otherwise `SMS_SEGMENT_COST` if set, else the sending provider's `SEGMENT_COST_MILLICENTS` default |
 | `cost_bearer` | Whether this row bears the charge for its (possibly shared) message | `DeduplicatingSmsProvider` via the send — TRUE on a group's primary row, FALSE on the secondary persons sharing the number |
 

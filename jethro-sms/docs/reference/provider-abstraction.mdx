@@ -38,7 +38,7 @@ per-provider capability table.
 
 ## Why an Interface?
 
-- **Gateway independence** — swap between FiveCentSMS, Cellcast, or a custom provider without changing calling code
+- **Gateway independence** — swap between FiveCentSMS, Cellcast, MobileMessage, or a custom provider without changing calling code
 - **Testability** — mock the provider in tests, or swap in a `FakeHttpClient` beneath a real provider
 - **Capability discovery** — `hasCapability(SmsCapability)` lets callers check what's supported before attempting an operation, rather than calling and catching a failure
 

@@ -31,8 +31,8 @@ The SMS module is organised into three layers. Dependencies only point downwards
 │  │ │ │ TokenExpandingSmsProvider (pure layer)     │ │ │  │
 │  │ │ │ ┌────────────────────────────────────────┐ │ │ │  │
 │  │ │ │ Raw provider + SessionSmsCache         │ │ │ │  │
-│  │ │ │ 5CentSMS v5 / Cellcast /               │ │ │ │  │
-│  │ │ │ 5CentSMS v4 /                          │ │ │ │  │
+│  │ │ │ MobileMessage / 5CentSMS v5 /          │ │ │ │  │
+│  │ │ │ Cellcast / 5CentSMS v4 /               │ │ │ │  │
 │  │ │ │ Template                               │ │ │ │  │
 │  │ │ │ └────────────────────────────────────────┘ │ │ │  │
 │  │ │ └────────────────────────────────────────────┘ │ │  │
@@ -56,7 +56,7 @@ The pure layer is the standalone `jethro-sms/` package (`Sms\` namespace). It kn
 - **Interfaces** — `SmsProvider`, `HttpClient`, `SmsCache`
 - **Value objects** — `SmsDelivery`, `PhoneNumber`, `SendSummary`, `RegistrationStep`, `HttpRequest`, `HttpResponse`
 - **Enums** — `SmsStatus`, `SmsCapability`
-- **Concrete providers** — `FiveCentSmsV5Provider`, `CellcastSmsProvider`, `TemplateSmsProvider`, and `FiveCentSmsV4Provider` (a `TemplateSmsProvider` subclass, deprecated). `factory.php` picks one from `SMS_PROVIDER` or auto-detects it from the configured constants.
+- **Concrete providers** — `MobileMessageSmsProvider`, `FiveCentSmsV5Provider`, `CellcastSmsProvider`, `TemplateSmsProvider`, and `FiveCentSmsV4Provider` (a `TemplateSmsProvider` subclass, deprecated). `factory.php` picks one from `SMS_PROVIDER` or auto-detects it from the configured constants.
 - **Decorators** (all extend `DecoratingSmsProvider`)
   - `TokenExpandingSmsProvider` — per-recipient `%token%` / `%(fn …)%` expansion via `Templater`, plus URL shortening
   - `OverridingSmsProvider` — sender resolution and the `SMS_SENDER_OPTIONS` allowlist, and turns the send cool-off into a deferred send

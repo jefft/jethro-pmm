@@ -28,6 +28,7 @@ Capabilities are checked via `hasCapability(SmsCapability)`. See
 | Provider | Auth | Format | Schedule | Cancel | Status Poll | Balance | Sender Reg | Sender ID Reg |
 |---|---|---|---|---|---|---|---|---|
 | `FiveCentSmsV5Provider` | key-id + key-secret in JSON body | JSON | ✓ | ✓ (DELETE) | ✓ (`GET /v5/sms/{id}`) | ✓ | ✓ | ✓ |
+| `MobileMessageSmsProvider` | HTTP Basic (username + password) | JSON | ✓ | ✓ (DELETE) | ✓ (`GET /v1/messages?message_id=`) | ✓ | ✓ (own number) | ✗ (dashboard/ACMA) |
 | `CellcastSmsProvider` | Bearer token header | JSON | ✓ | ✓ (POST cancel) | ✓ (`GET /api/v2/report/message/{id}`) | ✓ | ✓ | ✓ |
 | `FiveCentSmsV4Provider` | header template | URL-encoded | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ |
 | `TemplateSmsProvider` | configurable | URL-encoded | ✗ | ✗ | ✗ | optional | ✗ | ✗ |
@@ -51,6 +52,27 @@ Sender number registration uses OTP verification. Sender ID registration
 submits to `/api/v1/business/add`.
 
 Test mode: `CellcastFakeHttpClient` returns realistic JSON for all endpoints.
+
+## MobileMessageSmsProvider
+
+`jethro-sms/src/Providers/MobileMessageSmsProvider.php` — key:
+`'mobilemessage'`, preference: 10. Everything except
+REGISTER_SENDER_ID (alphanumeric IDs are registered through the
+MobileMessage dashboard, which submits to the ACMA Sender ID Register).
+Segment cost: 2000 millicents (2.0¢ nominal; real per-credit pricing
+arrives with each purchase and every send reports its credit cost).
+Deferred send max delay: null — the API documents only a 60-second
+minimum for `scheduled_for` and no maximum. `send()` clamps deferred
+sends up past that minimum so the undo cool-off survives (the API would
+otherwise silently downgrade sub-60-second schedules to immediate sends).
+
+Auth is HTTP Basic (API username + password from the dashboard's
+Settings → API). Every 4xx/5xx uses a single `{"error": "…"}` envelope;
+sends reply per-message inside an HTTP 200 (`results[].status` is
+`success` | `error` | `blocked`), so a 200 is not "all delivered".
+
+Test mode: `MobileMessageFakeHttpClient` fakes sends and cancels; reads
+(balance, senders, opt-outs) fall through to the real API.
 
 ## FiveCentSmsV4Provider
 
@@ -77,11 +99,12 @@ providers by `usagePreference()` descending:
 | Preference | Provider | Required constants |
 |---|---|---|
 | 10 | `FiveCentSmsV5Provider` | `SMS_5CENTSMS_APIKEY_ID`, `SMS_5CENTSMS_APIKEY` |
+| 10 | `MobileMessageSmsProvider` | `SMS_MOBILEMESSAGE_APIKEY_USERNAME`, `SMS_MOBILEMESSAGE_APIKEY_PASSWORD` |
 | 9 | `CellcastSmsProvider` | `SMS_CELLCAST_APIKEY` |
 | -1 | `FiveCentSmsV4Provider` | `SMS_HTTP_URL` (must match v4 endpoint) |
 | -2 | `TemplateSmsProvider` | `SMS_HTTP_URL` |
 
-Short keys: `'5centsmsv5'`, `'cellcast'`.
+Short keys: `'5centsmsv5'`, `'cellcast'`, `'mobilemessage'`.
 Providers with negative preference are excluded from the "not configured"
 error help text.
 

@@ -2636,6 +2636,7 @@ function defaultSegmentCost(string $providerKey): float
 	$class = match ($providerKey) {
 		'5centsmsv5' => \Sms\Providers\FiveCentSmsV5Provider::class,
 		'cellcast' => \Sms\Providers\CellcastSmsProvider::class,
+		'mobilemessage' => \Sms\Providers\MobileMessageSmsProvider::class,
 		'5csmsv4' => \Sms\Providers\TemplateSmsProvider::class,
 		default => null,
 	};

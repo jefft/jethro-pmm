@@ -36,6 +36,10 @@
       {
         "value": "cellcast",
         "label": "Cellcast"
+      },
+      {
+        "value": "mobilemessage",
+        "label": "MobileMessage"
       }
     ]
   },
@@ -1010,10 +1014,40 @@
       "fileOnly": true
     },
 
+    "SMS_MOBILEMESSAGE_APIKEY_PASSWORD": {
+      "type": "text",
+      "label": "Sms Mobilemessage Apikey Password",
+      "description": "API password from your MobileMessage dashboard, Settings → API (required if using the MobileMessage provider).",
+      "explanation": "",
+      "default": null,
+      "note": "MobileMessage API password",
+      "fileOnly": true
+    },
+
+    "SMS_MOBILEMESSAGE_APIKEY_USERNAME": {
+      "type": "text",
+      "label": "Sms Mobilemessage Apikey Username",
+      "description": "API username from your MobileMessage dashboard, Settings → API (required if using the MobileMessage provider).",
+      "explanation": "",
+      "default": null,
+      "note": "MobileMessage API username",
+      "fileOnly": true
+    },
+
+    "SMS_MOBILEMESSAGE_URL": {
+      "type": "text",
+      "label": "Sms Mobilemessage Url",
+      "description": "API base URL (optional; defaults to <code>https://api.mobilemessage.com.au</code>).",
+      "explanation": "",
+      "default": "https://api.mobilemessage.com.au",
+      "note": "",
+      "fileOnly": true
+    },
+
     "SMS_PROVIDER": {
       "type": "select",
       "label": "Sms Provider",
-      "description": "Which SMS provider to use for sending. Short key or fully-qualified class name. Short keys: <code>5centsmsv5</code>, <code>cellcast</code>. When unset, Jethro auto-detects from whichever required provider constants are defined.",
+      "description": "Which SMS provider to use for sending. Short key or fully-qualified class name. Short keys: <code>5centsmsv5</code>, <code>cellcast</code>, <code>mobilemessage</code>. When unset, Jethro auto-detects from whichever required provider constants are defined.",
       "explanation": "",
       "default": "",
       "note": "Which SMS provider to use for sending",
@@ -1069,7 +1103,7 @@
     "SMS_SEND_COOLOFF": {
       "type": "number",
       "label": "Sms Send Cooloff",
-      "description": "Delay in seconds applied to user-initiated immediate (non-deferred) sends. When unset, a 30-second cool-off is applied automatically — giving the user a window to cancel a mistaken send. Set to <code>0</code> to disable. Only takes effect with providers that support both scheduled send and cancellation (5CentSMS v5, Cellcast); with other providers (5CentSMS v4, HTTP-template gateways), and for automatic messages (2FA codes, reminders), messages are sent immediately.",
+      "description": "Delay in seconds applied to user-initiated immediate (non-deferred) sends. When unset, a 30-second cool-off is applied automatically — giving the user a window to cancel a mistaken send. Set to <code>0</code> to disable. Only takes effect with providers that support both scheduled send and cancellation (5CentSMS v5, Cellcast, MobileMessage); with other providers (5CentSMS v4, HTTP-template gateways), and for automatic messages (2FA codes, reminders), messages are sent immediately. MobileMessage only accepts schedules more than 60 seconds ahead, so its minimum effective cool-off is 61 seconds.",
       "explanation": "",
       "default": 30,
       "note": "Delay before sending to allow cancellation"
@@ -1473,6 +1507,12 @@
       "settings": ["SMS_CELLCAST_APIKEY", "SMS_CELLCAST_URL"]
     },
 
+    "mobileMessage": {
+      "heading": "MobileMessage",
+      "intro": "API credentials come from the MobileMessage dashboard (Settings → API). Note: the send-undo cool-off requires SMS_SEND_COOLOFF ≥ 61 seconds with this provider.",
+      "settings": ["SMS_MOBILEMESSAGE_APIKEY_USERNAME", "SMS_MOBILEMESSAGE_APIKEY_PASSWORD", "SMS_MOBILEMESSAGE_URL"]
+    },
+
     "messageBody": {
       "heading": "Message body",
       "intro": "Limits on what the user can type.",
@@ -1588,6 +1628,7 @@
         "providerSelection",
         "fiveCentSms",
         "cellcast",
+        "mobileMessage",
         "messageBody",
         "debugging",
         "legacyGateway",

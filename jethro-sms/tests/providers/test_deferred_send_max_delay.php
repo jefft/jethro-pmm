@@ -16,6 +16,7 @@ use \Sms\{
 use Sms\Providers\TemplateSmsProvider;
 use Sms\Providers\FiveCentSmsV5Provider;
 use Sms\Providers\CellcastSmsProvider;
+use Sms\Providers\MobileMessageSmsProvider;
 
 require_once __DIR__ . '/../../src/load.php';
 
@@ -44,6 +45,20 @@ test('CellcastSmsProvider getDeferredSendMaxDelay() → 24 hours (86400)', funct
     );
     $delay = $p->getDeferredSendMaxDelay();
     assert_eq($delay, 86400, 'Expected 24 hours (86400 seconds)');
+});
+
+// ---------------------------------------------------------------------------
+// MobileMessageSmsProvider → null (only a 60s minimum is documented)
+// ---------------------------------------------------------------------------
+
+test('MobileMessageSmsProvider getDeferredSendMaxDelay() → null', function () {
+    $p = new MobileMessageSmsProvider(
+        username: 'u',
+        password: 'p',
+        url: 'https://example.com',
+    );
+    $delay = $p->getDeferredSendMaxDelay();
+    assert_eq($delay, null, 'Expected null (unspecified)');
 });
 
 // ---------------------------------------------------------------------------

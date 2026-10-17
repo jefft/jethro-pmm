@@ -21,7 +21,7 @@ interface SmsProvider {
 
 ## Why an Interface?
 
-- **Gateway independence** — swap between FiveCentSms, Cellcast, or custom providers without changing calling code
+- **Gateway independence** — swap between FiveCentSms, Cellcast, MobileMessage, or custom providers without changing calling code
 - **Testability** — mock the provider in tests
 - **Capability discovery** — `getCapabilities()` tells callers what's supported before they attempt operations
 

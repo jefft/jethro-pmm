@@ -86,7 +86,7 @@ class SmsDelivery extends DB_Object
 				`remote_id` VARCHAR(255) NULL DEFAULT NULL,
 				`raw_response` TEXT NULL DEFAULT NULL,
 				`body` TEXT NULL DEFAULT NULL,
-				`provider` ENUM('5centsmsv5','cellcast','5csmsv4') NULL DEFAULT NULL,
+				`provider` ENUM('5centsmsv5','cellcast','5csmsv4','mobilemessage') NULL DEFAULT NULL,
 				`delivered_at` DATETIME NULL DEFAULT NULL,
 				`status` ENUM('queued','sent','delivered','failed','in-progress','scheduled','cancelled','sending','test-message','unknown') NOT NULL DEFAULT 'sending',
 				`segments_used` INT NULL DEFAULT NULL,

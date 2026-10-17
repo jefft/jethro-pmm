@@ -213,7 +213,7 @@ A bulk SMS can be delayed / scheduled to send, for up to 24h in the case of 5Cen
 
 #### Send Cool-off
 
-With an SMS provider that supports scheduled sending and cancellation (5CentSMS v5, Cellcast), Jethro by default applies a **30-second cool-off delay** to messages you send, giving you a brief window to cancel a mistaken send. The delay is invisible: the provider holds the message as a send scheduled 30 seconds ahead. With other providers (5CentSMS v4, HTTP-template gateways), and for automatic messages (2-factor login codes, reminders), messages are sent immediately. An administrator can change or disable the delay via <SettingRef name="SMS_SEND_COOLOFF" />.
+With an SMS provider that supports scheduled sending and cancellation (5CentSMS v5, Cellcast, MobileMessage), Jethro by default applies a **30-second cool-off delay** to messages you send, giving you a brief window to cancel a mistaken send. The delay is invisible: the provider holds the message as a send scheduled 30 seconds ahead. With other providers (5CentSMS v4, HTTP-template gateways), and for automatic messages (2-factor login codes, reminders), messages are sent immediately. With MobileMessage the delay is 61 seconds, since that provider only accepts schedules further than 60 seconds ahead. An administrator can change or disable the delay via <SettingRef name="SMS_SEND_COOLOFF" />.
 
 ### Saving as a Note
 
@@ -259,7 +259,7 @@ To cancel a scheduled message before it's sent:
 
 {/* screenshot: cancel_scheduled.png */}
 
-Provider support: **5CentSMS v5** ✓, **Cellcast** ✓, **Legacy v4** ✗. Cancel early — once the gateway dispatches, it can't be recalled.
+Provider support: **5CentSMS v5** ✓, **Cellcast** ✓, **MobileMessage** ✓, **Legacy v4** ✗. Cancel early — once the gateway dispatches, it can't be recalled.
 
 The result message reports the outcome per recipient, e.g.
 **"Cancelled 2 deliveries, 1 failed (message not found)."** — the reason in

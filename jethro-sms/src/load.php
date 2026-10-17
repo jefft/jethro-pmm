@@ -63,14 +63,17 @@ require_once __DIR__ . '/Providers/TemplateSmsProvider.php';
 require_once __DIR__ . '/Providers/FiveCentSmsV4Provider.php';
 require_once __DIR__ . '/Providers/FiveCentSmsV5Provider.php';
 require_once __DIR__ . '/Providers/CellcastSmsProvider.php';
+require_once __DIR__ . '/Providers/MobileMessageSmsProvider.php';
 
 // Provider-specific delivery types
 require_once __DIR__ . '/Providers/FiveCentSmsDelivery.php';
 require_once __DIR__ . '/Providers/CellcastSmsDelivery.php';
+require_once __DIR__ . '/Providers/MobileMessageSmsDelivery.php';
 
 // Provider-specific fake HTTP clients
 require_once __DIR__ . '/Providers/CellcastFakeHttpClient.php';
 require_once __DIR__ . '/Providers/FiveCentSmsV5FakeHttpClient.php';
+require_once __DIR__ . '/Providers/MobileMessageFakeHttpClient.php';
 require_once __DIR__ . '/Providers/TemplateFakeHttpClient.php';
 
 // Standalone functions (depend on all types above)

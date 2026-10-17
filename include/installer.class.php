@@ -403,7 +403,7 @@ class Installer
 			-- Synced with upgrades/2026-upgrade-to-2.40.sql:141 — SMS_SAVE_TO_NOTE_SUBJECT default changed to 'SMS follow-up'
 			(@rank:=@rank+5, '',                         'SMS_SAVE_TO_NOTE_SUBJECT','','text','SMS follow-up'),
 			-- Synced with upgrades/2026-upgrade-to-2.40.sql:153 — send cool-off (undo window)
-			(@rank:=@rank+5, '',                         'SMS_SEND_COOLOFF','Undo window: seconds an immediate SMS is held, cancellable, before dispatch. 0 to disable. Only with providers that can schedule and cancel (5CentSMS v5, Cellcast); other providers, 2FA codes and reminders send immediately.','int','30'),
+			(@rank:=@rank+5, '',                         'SMS_SEND_COOLOFF','Undo window: seconds an immediate SMS is held, cancellable, before dispatch. 0 to disable. Only with providers that can schedule and cancel (5CentSMS v5, Cellcast; MobileMessage: at least 61); other providers, 2FA codes and reminders send immediately.','int','30'),
 			(@rank:=@rank+5, '',                         'SMS_TESTMODE','In Test Mode no SMSes are actually sent','bool','false'),
 			(@rank:=@rank+5, '',                         'SMS_VERBOSE','Log HTTP requests to upstream SMS provider','bool','false'),
 			-- Synced with upgrades/2026-upgrade-to-2.40.sql:146 — per-segment cost override
@@ -411,10 +411,12 @@ class Installer
 			(@rank:=@rank+5, '',                         'SMS_BALANCE_LOW_THRESHOLD','Notify a staff member when SMS account balance drops below this amount (0 = disabled)','int','0'),
 			(@rank:=@rank+5, '',                         'SMS_BALANCE_LOW_NOTIFICANT_PERSON_ID','Person ID of the staff member to notify when SMS balance is low','person',''),
 			-- Synced with upgrades/2026-upgrade-to-2.40.sql:116 — provider selection with auto-detect
-			(@rank:=@rank+5, '',                         'SMS_PROVIDER','Which SMS provider to use for sending','select{\"\":\"Auto-detect (based on settings)\",\"5centsmsv5\":\"5CentSMS v5\",\"cellcast\":\"Cellcast\"}',''),
+			(@rank:=@rank+5, '',                         'SMS_PROVIDER','Which SMS provider to use for sending','select{\"\":\"Auto-detect (based on settings)\",\"5centsmsv5\":\"5CentSMS v5\",\"cellcast\":\"Cellcast\",\"mobilemessage\":\"MobileMessage\"}',''),
 			(@rank:=@rank+5, '',                         'SMS_5CENTSMS_APIKEY_ID','FiveCent SMS v5 API key ID','text',''),
 			(@rank:=@rank+5, '',                         'SMS_5CENTSMS_APIKEY','FiveCent SMS v5 API key secret','text',''),
 			(@rank:=@rank+5, '',                         'SMS_CELLCAST_APIKEY','Cellcast API bearer token','text',''),
+			(@rank:=@rank+5, '',                         'SMS_MOBILEMESSAGE_APIKEY_USERNAME','MobileMessage API username','text',''),
+			(@rank:=@rank+5, '',                         'SMS_MOBILEMESSAGE_APIKEY_PASSWORD','MobileMessage API password','text',''),
 			-- Deprecated 5CentSMS v4 settings (SMS_HTTP_*, SMS_RECIPIENT_ARRAY_PARAMETER) and the
 			-- SMS_LOCAL/INTERNATIONAL_PREFIX overrides are not created; the 2.40 upgrade deletes them
 			-- when blank/default. They can still be defined in conf.php (code defaults: '0' / '61').

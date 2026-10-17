@@ -20,6 +20,7 @@ namespace Sms;
 use Sms\Providers\CellcastSmsProvider;
 use Sms\Providers\FiveCentSmsV4Provider;
 use Sms\Providers\FiveCentSmsV5Provider;
+use Sms\Providers\MobileMessageSmsProvider;
 use Sms\Providers\TemplateSmsProvider;
 
 
@@ -33,6 +34,7 @@ function providerShortNames(): array
 	return [
 		'5centsmsv5' => FiveCentSmsV5Provider::class,
 		'cellcast' => CellcastSmsProvider::class,
+		'mobilemessage' => MobileMessageSmsProvider::class,
 	];
 }
 
@@ -44,6 +46,7 @@ function providerShortNames(): array
 function providerCandidates(): array
 {
 	$candidates = [
+		[MobileMessageSmsProvider::class, 'MobileMessage'],
 		[FiveCentSmsV5Provider::class, '5CentSMS (v5)'],
 		[CellcastSmsProvider::class, 'Cellcast'],
 		[FiveCentSmsV4Provider::class, '5CentSMS (v4)'],
