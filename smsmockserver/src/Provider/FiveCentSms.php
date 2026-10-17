@@ -49,6 +49,8 @@ final class FiveCentSms implements ProviderInterface
                 $this->handlePostSenderIdV5($ctx);
             case $method === 'GET' && $path === '/senderid':
                 $this->handleGetSenderIdV5($ctx);
+            case $method === 'GET' && $path === '/optouts':
+                $this->handleOptOutsV5($ctx);
 
             case $method === 'POST' && $path === '/api/v1/sendSms':
                 $this->handleSend($ctx);
@@ -493,20 +495,48 @@ final class FiveCentSms implements ProviderInterface
 
     // ── v5 Get Sender IDs ──────────────────────────────────────────────
 
-    /** GET /senderid handler for FiveCentSmsV5Provider format. */
+    /** GET /senderid handler for FiveCentSmsV5Provider format: the profile's
+     *  approved senders, then those registered through POST /senderid. */
     private function handleGetSenderIdV5(Ctx $ctx): void
     {
-        $rows = $ctx->store->listRegistrationsForScope($ctx->profileName, '5centsms');
         $out = [];
+        foreach (FiveCentSmsProfile::get($ctx->profileName)?->approvedSenders ?? [] as $sender) {
+            $out[$sender] = ['senderid' => $sender, 'status' => 'approved'];
+        }
+        $rows = $ctx->store->listRegistrationsForScope($ctx->profileName, '5centsms');
         foreach ($rows as $row) {
             if ($row['kind'] !== 'senderid') continue;
-            $approval = $ctx->state->deriveApproval($row, $ctx->now);
-            $out[] = [
+            $out[$row['value']] ??= [
                 'senderid' => $row['value'],
-                'status' => $approval,
+                'status' => $ctx->state->deriveApproval($row, $ctx->now),
             ];
         }
-        \SmsMockServer\Util::json(200, ['senderids' => $out]);
+        \SmsMockServer\Util::json(200, ['senderids' => array_values($out)]);
+    }
+
+    /** GET /optouts?after= handler, recorded live shape (see
+     *  docs/docs/developer/reference/sms/_5centsmsv5/optouts/GET.md). One
+     *  page holds every entry; its next_page cursor leads to the terminal
+     *  page (count 0), as the live API's does. */
+    private function handleOptOutsV5(Ctx $ctx): void
+    {
+        $numbers = [];
+        if (($_GET['after'] ?? '') === '') {
+            foreach (FiveCentSmsProfile::get($ctx->profileName)?->optOuts ?? [] as $number) {
+                $numbers[] = [
+                    'id' => substr(md5($number), 0, 24),
+                    'number' => $number,
+                    'timestamp' => $ctx->now->getTimestamp(),
+                ];
+            }
+        }
+        $last = $numbers === [] ? '' : $numbers[array_key_last($numbers)]['id'];
+        \SmsMockServer\Util::json(200, [
+            'error' => '',
+            'numbers' => $numbers,
+            'count' => \count($numbers),
+            'next_page' => 'api/v5/optouts?after=' . $last,
+        ]);
     }
 
 

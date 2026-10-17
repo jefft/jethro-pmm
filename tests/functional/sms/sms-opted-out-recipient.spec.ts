@@ -1,5 +1,6 @@
 import { test, expect } from "../fixtures.js";
 import { mockMeta } from "./smsmock-url.js"
+import { mockProfile, sentSms } from "./scenario.js";
 import { login } from "../auth.js";
 import { to } from "../timeouts.js";
 
@@ -76,15 +77,11 @@ test.describe("SMS to family with opted-out member", () => {
     await expect(results).toContainText("has opted out of receiving SMS");
 
     // 9. Verify via /meta/lastPost that only Bridget's number was POSTed
-    const lastPost = await request.get(
-      mockMeta("tests/functional/sms/sms-opted-out-recipient", "lastPost")
-    );
+    const lastPost = await request.get(mockMeta(mockProfile(test.info()), "lastPost"));
     const captured = await lastPost.json();
     expect(captured, "mock proxy did not capture an SMS POST").not.toBeNull();
-    expect(captured.json.contacts, "POST body should contain only Bridget's number").toEqual([
-      "0491570156",
-    ]);
-    expect(captured.json.message).toContain("Test opted-out");
-    expect(captured.json.countryCode).toBe(61);
+    const sent = sentSms(test.info(), captured.json);
+    expect(sent.recipients, "POST body should contain only Bridget's number").toEqual(["0491570156"]);
+    expect(sent.message).toContain("Test opted-out");
   });
 });

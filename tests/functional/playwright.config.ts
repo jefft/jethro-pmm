@@ -46,6 +46,21 @@ const SMS_SCENARIOS = [
   // A sent message is polled on to delivered (not left at ✓).
   "sms-delivered-status",
 ];
+
+// Provider-sensitive scenarios (schedule/cancel, cool-off, status lifecycle,
+// send failure, opt-outs, sender registration, history) also run against
+// 5CentSMS v5: the same spec, with its own <name>-v5.conf and mock profile.
+// sms/scenario.ts reads each project's metadata.smsProvider.
+const PROVIDER_MATRIX = [
+  "sms-schedule-and-cancel",
+  "sms-cooloff",
+  "sms-scheduled-status",
+  "sms-delivered-status",
+  "sms-failed-send",
+  "sms-opted-out-recipient",
+  "sms-sender-number-registration",
+  "sms-admin-history-filters",
+];
  
 export default defineConfig({
   globalSetup: "./global-setup.ts",
@@ -64,6 +79,13 @@ export default defineConfig({
       name,
       use: { baseURL: `${HOST}/tests/functional/sms/${name}/` },
       testMatch: [`sms/${name}.spec.ts`],
+      ...(PROVIDER_MATRIX.includes(name) ? { metadata: { smsProvider: "cellcast" } } : {}),
+    })),
+    ...PROVIDER_MATRIX.map((name) => ({
+      name: `${name}-v5`,
+      use: { baseURL: `${HOST}/tests/functional/sms/${name}-v5/` },
+      testMatch: [`sms/${name}.spec.ts`],
+      metadata: { smsProvider: "5centsmsv5" },
     })),
     { name: "lookaround", testMatch: ["lookaround/lookaround.spec.ts"] },
     {

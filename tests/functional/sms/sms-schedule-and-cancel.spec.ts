@@ -1,6 +1,7 @@
 import { to } from "../timeouts.js";
 import { test, expect } from "../fixtures.js";
 import { mockMeta } from "./smsmock-url.js"
+import { mockProfile, sentSms } from "./scenario.js";
 import { login } from "../auth.js";
 
 let scheduledTimestamp = "";
@@ -33,7 +34,7 @@ test.describe("SMS schedule send and cancel", () => {
     const messageBox = smsForm.locator(".sms-message");
     await messageBox.fill(message);
 
-    // 4. Verify the "Schedule Send…" checkbox is visible (Cellcast capability gating)
+    // 4. Verify the "Schedule Send…" checkbox is visible (capability gating)
     const scheduleCheckbox = smsForm.locator(".sms-schedule-toggle");
     await expect(scheduleCheckbox).toBeVisible();
 
@@ -74,20 +75,16 @@ test.describe("SMS schedule send and cancel", () => {
     await expect(results).toContainText("Idelette de Bure");
     await expect(results).toContainText("Pierre de Bure");
 
-    // 9. Verify the POST body contains the scheduleAt field
-    const lastPost = await request.get(
-      mockMeta("tests/functional/sms/sms-schedule-and-cancel", "lastPost")
-    );
+    // 9. Verify the provider was asked for a deferred send to all 3 recipients
+    const lastPost = await request.get(mockMeta(mockProfile(test.info()), "lastPost"));
     const captured = await lastPost.json();
     expect(captured, "mock proxy did not capture an SMS POST").not.toBeNull();
-    expect(captured.json.scheduleAt, "scheduleAt must be present for deferred send").toBeDefined();
-    expect(new Date(captured.json.scheduleAt + "Z").getTime(), "scheduleAt must be in the future").toBeGreaterThan(
-      Date.now(),
-    );
-    expect(captured.json.message).toContain("Scheduled test");
-    expect(captured.json.contacts).toHaveLength(3);
-    expect(captured.json.countryCode).toBe(61);
-    expect(captured.json.sender).toBeDefined();
+    const sent = sentSms(test.info(), captured.json);
+    expect(sent.scheduledAt, "a deferred send must carry its send time").not.toBeNull();
+    expect(sent.scheduledAt!, "send time must be in the future").toBeGreaterThan(Date.now());
+    expect(sent.message).toContain("Scheduled test");
+    expect(sent.recipients).toHaveLength(3);
+    expect(sent.sender).toBeDefined();
 
     // Store timestamp for the next test
     scheduledTimestamp = timestamp;

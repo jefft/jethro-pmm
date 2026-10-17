@@ -1,6 +1,7 @@
 import { to } from "../timeouts.js";
 import { test, expect } from "../fixtures.js";
 import { mockMeta } from "./smsmock-url.js"
+import { mockProfile, scenarioProvider, sentSms } from "./scenario.js";
 import { login } from "../auth.js";
 
 test.describe("SMS admin history filters", () => {
@@ -48,14 +49,12 @@ test.describe("SMS admin history filters", () => {
     });
 
     // Verify the POST body matches what was sent
-    const lastPost = await request.get(
-      mockMeta("tests/functional/sms/sms-admin-history-filters", "lastPost")
-    );
+    const lastPost = await request.get(mockMeta(mockProfile(test.info()), "lastPost"));
     const captured = await lastPost.json();
     expect(captured, "mock proxy did not capture an SMS POST").not.toBeNull();
-    expect(captured.json.message).toContain("Filter test message");
-    expect(captured.json.contacts.length, "Mann family should have multiple recipients").toBeGreaterThanOrEqual(2);
-    expect(captured.json.countryCode).toBe(61);
+    const sent = sentSms(test.info(), captured.json);
+    expect(sent.message).toContain("Filter test message");
+    expect(sent.recipients.length, "Mann family should have multiple recipients").toBeGreaterThanOrEqual(2);
 
     // 7. Navigate to Persons > SMS page
     await page.goto("./?view=persons__messages");
@@ -106,6 +105,7 @@ test.describe("SMS admin history filters", () => {
   test("Send History tab: Cost column, Single recipients only filter, and Body text filter", async ({
     page,
   }) => {
+    test.skip(scenarioProvider(test.info()) !== "cellcast", "filters seeded history only; provider-independent");
     // Heavy global messages page (seed data has ~14k deliveries) with many
     // client-side filter interactions; give headroom under concurrent load.
     test.slow();

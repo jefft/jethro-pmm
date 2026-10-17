@@ -127,6 +127,20 @@ project whose `baseURL` is `${HOST}/tests/functional/sms/{name}/` and whose
 `.spec.ts` file must all agree on the same name** — there's no dynamic
 discovery. Adding a new SMS scenario means adding to all three.
 
+**Provider matrix.** The scenarios in `PROVIDER_MATRIX` — the ones where
+provider differences reach the UI (schedule/cancel, cool-off, status
+lifecycle, send failure, opt-outs, sender registration, history) — run once
+per provider. Each also becomes a `<name>-v5` project that runs the **same**
+`.spec.ts` under `/tests/functional/sms/<name>-v5/`, so it loads
+`<name>-v5.conf` (`SMS_PROVIDER=5centsmsv5`) and the `<name>-v5` mock
+profile. Every matrix project sets `metadata.smsProvider`, and the specs stay
+provider-neutral through `tests/functional/sms/scenario.ts`:
+`mockProfile(test.info())` for `mockMeta()`, and `sentSms(test.info(), body)`,
+which parses the captured send request (Cellcast `contacts`/`scheduleAt` or
+v5 `to`/`schedule`) into recipients in local form and a send time in epoch ms.
+Branch on `scenarioProvider()` only where the providers' flows differ: e.g.
+Cellcast's OTP sender registration vs 5CentSMS's verification link.
+
 ### 7. Mock SMS server — `smsmockserver/`
 
 A small standalone PHP app (its own `composer.json`, autoloaded under
@@ -220,6 +234,12 @@ grep -oE 'rt=[0-9.]+' .devbox/virtenv/nginx/access.log | sort -t= -k2 -rn | head
 3. Create `tests/functional/sms/<name>.spec.ts`.
 4. If it needs custom mock-provider behavior, create
    `tests/functional/sms/<name>.smsmock.php`.
+5. If provider differences can change what it observes, also add it to
+   `PROVIDER_MATRIX`, create `<name>-v5.conf` and `<name>-v5.smsmock.php`
+   (`FiveCentSmsProfile::register('<name>-v5', …)`; point `SMS_5CENTSMS_URL`
+   at `/smsmockserver/tests/functional/sms/<name>-v5`, with no `/api/v1`
+   suffix, which would hit the mock's v4 routes), and keep the spec
+   provider-neutral via `scenario.ts`.
 
 ## Role-based permission checks
 

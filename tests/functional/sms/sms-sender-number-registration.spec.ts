@@ -1,25 +1,31 @@
 import { to } from "../timeouts.js";
 import { test, expect } from "../fixtures.js";
 import { mockMeta } from "./smsmock-url.js"
+import { mockProfile, scenarioProvider } from "./scenario.js";
 import { login } from "../auth.js";
 
-const SENDER = "smallgroupleader";
-const SENDER_PERSONID = 170;
+// A persona per provider run: the runs are parallel, and the shared functest
+// database records a number as verified for the first person it is verified
+// for (DbLoggingSmsProvider::verifySenderNumber()). Each can send, and no
+// other scenario sends from or verifies its mobile.
+const SENDERS = {
+  cellcast: { username: "smallgroupleader", personid: 170 },
+  "5centsmsv5": { username: "bandleader", personid: 175 },
+};
 
-test.describe("SMS sender number registration (OTP flow)", () => {
+test.describe("SMS sender number registration", () => {
   test.beforeEach(async ({ page, request }) => {
     // Clean up any registration from a previous run — stale registrations
     // with ApprovalDelay=0 default to "approved" in the mock, making
     // verifySenderNumber() return true and hiding the registration UI.
-    await request.delete(mockMeta("tests/functional/sms/sms-sender-number-registration", "registrations"));
-    // smallgroupleader (person 170): can send, and no other scenario sends from
-    // its mobile, so no other scenario has verified it — the shared functest
-    // database records a number as verified for the first person it is
-    // verified for (DbLoggingSmsProvider::verifySenderNumber()).
-    await login(page, SENDER);
+    await request.delete(mockMeta(mockProfile(test.info()), "registrations"));
+    await login(page, SENDERS[scenarioProvider(test.info())].username);
   });
 
-  test("Register and verify own mobile number as SMS sender", async ({ page }) => {
+  test("Register own mobile number as SMS sender", async ({ page }) => {
+    const provider = scenarioProvider(test.info());
+    const SENDER_PERSONID = SENDERS[provider].personid;
+
     // 1. Navigate to the sender's own person page
     await page.goto(`./?view=persons&personid=${SENDER_PERSONID}`);
     await page.waitForLoadState("load");
@@ -40,8 +46,8 @@ test.describe("SMS sender number registration (OTP flow)", () => {
     const modal = page.locator("#send-sms-modal");
     await expect(modal).toBeVisible({ timeout: to(5000) });
 
-    // 5. The sender area shows "needs verifying" — the user's mobile is not yet registered
-    // (the mock proxy's GET /api/v1/customNumber list doesn't include it)
+    // 5. The sender area shows "needs verifying" — the provider's sender list
+    // doesn't include the user's mobile yet
     const registerStatus = page.locator(`#sms-register-person_${SENDER_PERSONID}`);
     await expect(registerStatus).toBeVisible();
     await expect(registerStatus).toContainText("needs verifying");
@@ -57,11 +63,16 @@ test.describe("SMS sender number registration (OTP flow)", () => {
     // 7. Brief pause for Datastar response to arrive
     await page.waitForTimeout(150);
 
-    // 8. The mock proxy returns {"status": true, "message": "Custom number created"}
-    //    (or "Number already exist in system" when already registered — e.g.
-    //    parallel runs). Cellcast treats both as success. Datastar patches
-    //    #sms-register-person_<id> with the message.
+    // 8. Datastar patches #sms-register-person_<id> with the provider's answer.
     await expect(registerStatus).not.toContainText("needs verifying", { timeout: to(5000) });
-    await expect(registerStatus).toContainText(/created|verified|success|already exist/i, { timeout: to(5000) });
+    if (provider === "cellcast") {
+      // {"status": true, "message": "Custom number created"} (or "Number
+      // already exist in system" when already registered — e.g. parallel
+      // runs); Cellcast treats both as success.
+      await expect(registerStatus).toContainText(/created|verified|success|already exist/i, { timeout: to(5000) });
+    } else {
+      // 5CentSMS verifies out of band: it texts the number a link to click.
+      await expect(registerStatus).toContainText("Verification link sent to the number", { timeout: to(5000) });
+    }
   });
 });

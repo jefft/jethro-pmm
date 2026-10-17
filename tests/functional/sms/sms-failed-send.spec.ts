@@ -1,6 +1,7 @@
 import { to } from "../timeouts.js";
 import { test, expect } from "../fixtures.js";
 import { mockMeta } from "./smsmock-url.js"
+import { mockProfile, sentSms } from "./scenario.js";
 import { login } from "../auth.js";
 
 test.describe("SMS send failure — provider error", () => {
@@ -22,7 +23,7 @@ test.describe("SMS send failure — provider error", () => {
     const smsForm = page.locator("#smshttp");
     await expect(smsForm).toBeVisible();
 
-    // Fill message and send — proxy returns {status: false, message: "Insufficient credits"}.
+    // Fill message and send — the mock rejects every send with "Insufficient credits".
     const messageBox = smsForm.locator(".sms-message");
     await messageBox.fill("Test failed send message");
 
@@ -50,13 +51,11 @@ test.describe("SMS send failure — provider error", () => {
     });
 
     // Verify a POST was actually attempted (not silently skipped)
-    const lastPost = await request.get(
-      mockMeta("tests/functional/sms/sms-failed-send", "lastPost")
-    );
+    const lastPost = await request.get(mockMeta(mockProfile(test.info()), "lastPost"));
     const captured = await lastPost.json();
     expect(captured, "an SMS POST should have been attempted before the failure was returned").not.toBeNull();
-    expect(captured.json.message).toBe("Test failed send message");
-    expect(captured.json.contacts.length, "both Williamson members should be in the POST").toBeGreaterThanOrEqual(2);
-    expect(captured.json.countryCode).toBe(61);
+    const sent = sentSms(test.info(), captured.json);
+    expect(sent.message).toBe("Test failed send message");
+    expect(sent.recipients.length, "both Williamson members should be in the POST").toBeGreaterThanOrEqual(2);
   });
 });

@@ -1,15 +1,16 @@
 import { to } from "../timeouts.js";
 import { test, expect } from "../fixtures.js";
 import { mockMeta } from "./smsmock-url.js"
+import { mockProfile, sentSms } from "./scenario.js";
 import { login } from "../auth.js";
 
 test.describe("SMS cooloff delay", () => {
   test.beforeEach(async ({ page, request }) => {
-    await request.delete(mockMeta("tests/functional/sms/sms-cooloff", "lastPost"));
+    await request.delete(mockMeta(mockProfile(test.info()), "lastPost"));
     await login(page);
   });
 
-  test("immediate send is scheduled with a future scheduleAt, Cancel link, and Datastar polling", async ({
+  test("immediate send is scheduled with a future send time, Cancel link, and Datastar polling", async ({
     page,
     request,
   }) => {
@@ -34,7 +35,7 @@ test.describe("SMS cooloff delay", () => {
     const modal = page.locator("#send-sms-modal");
     await expect(modal).toBeVisible({ timeout: to(5000) });
 
-    // 3. Fill and send — SMS_SEND_COOLOFF=3 adds ~3s to scheduleAt
+    // 3. Fill and send — SMS_SEND_COOLOFF=3 defers the send by ~3s
     const messageTextarea = modal.locator(".sms-message");
     await messageTextarea.fill(message);
     const sendTime = Date.now();
@@ -48,26 +49,19 @@ test.describe("SMS cooloff delay", () => {
     await reloadPromise;
 
     // 5. Verify the mock proxy captured the POST
-    const lastPost = await request.get(
-      mockMeta("tests/functional/sms/sms-cooloff", "lastPost")
-    );
+    const lastPost = await request.get(mockMeta(mockProfile(test.info()), "lastPost"));
     const captured = await lastPost.json();
 
     expect(captured, "mock proxy did not capture an SMS POST").not.toBeNull();
+    const sent = sentSms(test.info(), captured.json);
 
-    expect(
-      captured.json.scheduleAt,
-      "cooloff should produce a scheduleAt field for immediate sends"
-    ).toBeDefined();
+    expect(sent.scheduledAt, "cooloff should give immediate sends a send time").not.toBeNull();
+    // SMS_SEND_COOLOFF=3s → the send time should be 1-7s in the future
+    expect(sent.scheduledAt! - sendTime).toBeGreaterThan(1_000);
+    expect(sent.scheduledAt! - sendTime).toBeLessThan(7_000);
 
-    const sentAt = new Date(captured.json.scheduleAt + "Z").getTime();
-    // SMS_SEND_COOLOFF=3s → scheduleAt should be 1-7s in the future
-    expect(sentAt - sendTime).toBeGreaterThan(1_000);
-    expect(sentAt - sendTime).toBeLessThan(7_000);
-
-    expect(captured.json.message).toBe(message);
-    expect(captured.json.contacts).toEqual(["0491570158"]);
-    expect(captured.json.countryCode).toBe(61);
+    expect(sent.message).toBe(message);
+    expect(sent.recipients).toEqual(["0491570158"]);
 
     // 6. Navigate to Messages page — renders from the local DB.
     //    The message is non-final (scheduled_send_at is in the future),

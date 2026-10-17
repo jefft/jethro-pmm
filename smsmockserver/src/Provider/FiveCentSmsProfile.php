@@ -5,12 +5,25 @@ namespace SmsMockServer\Provider;
 use SmsMockServer\Profile;
 
 /**
- * FiveCentSms-specific profile wrapper.
+ * FiveCentSms-specific profile wrapper: account state the v5 routes list
+ * (sender numbers, sender IDs, opt-outs) plus behaviour helpers.
  */
 final class FiveCentSmsProfile
 {
+    /** @var array<string, self> name => FiveCentSmsProfile */
+    private static array $registry = [];
+
+    public static function get(string $name): ?self
+    {
+        return self::$registry[$name] ?? null;
+    }
+
     private function __construct(
         public readonly Profile $profile,
+        /** @var list<string> Sender numbers/IDs already approved on the account (GET /senderid) */
+        public array $approvedSenders = [],
+        /** @var list<string> Opted-out numbers, international form (GET /optouts) */
+        public array $optOuts = [],
     ) {}
 
     /** Register a 5centsms profile with the given name. */
@@ -20,7 +33,40 @@ final class FiveCentSmsProfile
         $fp = new self($profile);
         $setup($fp);
         Profile::register('5centsms', $name, $profile);
+        self::$registry[$name] = $fp;
         return $fp;
+    }
+
+    /**
+     * Sender numbers the account has already verified, e.g. the test user's
+     * own mobile; GET /senderid lists them with status "approved", as the
+     * live API does once the verification link has been clicked.
+     *
+     * @param list<string> $numbers International form, e.g. '61491570157'
+     */
+    public function preRegisterNumbers(array $numbers): void
+    {
+        array_push($this->approvedSenders, ...$numbers);
+    }
+
+    /**
+     * ACMA-approved alphanumeric Sender IDs, listed by GET /senderid.
+     *
+     * @param list<string> $ids e.g. ['Jethro']
+     */
+    public function setSenderIds(array $ids): void
+    {
+        array_push($this->approvedSenders, ...$ids);
+    }
+
+    /**
+     * Numbers GET /optouts lists as opted out.
+     *
+     * @param list<string> $numbers International form, e.g. '61491570159'
+     */
+    public function setOptOuts(array $numbers): void
+    {
+        $this->optOuts = $numbers;
     }
 
     public function setBalance(int $n): void
@@ -40,11 +86,11 @@ final class FiveCentSmsProfile
         };
     }
 
-    /** Reject all sends via endpoint override. */
+    /** Reject every send: POST /sms answers {"error": msg}, the live API's rejection shape. */
     public function rejectAllSends(string $msg, int $status = 200): void
     {
-        $this->profile->endpoint('POST', '/api/v1/sendSms')
-            ->returnJSON(['error_code' => 1, 'error_msg' => $msg])
+        $this->profile->endpoint('POST', '/sms')
+            ->returnJSON(['error' => $msg])
             ->returnStatus($status);
     }
 
