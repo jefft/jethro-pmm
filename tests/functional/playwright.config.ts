@@ -63,7 +63,6 @@ const PROVIDER_MATRIX = [
 ];
  
 export default defineConfig({
-  globalSetup: "./global-setup.ts",
   testDir: ".",
   // Cancels the scheduled-SMS polling backlog left by previous runs.
   globalSetup: "./global-setup.ts",
