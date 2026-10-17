@@ -45,6 +45,8 @@ const SMS_SCENARIOS = [
   "sms-scheduled-status",
   // A sent message is polled on to delivered (not left at ✓).
   "sms-delivered-status",
+  // The SMS status panel reports the provider's credit balance.
+  "sms-status-panel",
 ];
 
 // Provider-sensitive scenarios (schedule/cancel, cool-off, status lifecycle,
@@ -60,6 +62,7 @@ const PROVIDER_MATRIX = [
   "sms-opted-out-recipient",
   "sms-sender-number-registration",
   "sms-admin-history-filters",
+  "sms-status-panel",
 ];
 const MATRIX_PROVIDERS = [
   { suffix: "v5", smsProvider: "5centsmsv5" },
