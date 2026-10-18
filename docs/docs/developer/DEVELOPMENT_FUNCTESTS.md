@@ -166,9 +166,9 @@ database, `jethro_functest_smsmockserver`.
   `request.delete(mockMeta(...))` in a `beforeEach` is the standard way to
   reset captured state between tests.
 - The `smsmock-recordings` project checks the mock against recordings of
-  the live APIs (`smsmockserver/recordings/<provider>/actual/`): it replays
-  the same requests against the mock with `smsmockserver/bin/record` and
-  fails on any difference. See `smsmockserver/README.md` for re-recording
+  the live APIs (`smsmockserver/recordings/<provider>/actual/`): it runs
+  `smsmockserver/bin/check`, which records each provider against the mock
+  and diffs the result. See `smsmockserver/README.md` for re-recording
   after a provider changes its API.
 
 ## Running

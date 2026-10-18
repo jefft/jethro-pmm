@@ -1,0 +1,98 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Check the mock against the committed recordings of the live APIs.
+ *
+ * For each provider (or only those named), records its cases against the
+ * running mock — into recordings/<provider>/mockresults/ — and diffs the
+ * normalised output with recordings/<provider>/actual/. Exits non-zero on any
+ * difference, so it can run in CI with no credentials.
+ *
+ *   bin/check [provider...]
+ *
+ * Environment:
+ *   SMSMOCK_URL             Mock base URL (default http://127.0.0.1:8089/smsmockserver)
+ *   SMSMOCK_PROFILE_PREFIX  Profile URL prefix (default profiles)
+ */
+
+declare(strict_types=1);
+
+require __DIR__ . '/../autoload.php';
+
+use SmsMockServer\Recorder\Providers;
+
+$base = rtrim((string) (getenv('SMSMOCK_URL') ?: 'http://127.0.0.1:8089/smsmockserver'), '/');
+$prefix = trim((string) (getenv('SMSMOCK_PROFILE_PREFIX') ?: 'profiles'), '/');
+$providers = Providers::all();
+$wanted = array_slice($argv, 1) ?: array_keys($providers);
+
+/** @return array{int, string} exit code and combined output */
+function run(array $command, ?array $env = null): array
+{
+    $process = proc_open(
+        $command,
+        [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+        $pipes,
+        null,
+        $env,
+    );
+    if (!\is_resource($process)) {
+        return [127, 'could not start ' . implode(' ', $command)];
+    }
+    $out = stream_get_contents($pipes[1]);
+    $err = stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    return [proc_close($process), $out . $err];
+}
+
+function removeDir(string $dir): void
+{
+    if (!is_dir($dir)) return;
+    $files = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST,
+    );
+    foreach ($files as $file) {
+        $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
+    }
+    rmdir($dir);
+}
+
+$failed = 0;
+foreach ($wanted as $name) {
+    if (!isset($providers[$name])) {
+        fwrite(STDERR, "Unknown provider '$name'\n");
+        $failed++;
+        continue;
+    }
+    $dir = __DIR__ . '/../recordings/' . $name;
+    $actual = "$dir/actual";
+    $mockresults = "$dir/mockresults";
+    removeDir($mockresults);
+
+    $command = [
+        PHP_BINARY, __DIR__ . '/record', $name,
+        "$base/$prefix/{$providers[$name]['profile']}",
+        $mockresults,
+    ];
+    // Same cases as the live recording: the real-send ones only if it has them.
+    if (is_dir("$actual/send")) $command[] = '--send';
+
+    [$code, $output] = run($command, array_merge(getenv(), $providers[$name]['mock_env']));
+    if ($code !== 0) {
+        echo "[$name] RECORD FAILED\n$output\n";
+        $failed++;
+        continue;
+    }
+
+    [$code, $diff] = run(['diff', '-ru', '--exclude=*.raw.json', $actual, $mockresults]);
+    if ($code !== 0) {
+        echo "[$name] DIFFERS from the live recording ($actual):\n$diff\n";
+        $failed++;
+        continue;
+    }
+    echo "[$name] identical to the live recording\n";
+}
+
+exit($failed === 0 ? 0 : 1);

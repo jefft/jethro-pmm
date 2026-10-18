@@ -20,6 +20,33 @@ SMSMockServer is mounted at:
 
 It is normally not mounted in a production Jethro, where SMS_TESTMODE=true is generally sufficient for making SMS temporarily present but non-functional.
 
+## Standalone use (vendoring)
+
+The server has no dependency on Jethro: `composer.json` requires only PHP and
+the `pdo_mysql`/`curl` extensions, and every class is in the
+`SmsMockServer\…` namespace. To run it on its own:
+
+```bash
+SMSMOCK_DSN='mysql:host=127.0.0.1;dbname=smsmock;charset=utf8mb4' \
+SMSMOCK_DB_USER=smsmock SMSMOCK_DB_PASS=… \
+  php -S 127.0.0.1:8083 -t webroot webroot/index.php
+```
+
+(Served through nginx/FrankenPHP instead, the front controller needs
+`PATH_INFO` set, as in the snippet above.)
+
+| Environment | Purpose |
+|---|---|
+| `SMSMOCK_PROFILES` | `:`-separated profile directories (default: `./profiles`, then the Jethro functest tree) |
+| `SMSMOCK_PROFILE_PREFIX` | Profile URL prefix (default `profiles`): `/profiles/{profile}/…`; `/tests/functional/{dir}/{profile}/…` always works too |
+| `SMSMOCK_DSN`, `_DB_USER`, `_DB_PASS` | Database; default is the devbox MariaDB socket database `jethro_functest_smsmockserver` |
+| `SMSMOCK_URL` | Base URL used by `bin/check` (default `http://127.0.0.1:8089/smsmockserver`) |
+| `DELIVERY_DELAY`, `APPROVAL_DELAY` | State-machine timings, seconds |
+
+Profiles are plain PHP files registering overrides (`Profile::register(...)`);
+the provider defaults need no file. The database (two tables) is created and
+migrated on first request.
+
 ## Recordings: keeping the mock faithful to the live APIs
 
 `bin/record` replays a provider's API exchanges (`src/Recorder/<Provider>Cases.php`)
@@ -32,18 +59,21 @@ against any base URL and writes one pair of files per case:
   (statuses, error messages) are kept; per-account values are tokenised
   (`acma_additional_details` to `<text>`, an alphanumeric `senderid` to
   `<sender-id>`).
-- `<case>.raw.json`: the reply as received, phone numbers masked.
+- `<case>.raw.json`: the reply as received, phone numbers masked and
+  account/people values (names, emails, business details, API key name, stack
+  traces) blanked.
 
 Credentials come from the environment and are never written. A message a run
 schedules is cancelled before it ends. Cases that would deliver an SMS live
 under `send/` and run only with `--send`.
 
 `recordings/<provider>/actual/` is the committed recording of the **live** API.
-The `smsmock-recordings` functional test records the mock's
-`recording-<provider>` profile (`tests/functional/smsmock/`) into
-`recordings/<provider>/mockresults/` and fails unless it equals `actual/`
-(raw files excluded). That profile mirrors the live account's state (senders,
-unsubscribes), so list replies compare equal.
+`bin/check` records each provider's cases against the running mock, using the
+`recording-<provider>` profile shipped in `profiles/` (it mirrors the live
+account's state — senders, unsubscribes — so list replies compare equal), into
+`recordings/<provider>/mockresults/`, and fails unless it equals `actual/`
+(raw files excluded). It needs no credentials, so Jethro's `smsmock-recordings`
+functional test simply runs it.
 
 Re-record against the live API (by hand, e.g. before a release, or when a
 provider announces API changes), review the diff, then fix the mock:

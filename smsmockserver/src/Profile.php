@@ -18,8 +18,11 @@ class Profile
     /** @var array<string, string> profileName => providerName */
     private static array $flatRegistry = [];
 
-    /** Base directory from which profiles were loaded. Set by loadProfiles(). */
+    /** Base directory from which profiles were last loaded. Set by loadProfiles(). */
     public static string $profilesDir = '';
+
+    /** @var array<string, string> profileName => defining file */
+    private static array $files = [];
 
     /** Register a profile in the global registry. */
     public static function register(string $provider, string $name, self $profile): void
@@ -64,8 +67,18 @@ class Profile
             glob("$profilesDir/*.smsmock.php") ?: [],
             glob("$profilesDir/*/*.smsmock.php") ?: [],
         ) as $file) {
+            $before = array_keys(self::$flatRegistry);
             require_once $file;
+            foreach (array_diff(array_keys(self::$flatRegistry), $before) as $name) {
+                self::$files[$name] = realpath($file) ?: $file;
+            }
         }
+    }
+
+    /** The file that defined a profile, or null for a built-in one. */
+    public static function fileFor(string $name): ?string
+    {
+        return self::$files[$name] ?? null;
     }
 
     // ── Instance ───────────────────────────────────────────────────────

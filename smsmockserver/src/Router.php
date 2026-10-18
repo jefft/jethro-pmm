@@ -47,43 +47,59 @@ final class Router
         }
 
         // Built-in default providers: /5centsms/... or /cellcast/...
-        $entry = Profile::getByName($parts[0]);
-        if ($entry !== null) {
-            $profileName = $parts[0];
-            $providerName = $entry['provider'];
-            $hooks = $entry['profile'];
-            $p = $this->providers[$providerName] ?? null;
-            if ($p === null) Util::json(404, ['error' => "unknown provider: $providerName"]);
-            $remainder = $this->buildRemainder($parts, 1);
-            if ($remainder === '/' || $remainder === '') {
-                $this->renderProfileInfo($providerName, $profileName);
-            }
-            $this->doDispatchToProvider($p, $providerName, $profileName, $hooks, $remainder);
+        if (Profile::getByName($parts[0]) !== null) {
+            $this->dispatchProfile($parts, 0);
         }
 
-        // Test scenario profiles: /tests/functional/{dir}/{scenario}/...
+        // Jethro functional tests: /tests/functional/{dir}/{scenario}/...
         if (($parts[0] ?? '') === 'tests' && ($parts[1] ?? '') === 'functional') {
-            $profileName = $parts[3] ?? '';
-            if ($profileName === '') {
-                $this->renderIndexPage();
-            }
-            $entry = Profile::getByName($profileName);
-            if ($entry === null) {
-                $this->renderProfileNotFound($profileName);
-            }
-            $providerName = $entry['provider'];
-            $hooks = $entry['profile'];
-            $p = $this->providers[$providerName] ?? null;
-            if ($p === null) Util::json(404, ['error' => "unknown provider: $providerName"]);
-            $remainder = $this->buildRemainder($parts, 4);
-            if ($remainder === '/' || $remainder === '') {
-                $this->renderProfileInfo($providerName, $profileName);
-            }
-            $this->doDispatchToProvider($p, $providerName, $profileName, $hooks, $remainder);
+            $this->dispatchProfile($parts, 3);
+        }
+
+        // Standalone layout: /{SMSMOCK_PROFILE_PREFIX}/{profile}/...
+        // (default /profiles/{profile}/...; set the prefix to keep an existing layout)
+        $prefix = self::profilePrefixParts();
+        if ($prefix !== [] && \array_slice($parts, 0, \count($prefix)) === $prefix) {
+            $this->dispatchProfile($parts, \count($prefix));
         }
 
         // Anything else — show index
         $this->renderIndexPage();
+    }
+
+    /** Dispatch /…/{profileName}/… with the profile at $profileIndex. */
+    private function dispatchProfile(array $parts, int $profileIndex): void
+    {
+        $profileName = $parts[$profileIndex] ?? '';
+        if ($profileName === '') {
+            $this->renderIndexPage();
+        }
+        $entry = Profile::getByName($profileName);
+        if ($entry === null) {
+            $this->renderProfileNotFound($profileName);
+        }
+        $providerName = $entry['provider'];
+        $hooks = $entry['profile'];
+        $p = $this->providers[$providerName] ?? null;
+        if ($p === null) Util::json(404, ['error' => "unknown provider: $providerName"]);
+        $remainder = $this->buildRemainder($parts, $profileIndex + 1);
+        if ($remainder === '/' || $remainder === '') {
+            $this->renderProfileInfo($providerName, $profileName);
+        }
+        $this->doDispatchToProvider($p, $providerName, $profileName, $hooks, $remainder);
+    }
+
+    /** @return list<string> Segments of SMSMOCK_PROFILE_PREFIX (default "profiles") */
+    private static function profilePrefixParts(): array
+    {
+        $prefix = trim((string) (getenv('SMSMOCK_PROFILE_PREFIX') ?: 'profiles'), '/');
+        return $prefix === '' ? [] : explode('/', $prefix);
+    }
+
+    /** The profile URL prefix for links, as configured. */
+    private static function profileUrlPrefix(): string
+    {
+        return implode('/', self::profilePrefixParts());
     }
 
 
@@ -164,18 +180,16 @@ final class Router
 
         // Test profiles from registry (skip built-in defaults)
         $registry = Profile::all();
-        $profilesDir = Profile::$profilesDir;
         $testHtml = '';
         foreach ($registry as $providerName => $profiles) {
             $profileRows = '';
             foreach ($profiles as $profileName => $profile) {
                 // Skip built-in default profiles — shown in the defaults section
                 if ($profileName === $providerName) continue;
-                $filePath = $profilesDir !== ''
-                    ? "$profilesDir/$profileName.smsmock.php"
-                    : "$profileName.smsmock.php";
+                $filePath = Profile::fileFor($profileName) ?? "$profileName.smsmock.php";
                 $profileRows .= sprintf(
-                    '<li><a href="tests/functional/sms/sms/%s"><code>%s</code></a> <span class="path">%s</span></li>',
+                    '<li><a href="%s/%s"><code>%s</code></a> <span class="path">%s</span></li>',
+                    self::h(self::profileUrlPrefix()),
                     self::h($profileName),
                     self::h($profileName),
                     self::h($filePath),
@@ -228,7 +242,7 @@ final class Router
             $items = '';
             foreach ($allNames as $name) {
                 $isBuiltin = in_array($name, ['5centsms', 'cellcast'], true);
-                $url = $isBuiltin ? "$name/" : "tests/functional/sms/sms/$name";
+                $url = $isBuiltin ? "$name/" : self::profileUrlPrefix() . "/$name";
                 $items .= sprintf(
                     '<li><a href="%s"><code>%s</code></a></li>',
                     self::h($url),
@@ -252,16 +266,13 @@ final class Router
     /** Render an informational page for a valid profile at its root URL. */
     private function renderProfileInfo(string $providerName, string $profileName): never
     {
-        $profilesDir = Profile::$profilesDir;
         $isBuiltin = $profileName === $providerName;
-        $urlBase = $isBuiltin ? $profileName : "tests/functional/sms/sms/$profileName";
+        $urlBase = $isBuiltin ? $profileName : self::profileUrlPrefix() . "/$profileName";
 
         if ($isBuiltin) {
             $filePath = '(built-in — no file)';
         } else {
-            $filePath = $profilesDir !== ''
-                ? "$profilesDir/$profileName.smsmock.php"
-                : "$profileName.smsmock.php";
+            $filePath = Profile::fileFor($profileName) ?? "$profileName.smsmock.php";
         }
 
         $safeProvider = self::h($providerName);
