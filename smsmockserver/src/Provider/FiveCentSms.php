@@ -11,7 +11,7 @@ final class FiveCentSms implements ProviderInterface
 
     public function handle(Ctx $ctx): void
     {
-        header('Content-Type: application/json');
+        \SmsMockServer\Util::jsonHeader();
         $method = $_SERVER['REQUEST_METHOD'];
         $path = $_SERVER['PATH_INFO'] ?? '/';
 
@@ -24,7 +24,7 @@ final class FiveCentSms implements ProviderInterface
                     \SmsMockServer\Endpoint::ACTION_RETURN_JSON => \SmsMockServer\Util::json($ep->status, $ep->data),
                     \SmsMockServer\Endpoint::ACTION_RETURN_JSON_FUNC => $ep->jsonFunc
                         ? \SmsMockServer\Util::json($ep->status, ($ep->jsonFunc)(new \SmsMockServer\ProviderRequest(
-                            body: file_get_contents('php://input'), query: $_GET,
+                            body: $ctx->rawBody(), query: $_GET,
                         )))
                         : \SmsMockServer\Util::json(200, ['error' => 'no jsonFunc']),
                     \SmsMockServer\Endpoint::ACTION_HANDLER => ($ep->handler)(),
@@ -84,7 +84,7 @@ final class FiveCentSms implements ProviderInterface
 
     private function handleSend(Ctx $ctx): void
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $body = $ctx->jsonBody();
         $numbers = $body['numbers'] ?? [];
         $message = $body['message'] ?? '';
         $senderId = $body['sender_id'] ?? '';
@@ -191,7 +191,7 @@ final class FiveCentSms implements ProviderInterface
 
     private function handlePostSenderId(Ctx $ctx): void
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $body = $ctx->jsonBody();
         $senderId = $body['sender_id'] ?? '';
 
         if ($senderId === '') {
@@ -308,7 +308,7 @@ final class FiveCentSms implements ProviderInterface
     /** POST /sms handler for FiveCentSmsV5Provider format. */
     private function handleSendV5(Ctx $ctx): void
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $body = $ctx->jsonBody();
         $to = $body['to'] ?? '';
         $message = $body['message'] ?? '';
         $sender = $body['sender'] ?? '';
@@ -496,7 +496,7 @@ final class FiveCentSms implements ProviderInterface
     /** POST /senderid handler for FiveCentSmsV5Provider format. */
     private function handlePostSenderIdV5(Ctx $ctx): void
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $body = $ctx->jsonBody();
         $senderId = $body['senderid'] ?? '';
 
         if ($senderId === '') {

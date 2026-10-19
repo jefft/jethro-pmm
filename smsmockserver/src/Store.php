@@ -8,7 +8,7 @@ namespace SmsMockServer;
  * Uses PDO. No connection pooling — each instance owns its own PDO handle.
  * All timestamps are stored/returned as ISO 8601 strings in UTC.
  */
-final class Store
+final class Store implements MessageStore
 {
     public function __construct(
         public readonly \PDO $pdo,

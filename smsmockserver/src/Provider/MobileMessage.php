@@ -26,7 +26,7 @@ final class MobileMessage implements ProviderInterface
 
     public function handle(Ctx $ctx): void
     {
-        header('Content-Type: application/json');
+        \SmsMockServer\Util::jsonHeader();
         $method = $_SERVER['REQUEST_METHOD'];
         $path = $_SERVER['PATH_INFO'] ?? '/';
 
@@ -40,14 +40,14 @@ final class MobileMessage implements ProviderInterface
             match ($ep->action) {
                 \SmsMockServer\Endpoint::ACTION_RETURN_JSON => Util::json($ep->status, $ep->data),
                 \SmsMockServer\Endpoint::ACTION_RETURN_JSON_FUNC => Util::json($ep->status, ($ep->jsonFunc)(new \SmsMockServer\ProviderRequest(
-                    body: file_get_contents('php://input'), query: $_GET,
+                    body: $ctx->rawBody(), query: $_GET,
                 ))),
                 \SmsMockServer\Endpoint::ACTION_HANDLER => ($ep->handler)(),
             };
             exit;
         }
 
-        $body = json_decode(file_get_contents('php://input') ?: '', true) ?: [];
+        $body = $ctx->jsonBody();
         match (true) {
             $method === 'POST' && $path === '/v1/messages' => $this->handleSend($ctx, $body),
             $method === 'GET' && $path === '/v1/messages' => isset($_GET['message_id'])

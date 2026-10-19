@@ -20,6 +20,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../autoload.php';
 
+use SmsMockServer\Recorder\CurlTransport;
 use SmsMockServer\Recorder\Providers;
 use SmsMockServer\Recorder\Recorder;
 
@@ -38,7 +39,7 @@ try {
         throw new \RuntimeException("Unknown provider '$provider' (known: " . implode(', ', array_keys($providers)) . ')');
     }
     $cases = ($providers[$provider]['cases'])::fromEnv();
-    $count = (new Recorder($cases, rtrim($baseUrl, '/'), rtrim($outDir, '/'), $send))->run();
+    $count = (new Recorder($cases, new CurlTransport(rtrim($baseUrl, '/')), rtrim($outDir, '/'), $send))->run();
 } catch (\RuntimeException $e) {
     fwrite(STDERR, $e->getMessage() . "\n");
     exit(1);

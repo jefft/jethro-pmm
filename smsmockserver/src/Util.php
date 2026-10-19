@@ -5,11 +5,33 @@ namespace SmsMockServer;
 /** Pure helper functions — no side effects, no I/O. */
 final class Util
 {
-    /** Write a JSON response and exit. */
+    /** When true, json() throws JsonResponse instead of writing and exiting (tests). */
+    private static bool $collectResponses = false;
+
+    public static function collectResponses(bool $collect): void
+    {
+        self::$collectResponses = $collect;
+    }
+
+    /** Send the JSON content type, unless responses are being collected. */
+    public static function jsonHeader(): void
+    {
+        if (!self::$collectResponses) {
+            header('Content-Type: application/json');
+        }
+    }
+
+    /**
+     * Write a JSON response and exit; with collecting enabled, throw it
+     * instead so a caller can inspect it.
+     */
     public static function json(int $status, mixed $data): never
     {
+        if (self::$collectResponses) {
+            throw new JsonResponse($status, $data);
+        }
         http_response_code($status);
-        header('Content-Type: application/json');
+        \SmsMockServer\Util::jsonHeader();
         echo json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         exit;
     }

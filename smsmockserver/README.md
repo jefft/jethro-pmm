@@ -47,6 +47,17 @@ Profiles are plain PHP files registering overrides (`Profile::register(...)`);
 the provider defaults need no file. The database (two tables) is created and
 migrated on first request.
 
+## Tests
+
+`php tests/run.php` (also `composer test`) needs neither a web server nor a
+database. It runs the normaliser's format tokens and the status/approval state
+machine, then each provider's recorded cases through its handlers **in-process**
+(`MemoryStore` + `InProcessTransport`) and compares the normalised replies with
+`recordings/<provider>/actual/`, case by case.
+
+`bin/check` performs the same comparison over HTTP against a running mock;
+Jethro's `smsmock-recordings` functional test runs it.
+
 ## Recordings: keeping the mock faithful to the live APIs
 
 `bin/record` replays a provider's API exchanges (`src/Recorder/<Provider>Cases.php`)

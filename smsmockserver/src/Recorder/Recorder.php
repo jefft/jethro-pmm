@@ -3,7 +3,8 @@
 namespace SmsMockServer\Recorder;
 
 /**
- * Runs a provider's cases against a base URL — the live API or this mock —
+ * Runs a provider's cases through a Transport — the live API, the running
+ * mock (CurlTransport), or the handlers in-process (InProcessTransport) —
  * and writes one pair of files per case:
  *   <name>.json      request and reply normalised (Normaliser), for diffing
  *   <name>.raw.json  the reply as received, phone numbers masked and
@@ -25,7 +26,7 @@ final class Recorder
 
     public function __construct(
         private readonly ProviderCases $cases,
-        private readonly string $baseUrl,
+        private readonly Transport $transport,
         private readonly string $outDir,
         private readonly bool $includeSends,
     ) {
@@ -47,7 +48,7 @@ final class Recorder
             foreach ($this->toCancel as $id) {
                 $cancel = $this->cases->cancelRequest($id);
                 [$headers, $body] = $this->credentials(true, $cancel['body']);
-                $this->http($cancel['method'], $cancel['path'], [], $body, $headers);
+                $this->transport->send($cancel['method'], $cancel['path'], [], $body, $headers);
             }
         }
         return $recorded;
@@ -63,7 +64,7 @@ final class Recorder
         $body = isset($case['body']) ? $this->fill($case['body']) : null;
         [$headers, $sentBody] = $this->credentials($case['auth'] ?? true, $body);
 
-        [$status, $raw] = $this->http($case['method'], $path, $query, $sentBody, $headers);
+        [$status, $raw] = $this->transport->send($case['method'], $path, $query, $sentBody, $headers);
         $reply = json_decode($raw);
         if ($reply === null && trim($raw) !== 'null') {
             $reply = $raw; // not JSON: compare the text
@@ -116,26 +117,6 @@ final class Recorder
      * @param list<string> $headers
      * @return array{int, string} HTTP status and body
      */
-    private function http(string $method, string $path, array $query, ?array $body, array $headers): array
-    {
-        $url = $this->baseUrl . $path . ($query === [] ? '' : '?' . http_build_query($query));
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_CUSTOMREQUEST => $method,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_HTTPHEADER => $body === null ? $headers : [...$headers, 'Content-Type: application/json'],
-        ]);
-        if ($body !== null) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
-        }
-        $raw = curl_exec($ch);
-        if ($raw === false) {
-            throw new \RuntimeException("$method $path: " . curl_error($ch));
-        }
-        return [(int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE), (string) $raw];
-    }
-
     /** Replace {var} placeholders throughout a string or array. */
     private function fill(mixed $value): mixed
     {

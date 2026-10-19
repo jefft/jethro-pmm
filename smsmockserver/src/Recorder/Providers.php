@@ -2,20 +2,26 @@
 
 namespace SmsMockServer\Recorder;
 
+use SmsMockServer\Provider\Cellcast;
+use SmsMockServer\Provider\FiveCentSms;
+use SmsMockServer\Provider\MobileMessage;
+
 /**
- * Every recordable provider: its cases class, the mock profile that mirrors
- * the live account (shipped in smsmockserver/profiles/), and the credentials
- * the mock accepts (it does not validate them).
+ * Every recordable provider: its handler class, cases class, the mock
+ * profile that mirrors the live account (shipped in smsmockserver/profiles/),
+ * and the credentials the mock accepts (it does not validate them).
  */
 final class Providers
 {
     /**
-     * @return array<string, array{cases: class-string<ProviderCases>, profile: string, mock_env: array<string, string>}>
+     * @return array<string, array{provider: class-string,
+     *     cases: class-string<ProviderCases>, profile: string, mock_env: array<string, string>}>
      */
     public static function all(): array
     {
         return [
             'cellcast' => [
+                'provider' => Cellcast::class,
                 'cases' => CellcastCases::class,
                 'profile' => 'recording-cellcast',
                 'mock_env' => [
@@ -25,6 +31,7 @@ final class Providers
                 ],
             ],
             '5centsmsv5' => [
+                'provider' => FiveCentSms::class,
                 'cases' => FiveCentSmsCases::class,
                 'profile' => 'recording-5centsmsv5',
                 'mock_env' => [
@@ -35,6 +42,7 @@ final class Providers
                 ],
             ],
             'mobilemessage' => [
+                'provider' => MobileMessage::class,
                 'cases' => MobileMessageCases::class,
                 'profile' => 'recording-mobilemessage',
                 'mock_env' => [

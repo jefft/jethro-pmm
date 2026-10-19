@@ -17,6 +17,7 @@
         "bin/record"
     ],
     "scripts": {
-        "start": "php -S 127.0.0.1:${SMSMOCK_PORT:-8083} -t webroot webroot/index.php"
+        "start": "php -S 127.0.0.1:${SMSMOCK_PORT:-8083} -t webroot webroot/index.php",
+        "test": "php tests/run.php"
     }
 }

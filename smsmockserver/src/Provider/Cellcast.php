@@ -19,7 +19,7 @@ final class Cellcast implements ProviderInterface
 
     public function handle(Ctx $ctx): void
     {
-        header('Content-Type: application/json');
+        \SmsMockServer\Util::jsonHeader();
         $method = $_SERVER['REQUEST_METHOD'];
         $path = $_SERVER['PATH_INFO'] ?? '/';
 
@@ -70,7 +70,7 @@ final class Cellcast implements ProviderInterface
             case \SmsMockServer\Endpoint::ACTION_RETURN_JSON_FUNC:
                 if ($ep->jsonFunc !== null) {
                     $req = new \SmsMockServer\ProviderRequest(
-                        body: file_get_contents('php://input'),
+                        body: $ctx->rawBody(),
                         query: $_GET,
                     );
                     Util::json($ep->status, ($ep->jsonFunc)($req));
@@ -92,7 +92,7 @@ final class Cellcast implements ProviderInterface
 
     private function handleSend(Ctx $ctx): void
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $body = $ctx->jsonBody();
         $message = $body['message'] ?? '';
         $contacts = $body['contacts'] ?? [];
         $sender = $body['sender'] ?? '';
@@ -157,7 +157,7 @@ final class Cellcast implements ProviderInterface
 
     private function handleCancel(Ctx $ctx): void
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $body = $ctx->jsonBody();
         $messageId = $body['messageId'] ?? '';
 
         $row = $ctx->store->getMessageByRemoteId('cellcast', $messageId);
@@ -287,7 +287,7 @@ final class Cellcast implements ProviderInterface
 
     private function handleAddCustomNumber(Ctx $ctx): void
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $body = $ctx->jsonBody();
         $number = $body['number'] ?? '';
         $name = $body['name'] ?? '';
 
@@ -360,7 +360,7 @@ final class Cellcast implements ProviderInterface
 
     private function handleVerifyCustomNumber(Ctx $ctx): void
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $body = $ctx->jsonBody();
         $number = $body['number'] ?? '';
         $otp = $body['otp'] ?? '';
 
@@ -400,7 +400,7 @@ final class Cellcast implements ProviderInterface
      */
     private function handleBusinessAdd(Ctx $ctx): void
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?: [];
+        $body = $ctx->jsonBody();
         $name = trim((string) ($body['businessname'] ?? ''));
         if ($name === '') {
             Util::json(200, ['status' => false, 'message' => 'Business Name is required!']);
