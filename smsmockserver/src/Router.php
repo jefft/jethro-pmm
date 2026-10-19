@@ -167,15 +167,19 @@ final class Router
     /** Render the root index page listing default providers and test profiles. */
     private function renderIndexPage(): never
     {
-        // Built-in default providers
+        // Built-in default providers: a profile registered under its provider's name.
+        $builtins = array_values(array_filter(
+            array_keys($this->providers),
+            fn(string $name) => Profile::get($name, $name) !== null,
+        ));
+        sort($builtins);
         $defaultsHtml = '';
-        foreach (['5centsms', 'cellcast'] as $name) {
-            if (isset($this->providers[$name])) {
-                $defaultsHtml .= sprintf(
-                    '<li><a href="%1$s/"><code>%1$s</code></a> <span class="desc">default, no overrides (balance: 12345)</span></li>',
-                    self::h($name),
-                );
-            }
+        foreach ($builtins as $name) {
+            $defaultsHtml .= sprintf(
+                '<li><a href="%1$s/"><code>%1$s</code></a> <span class="desc">default, no overrides (balance: %2$s)</span></li>',
+                self::h($name),
+                self::h((string) Profile::get($name, $name)?->balance),
+            );
         }
 
         // Test profiles from registry (skip built-in defaults)
@@ -241,7 +245,7 @@ final class Router
         if ($allNames !== []) {
             $items = '';
             foreach ($allNames as $name) {
-                $isBuiltin = in_array($name, ['5centsms', 'cellcast'], true);
+                $isBuiltin = Profile::get($name, $name) !== null;
                 $url = $isBuiltin ? "$name/" : self::profileUrlPrefix() . "/$name";
                 $items .= sprintf(
                     '<li><a href="%s"><code>%s</code></a></li>',
