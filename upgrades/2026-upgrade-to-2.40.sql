@@ -226,6 +226,12 @@ UPDATE setting SET note = 'Undo window: seconds an immediate SMS is held, cancel
 -- SMS_SHORTEN_URLS is now only the "Shorten URLs" checkbox default; refresh its note.
 UPDATE setting SET note = 'Whether the ''Shorten URLs'' checkbox is checked by default when sending an SMS' WHERE symbol = 'SMS_SHORTEN_URLS';
 
+-- Databases that ran an earlier 2.40 update still list the removed SMS
+-- Broadcast provider here (INSERT IGNORE cannot correct an existing row).
+UPDATE setting SET type = 'select{"":"Auto-detect (based on settings)","5centsmsv5":"5CentSMS v5","cellcast":"Cellcast","mobilemessage":"MobileMessage"}' WHERE symbol = 'SMS_PROVIDER';
+-- ...and may still have it selected; fall back to auto-detect.
+UPDATE setting SET value = '' WHERE symbol = 'SMS_PROVIDER' AND value = 'smsbroadcast';
+
 -- SMS_SEGMENT_COST now only prices new sends and the compose estimate; refresh its note.
 UPDATE setting SET note = 'Your price per SMS segment in dollars, e.g. 0.029. Used for the compose cost estimate, and recorded with each new send when the provider does not report its own price (Cellcast does). Blank = provider default.' WHERE symbol = 'SMS_SEGMENT_COST';
 
