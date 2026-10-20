@@ -1,0 +1,15 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/optouts"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "error": "",
+            "numbers": [],
+            "count": 0,
+            "next_page": "api/v5/optouts?after="
+        }
+    }
+}

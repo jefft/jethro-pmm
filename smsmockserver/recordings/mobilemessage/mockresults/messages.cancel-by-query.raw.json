@@ -1,0 +1,15 @@
+{
+    "request": {
+        "method": "DELETE",
+        "path": "/v1/messages",
+        "query": {
+            "message_id": "998870ea-34e3-4bf1-a2b0-929644015501"
+        }
+    },
+    "response": {
+        "status": 400,
+        "body": {
+            "error": "\"message_id\", \"custom_ref\", or \"send_id\" is required."
+        }
+    }
+}

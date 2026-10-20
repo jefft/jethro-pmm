@@ -1,0 +1,19 @@
+{
+    "request": {
+        "method": "DELETE",
+        "path": "/sms/<24-hex>"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "error": "",
+            "messages": {
+                "destination": "",
+                "id": "<24-hex>",
+                "message_text": "DELETED",
+                "status": "<int>",
+                "status_text": "Cancelled"
+            }
+        }
+    }
+}

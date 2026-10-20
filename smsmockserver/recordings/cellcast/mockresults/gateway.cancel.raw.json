@@ -1,0 +1,31 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/api/v1/gateway/cancelScheduleQuickMessage",
+        "body": {
+            "messageId": "1515de1b846bc7ad784a9b20",
+            "type": "sms"
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "app_type": "web",
+            "app_version": "1.0",
+            "maintainence": 0,
+            "new_version": 0,
+            "force_update": 0,
+            "invalid_token": 0,
+            "refresh_token": "",
+            "show_message": 0,
+            "is_enc": false,
+            "status": true,
+            "message": "Job removed successfully",
+            "message_type": "toast",
+            "data": {
+                "message": "Job removed successfully"
+            },
+            "error": []
+        }
+    }
+}

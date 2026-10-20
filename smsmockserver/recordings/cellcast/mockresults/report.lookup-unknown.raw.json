@@ -1,0 +1,27 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/api/v2/report/message/000000000000000000000000"
+    },
+    "response": {
+        "status": 404,
+        "body": {
+            "app_type": "web",
+            "app_version": "1.0",
+            "maintainence": 0,
+            "new_version": 0,
+            "force_update": 0,
+            "invalid_token": 0,
+            "refresh_token": "",
+            "show_message": 0,
+            "is_enc": false,
+            "status": false,
+            "message": "Message not found",
+            "message_type": "toast",
+            "data": [],
+            "error": {
+                "message": "Message not found"
+            }
+        }
+    }
+}

@@ -1,0 +1,13 @@
+{
+    "request": {
+        "auth": false,
+        "method": "GET",
+        "path": "/v1/account"
+    },
+    "response": {
+        "status": 401,
+        "body": {
+            "error": "Unauthorized"
+        }
+    }
+}

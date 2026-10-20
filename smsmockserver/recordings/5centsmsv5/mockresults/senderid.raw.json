@@ -1,0 +1,52 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/senderid"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "error": "",
+            "senderids": [
+                {
+                    "senderid": "614xxxxxxxx",
+                    "status": "pending",
+                    "id": "c2012932bdb3a9d9fec141a2",
+                    "shared": false
+                },
+                {
+                    "senderid": "614xxxxxxxx",
+                    "status": "unverified",
+                    "id": "2d12552a574c9a7b39203dd3",
+                    "shared": false
+                },
+                {
+                    "senderid": "614xxxxxxxx",
+                    "status": "approved",
+                    "id": "502d8e8f6779061534dfbd8b",
+                    "shared": false
+                },
+                {
+                    "senderid": "614xxxxxxxx",
+                    "status": "unverified",
+                    "id": "aedaa51e6bed4ffe8295322b",
+                    "shared": false
+                },
+                {
+                    "senderid": "MockChurch",
+                    "status": "acma_approved",
+                    "acma_details_id": "000000000000000000000000",
+                    "acma_additional_details": "<redacted>",
+                    "id": "14314d8014d7528884f14589",
+                    "shared": false
+                },
+                {
+                    "senderid": "614xxxxxxxx",
+                    "status": "approved",
+                    "id": "7041d9b76c9766611543beb2",
+                    "shared": false
+                }
+            ]
+        }
+    }
+}

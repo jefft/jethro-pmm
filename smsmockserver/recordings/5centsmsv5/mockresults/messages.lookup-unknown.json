@@ -1,0 +1,12 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/sms/<24-hex>"
+    },
+    "response": {
+        "status": 400,
+        "body": {
+            "error": "Failed (Unauthorised)"
+        }
+    }
+}

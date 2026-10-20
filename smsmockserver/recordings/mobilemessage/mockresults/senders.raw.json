@@ -1,0 +1,26 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/v1/senders"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "status": "complete",
+            "results": [
+                {
+                    "sender": "614xxxxxxxx",
+                    "type": "shared",
+                    "label": "Shared Number",
+                    "is_default": true
+                },
+                {
+                    "sender": "614xxxxxxxx",
+                    "type": "own",
+                    "label": "Your Mobile",
+                    "is_default": false
+                }
+            ]
+        }
+    }
+}

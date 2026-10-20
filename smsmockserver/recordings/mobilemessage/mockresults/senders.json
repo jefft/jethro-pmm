@@ -1,0 +1,26 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/v1/senders"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "results": [
+                {
+                    "is_default": false,
+                    "label": "Your Mobile",
+                    "sender": "<msisdn 614…>",
+                    "type": "own"
+                },
+                {
+                    "is_default": true,
+                    "label": "Shared Number",
+                    "sender": "<msisdn 614…>",
+                    "type": "shared"
+                }
+            ],
+            "status": "complete"
+        }
+    }
+}

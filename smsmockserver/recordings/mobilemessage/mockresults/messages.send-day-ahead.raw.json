@@ -1,0 +1,39 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/v1/messages",
+        "body": {
+            "messages": [
+                {
+                    "to": "04xxxxxxxx",
+                    "sender": "04xxxxxxxx",
+                    "message": "Jethro smsmockserver recording: scheduled a day ahead, then cancelled",
+                    "scheduled_for": "2026-10-21T05:22:04Z"
+                }
+            ],
+            "enable_unicode": false
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "status": "complete",
+            "ignore_unsubscribes": false,
+            "shorten_urls": false,
+            "total_cost": 1,
+            "results": [
+                {
+                    "to": "614xxxxxxxx",
+                    "message": "Jethro smsmockserver recording: scheduled a day ahead, then cancelled",
+                    "sender": "614xxxxxxxx",
+                    "custom_ref": null,
+                    "status": "success",
+                    "cost": 1,
+                    "message_id": "998870ea-34e3-4bf1-a2b0-929644015501",
+                    "conversation": 0,
+                    "scheduled_for": "2026-10-21 05:22:04"
+                }
+            ]
+        }
+    }
+}

@@ -24,6 +24,7 @@ This release modernises Jethro's SMS subsystem with per-person and system-wide m
  - URL shortening (optional). If you type a URL longer than 26 characters, a 'Shorten URL' checkbox will appear, offering to rewrite it (on send) in a shorter `https://jethro.au/s/......` form. <details><summary>URL shortening details</summary>URL shortening is free but requires you to register in the 'URL Shortening' section of the configuration page. ![Screenshot](/img/sms/jethro_admin_urlshortener.png)<br/>
         The URL shortener service, https://jethro.au, is provided by Easy Jethro Pty Ltd for use by any Jethro installations. Its source code is at https://github.com/EasyJethro/jethro-url-shortener. </details>
  - [Message preview](../user-manual/sms.mdx#message-preview), in multi-person SMSes (to a report, group, family, roster, etc). See the exact recipients (particularly useful when sending to 'adults in the selected persons' families') and what URLs will be shortedn to, and %tokens% will expand to. You can also click the pencil in any person's preview and customize the SMS just for them.
+ - Insufficient-balance guard: if the provider account does not have enough SMS credit for the message, the compose box shows `⚠ Insufficient balance: N segments needed, M available` and disables Send before anything is attempted.
 
 ![Screenshot](/img/sms/group_sms_dialog_messagepreview.png)
 

@@ -1,0 +1,19 @@
+{
+    "request": {
+        "method": "DELETE",
+        "path": "/sms/89955eae4d5643dda3eb4c57"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "error": "",
+            "messages": {
+                "destination": "",
+                "id": "89955eae4d5643dda3eb4c57",
+                "status": 1007,
+                "status_text": "Cancelled",
+                "message_text": "DELETED"
+            }
+        }
+    }
+}

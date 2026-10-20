@@ -1,0 +1,15 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/v1/messages",
+        "body": {
+            "enable_unicode": false
+        }
+    },
+    "response": {
+        "status": 400,
+        "body": {
+            "error": "Missing or invalid \"messages\" parameter. It should be an array of messages."
+        }
+    }
+}

@@ -1,0 +1,15 @@
+{
+    "request": {
+        "method": "DELETE",
+        "path": "/v1/unsubscribes",
+        "query": {
+            "number": "614xxxxxxxx"
+        }
+    },
+    "response": {
+        "status": 400,
+        "body": {
+            "error": "\"number\" is required."
+        }
+    }
+}

@@ -1,0 +1,17 @@
+{
+    "request": {
+        "method": "DELETE",
+        "path": "/v1/unsubscribes",
+        "body": {
+            "number": "614xxxxxxxx"
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "status": "complete",
+            "number": "614xxxxxxxx",
+            "removed": false
+        }
+    }
+}

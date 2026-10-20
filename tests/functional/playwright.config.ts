@@ -31,6 +31,8 @@ const SMS_SCENARIOS = [
   "sms-opted-out-recipient",
   "sms-url-shortening-preview",
   "sms-failed-send",
+  // Zero credit: the statusline warns and blocks Send.
+  "sms-insufficient-balance",
   "sms-sender-number-registration",
   "sms-2fa",
   "sms-cooloff",

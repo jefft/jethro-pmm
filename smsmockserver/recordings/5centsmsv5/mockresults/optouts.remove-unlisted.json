@@ -1,0 +1,12 @@
+{
+    "request": {
+        "method": "DELETE",
+        "path": "/optouts/61400000001"
+    },
+    "response": {
+        "status": 400,
+        "body": {
+            "error": "Number not found"
+        }
+    }
+}

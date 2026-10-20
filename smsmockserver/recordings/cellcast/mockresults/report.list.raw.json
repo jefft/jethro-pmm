@@ -1,0 +1,66 @@
+{
+    "request": {
+        "method": "GET",
+        "path": "/api/v2/report/message",
+        "query": {
+            "campType": "sms",
+            "fromDate": "2026-10-20",
+            "page": "1",
+            "limit": "100"
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "app_type": "web",
+            "app_version": "1.0",
+            "maintainence": 0,
+            "new_version": 0,
+            "force_update": 0,
+            "invalid_token": 0,
+            "refresh_token": "",
+            "show_message": 0,
+            "is_enc": false,
+            "status": true,
+            "message": "Success",
+            "message_type": "toast",
+            "data": {
+                "items": [
+                    {
+                        "_id": "1515de1b846bc7ad784a9b20",
+                        "campaign_type": "notification",
+                        "createdAt": "2026-10-21T05:22:04.000Z",
+                        "creditAmount": 1.3,
+                        "gateway_count": 1,
+                        "message": "Jethro smsmockserver recording: scheduled, then cancelled",
+                        "receiver": "4xxxxxxxx",
+                        "replyMessage": null,
+                        "replyStop": false,
+                        "request_from": "API",
+                        "request_name": "<redacted>",
+                        "scheduleAt": "2026-10-21T05:22:04.000Z",
+                        "sender": "614xxxxxxxx",
+                        "smsDetail": {
+                            "_id": "4180c960c98b81c151396a5f",
+                            "costpersms": 0.047,
+                            "deductibleCredit": 1.3,
+                            "messagelength": 57,
+                            "smscount": 1
+                        },
+                        "status": "scheduled"
+                    }
+                ],
+                "total": 1,
+                "limit": 100,
+                "current": 1,
+                "totalPages": 1,
+                "pagingCounter": 1,
+                "hasPrevPage": false,
+                "hasNextPage": false,
+                "prevPage": null,
+                "nextPage": null
+            },
+            "error": []
+        }
+    }
+}

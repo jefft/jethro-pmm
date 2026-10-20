@@ -1,0 +1,15 @@
+{
+    "request": {
+        "body": {
+            "message_id": "<uuid>"
+        },
+        "method": "DELETE",
+        "path": "/v1/messages"
+    },
+    "response": {
+        "status": 404,
+        "body": {
+            "error": "Message not found."
+        }
+    }
+}

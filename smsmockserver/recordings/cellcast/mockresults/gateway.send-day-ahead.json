@@ -1,0 +1,55 @@
+{
+    "request": {
+        "body": {
+            "contacts": [
+                "<msisdn 04…>"
+            ],
+            "countryCode": "<int>",
+            "message": "Jethro smsmockserver recording: scheduled, then cancelled",
+            "scheduleAt": "<Y-m-d H:i:s>",
+            "sender": "<msisdn 614…>"
+        },
+        "method": "POST",
+        "path": "/api/v1/gateway"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "app_type": "web",
+            "app_version": "1.0",
+            "data": {
+                "invalidContacts": [],
+                "message": "success register all valid contacts to queue",
+                "queueResponse": [
+                    {
+                        "Contact": "<msisdn 4…>",
+                        "MessageId": "<24-hex>",
+                        "Number": "<msisdn 04…>",
+                        "jobInfo": {
+                            "data": {
+                                "messageData": {
+                                    "status": "queued"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "totalInvalidContact": "<int>",
+                "totalUnsubscribeContact": "<int>",
+                "totalValidContact": "<int>",
+                "unsubscribeContacts": []
+            },
+            "error": [],
+            "force_update": "<int>",
+            "invalid_token": "<int>",
+            "is_enc": false,
+            "maintainence": "<int>",
+            "message": "Request is being processed",
+            "message_type": "toast",
+            "new_version": "<int>",
+            "refresh_token": "",
+            "show_message": "<int>",
+            "status": true
+        }
+    }
+}

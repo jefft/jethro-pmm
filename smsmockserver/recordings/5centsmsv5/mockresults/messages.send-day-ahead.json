@@ -1,0 +1,29 @@
+{
+    "request": {
+        "body": {
+            "message": "Jethro smsmockserver recording: scheduled a day ahead, then cancelled",
+            "schedule": "<int>",
+            "sender": "<msisdn 614…>",
+            "test": false,
+            "to": "<msisdn 04…>"
+        },
+        "method": "POST",
+        "path": "/sms"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "error": "",
+            "messages": [
+                {
+                    "credits": "<int>",
+                    "destination": "<msisdn 04…>",
+                    "id": "<24-hex>",
+                    "schedule": "<int>",
+                    "status": "<int>",
+                    "status_text": "Scheduled"
+                }
+            ]
+        }
+    }
+}

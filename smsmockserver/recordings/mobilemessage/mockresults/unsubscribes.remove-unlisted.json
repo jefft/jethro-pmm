@@ -1,0 +1,17 @@
+{
+    "request": {
+        "body": {
+            "number": "<msisdn 614…>"
+        },
+        "method": "DELETE",
+        "path": "/v1/unsubscribes"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "number": "<msisdn 614…>",
+            "removed": false,
+            "status": "complete"
+        }
+    }
+}

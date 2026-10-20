@@ -2474,7 +2474,10 @@ function makeStatuslineConfig(bool $shortenUrls = false): \Sms\SmsStatuslineConf
         segmentLength: 160,
         ucs2SegmentLength: 70,
         segmentCost: $segmentCost,
-        balance: null,
+        // The statusline warns and blocks Send when a send needs more segments
+        // than the account has. Providers cache the balance for 300s, so typing
+        // does not call the provider's API every time.
+        balance: getSmsBalance(),
         shortenUrls: $shortenUrls && ifdef('URLSHORTENER', 'https://jethro.au') !== '',
         testMode: filter_var(ifdef('SMS_TESTMODE', false), FILTER_VALIDATE_BOOLEAN),
         unicodeMode: $unicodeMode,
