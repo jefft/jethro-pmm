@@ -68,6 +68,8 @@ after adding its own behavior — each layer adds exactly one responsibility.
 
 The rest of the system — UI, CLI, database logging, token expansion — works unchanged.
 
+A host application can also supply a provider class of its own, outside this package: it passes `[key => class]` to `resolveRawProviderClass($hostProviders)`, and `SMS_PROVIDER` may then name that key. Host providers are never auto-detected, and built-in keys win on a collision.
+
 ## Test Mode
 
 `FakeHttpClient` (abstract, `jethro-sms/src/FakeHttpClient.php`) replaces

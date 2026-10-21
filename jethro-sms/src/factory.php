@@ -60,13 +60,17 @@ function providerCandidates(): array
  * Resolve the raw provider class from SMS_PROVIDER (short key, FQCN, or
  * 'auto'/undefined for auto-detection).
  *
+ * @param array<string, class-string<SmsProvider>> $hostProviders  Extra short
+ *     keys supplied by the host application for its own provider classes
+ *     (key => class). Built-in keys win on a collision. Host providers are
+ *     only selected by an explicit SMS_PROVIDER, never auto-detected.
  * @return \Result  Success with class-string<SmsProvider>. Failure with
  *     array{message: string, notConfigured?: bool} — notConfigured is set
  *     when no provider matched, so hosts can append candidate/constant help
  *     (built from providerCandidates() + getConstants()) in their own
  *     presentation format.
  */
-function resolveRawProviderClass(): \Result
+function resolveRawProviderClass(array $hostProviders = []): \Result
 {
 	$class = null;
 	if (ifdef('SMS_PROVIDER')) {
@@ -76,7 +80,7 @@ function resolveRawProviderClass(): \Result
 		}
 		if ($raw !== 'auto') {
 			// Short key (e.g. '5centsmsv5') or FQCN
-			$class = providerShortNames()[$raw] ?? $raw;
+			$class = (providerShortNames() + $hostProviders)[$raw] ?? $raw;
 			if (!\class_exists($class)) {
 				return \Result::failure(['message' => 'SMS_PROVIDER class not found: ' . $class . '. Use a leading backslash (\\Sms\\CellcastSmsProvider::class) if the class is not in the current namespace.']);
 			}
