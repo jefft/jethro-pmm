@@ -66,7 +66,7 @@ final class SpySmsProvider implements SmsProvider
     {
         return \Result::success(true);
     }
-    public static function fromConstants(bool $tfa = false): static { throw new \RuntimeException('not used'); }
+    public static function fromSettings(\Sms\SmsSettings $settings, bool $tfa = false, ?string $baseUrl = null): static { throw new \RuntimeException('not used'); }
     public function getKey(): string { return 'spy'; }
     public static function getConstants(): array { return []; }
     public static function usagePreference(): int { return 0; }

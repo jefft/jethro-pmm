@@ -15,6 +15,7 @@ use Sms\RegistrationStep;
 use Sms\SenderID;
 use Sms\SmsCache;
 use Sms\SmsCapability;
+use Sms\SmsSettings;
 use Sms\SmsDelivery;
 use Sms\SmsDeliveryBatch;
 use Sms\SmsProvider;
@@ -56,30 +57,30 @@ class CellcastSmsProvider implements SmsProvider
 ) {}
 
 	/**
-	 * Create a Cellcast provider from PHP constants.
+	 * Create a Cellcast provider from the given settings.
 	 *
-	 * Reads SMS_CELLCAST_* constants from conf.php.  When $tfa is true,
-	 * 2FA_* prefixed constants are tried first for the API token
-	 * (2FA_SMS_CELLCAST_APIKEY), falling back to the standard constant
+	 * Reads the SMS_CELLCAST_* settings.  When $tfa is true,
+	 * 2FA_* prefixed settings are tried first for the API token
+	 * (2FA_SMS_CELLCAST_APIKEY), falling back to the standard setting
 	 * if the 2FA version is unset.
 	 *
-	 * @param bool $tfa  When true, reads 2FA_* constants first.
+	 * @param bool $tfa  When true, reads 2FA_* settings first.
 	 * @param ?string $baseUrl  Absolute base URL of the Jethro instance. When a bare
-	 *     path constant (starting with "/") is read, this is prepended to resolve it.
+	 *     path URL setting (starting with "/") is read, this is prepended to resolve it.
 	 * @throws \RuntimeException when SMS_CELLCAST_APIKEY is missing
 	 */
-	public static function fromConstants(bool $tfa = false, ?string $baseUrl = null): static
+	public static function fromSettings(SmsSettings $settings, bool $tfa = false, ?string $baseUrl = null): static
 	{
 		$apiToken = '';
 
 		if ($tfa) {
-			$apiToken = (string) ifdef('2FA_SMS_CELLCAST_APIKEY', '');
+			$apiToken = (string) $settings['2FA_SMS_CELLCAST_APIKEY']->val('');
 		}
 
 		if ($apiToken === '') {
-			$apiToken = (string) ifdef('SMS_CELLCAST_APIKEY', '');
+			$apiToken = (string) $settings['SMS_CELLCAST_APIKEY']->val('');
 		}
-		$url = rtrim((string) ifdef('SMS_CELLCAST_URL', self::CANONICAL_URL), '/');
+		$url = rtrim((string) $settings['SMS_CELLCAST_URL']->val(self::CANONICAL_URL), '/');
 		if ($url !== '' && $url[0] === '/' && $baseUrl !== null) {
 			$origin = parse_url($baseUrl, PHP_URL_SCHEME) . '://' . parse_url($baseUrl, PHP_URL_HOST);
 			$port = parse_url($baseUrl, PHP_URL_PORT);
@@ -88,16 +89,16 @@ class CellcastSmsProvider implements SmsProvider
 		}
 
 		if ($apiToken === '') {
-			throw new \RuntimeException('Missing SMS configuration: SMS_CELLCAST_APIKEY');
+			throw new \RuntimeException('Missing SMS configuration: ' . $settings['SMS_CELLCAST_APIKEY']->getName());
 		}
 
 		return new static(
 			apiToken: $apiToken,
 			url: $url,
-			senderIds: (string) ifdef('SMS_SENDER_OPTIONS', ''),
+			senderIds: (string) $settings['SMS_SENDER_OPTIONS']->val(''),
 			httpClient: static::createHttpClient(
-				filter_var(ifdef('SMS_TESTMODE', false), FILTER_VALIDATE_BOOLEAN),
-				filter_var(ifdef('SMS_VERBOSE', false), FILTER_VALIDATE_BOOLEAN),
+				filter_var($settings['SMS_TESTMODE']->val(false), FILTER_VALIDATE_BOOLEAN),
+				filter_var($settings['SMS_VERBOSE']->val(false), FILTER_VALIDATE_BOOLEAN),
 			),
 		);
 	}

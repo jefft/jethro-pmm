@@ -16,6 +16,7 @@ use Sms\RegistrationStep;
 use Sms\SenderID;
 use Sms\SmsCache;
 use Sms\SmsCapability;
+use Sms\SmsSettings;
 use Sms\SmsDelivery;
 use Sms\SmsDeliveryBatch;
 use Sms\SmsProvider;
@@ -71,25 +72,25 @@ class MobileMessageSmsProvider implements SmsProvider
 	) {}
 
 	/**
-	 * Create a MobileMessage provider from PHP constants.
+	 * Create a MobileMessage provider from the given settings.
 	 *
-	 * When $tfa is true, 2FA_*-prefixed constants are tried first for each
+	 * When $tfa is true, 2FA_*-prefixed settings are tried first for each
 	 * field (2FA_SMS_MOBILEMESSAGE_APIKEY_USERNAME / 2FA_SMS_MOBILEMESSAGE_APIKEY_PASSWORD),
-	 * falling back per-field to the standard constant when unset.
+	 * falling back per-field to the standard setting when unset.
 	 *
-	 * @param bool $tfa  When true, reads 2FA_* constants first.
+	 * @param bool $tfa  When true, reads 2FA_* settings first.
 	 * @param ?string $baseUrl  Absolute base URL of the Jethro instance. When a bare
-	 *     path constant (starting with "/") is read, this is prepended to resolve it.
+	 *     path URL setting (starting with "/") is read, this is prepended to resolve it.
 	 * @throws \RuntimeException when the username or password is missing
 	 */
-	public static function fromConstants(bool $tfa = false, ?string $baseUrl = null): static
+	public static function fromSettings(SmsSettings $settings, bool $tfa = false, ?string $baseUrl = null): static
 	{
-		$username = $tfa ? (string) ifdef('2FA_SMS_MOBILEMESSAGE_APIKEY_USERNAME', '') : '';
-		$password = $tfa ? (string) ifdef('2FA_SMS_MOBILEMESSAGE_APIKEY_PASSWORD', '') : '';
-		if ($username === '') $username = (string) ifdef('SMS_MOBILEMESSAGE_APIKEY_USERNAME', '');
-		if ($password === '') $password = (string) ifdef('SMS_MOBILEMESSAGE_APIKEY_PASSWORD', '');
+		$username = $tfa ? (string) $settings['2FA_SMS_MOBILEMESSAGE_APIKEY_USERNAME']->val('') : '';
+		$password = $tfa ? (string) $settings['2FA_SMS_MOBILEMESSAGE_APIKEY_PASSWORD']->val('') : '';
+		if ($username === '') $username = (string) $settings['SMS_MOBILEMESSAGE_APIKEY_USERNAME']->val('');
+		if ($password === '') $password = (string) $settings['SMS_MOBILEMESSAGE_APIKEY_PASSWORD']->val('');
 
-		$url = rtrim((string) ifdef('SMS_MOBILEMESSAGE_URL', self::CANONICAL_URL), '/');
+		$url = rtrim((string) $settings['SMS_MOBILEMESSAGE_URL']->val(self::CANONICAL_URL), '/');
 		if ($url !== '' && $url[0] === '/' && $baseUrl !== null) {
 			$origin = parse_url($baseUrl, PHP_URL_SCHEME) . '://' . parse_url($baseUrl, PHP_URL_HOST);
 			$port = parse_url($baseUrl, PHP_URL_PORT);
@@ -98,12 +99,12 @@ class MobileMessageSmsProvider implements SmsProvider
 		}
 
 		if ($username === '' || $password === '') {
-			throw new \RuntimeException('Missing SMS configuration: SMS_MOBILEMESSAGE_APIKEY_USERNAME and SMS_MOBILEMESSAGE_APIKEY_PASSWORD');
+			throw new \RuntimeException('Missing SMS configuration: ' . $settings['SMS_MOBILEMESSAGE_APIKEY_USERNAME']->getName() . ' and ' . $settings['SMS_MOBILEMESSAGE_APIKEY_PASSWORD']->getName());
 		}
 
 		// 'false' = "Not permitted": let the API strip non-GSM characters.
 		// 'when_free' / 'true' = permit unicode (multi-segment UCS-2 costs extra).
-		$unicodePermitted = (string) ifdef('SMS_UNICODE_PERMITTED', 'when_free') !== 'false';
+		$unicodePermitted = (string) $settings['SMS_UNICODE_PERMITTED']->val('when_free') !== 'false';
 
 		return new static(
 			username: $username,
@@ -111,8 +112,8 @@ class MobileMessageSmsProvider implements SmsProvider
 			url: $url,
 			unicodePermitted: $unicodePermitted,
 			httpClient: static::createHttpClient(
-				filter_var(ifdef('SMS_TESTMODE', false), FILTER_VALIDATE_BOOLEAN),
-				filter_var(ifdef('SMS_VERBOSE', false), FILTER_VALIDATE_BOOLEAN),
+				filter_var($settings['SMS_TESTMODE']->val(false), FILTER_VALIDATE_BOOLEAN),
+				filter_var($settings['SMS_VERBOSE']->val(false), FILTER_VALIDATE_BOOLEAN),
 			),
 		);
 	}

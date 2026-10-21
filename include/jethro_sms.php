@@ -154,7 +154,7 @@ function getSmsProvider(bool $tfa = false, bool $logToDb = true): \Result
 			fn($c) => $c[0] . '=' . (string) ifdef($c[0], ''),
 			$class::getConstants(),
 		)));
-		$provider = $class::fromConstants($tfa, baseUrl: $baseUrl)->withCache(new SessionSmsCache('sms_cache_', $fingerprint));
+		$provider = $class::fromSettings(new \Sms\ConstantSettings(), $tfa, baseUrl: $baseUrl)->withCache(new SessionSmsCache('sms_cache_', $fingerprint));
 	} catch (\Throwable $e) {
 		return \Result::failure($e->getMessage());
 	}

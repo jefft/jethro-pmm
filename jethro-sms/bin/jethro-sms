@@ -48,7 +48,7 @@ $env = new \Sms\Cli\CliEnvironment(
 		}
 		$class = $classResult->getValue();
 		try {
-			$provider = $class::fromConstants(false);
+			$provider = $class::fromSettings(new \Sms\ConstantSettings(), false);
 		} catch (\Throwable $e) {
 			return \Result::failure($e->getMessage());
 		}

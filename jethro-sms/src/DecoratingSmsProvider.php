@@ -12,9 +12,9 @@ namespace Sms;
  *
  * ## Static methods and the decorator contract
  *
- * {@see fromConstants()}, {@see getConstants()}, and {@see usagePreference()}
+ * {@see fromSettings()}, {@see getConstants()}, and {@see usagePreference()}
  * are **concrete-provider** concerns — they describe how a raw gateway class
- * is constructed from PHP constants and what priority it has for auto-detection.
+ * is constructed from injected SmsSettings and what priority it has for auto-detection.
  * Decorators don't participate in this: they wrap an already-instantiated
  * inner provider, so calling these static methods on a decorator class is
  * meaningless.  All three throw {@see \RuntimeException} with a descriptive
@@ -60,7 +60,7 @@ class DecoratingSmsProvider implements SmsProvider
         return $this->inner;
     }
 
-    public static function fromConstants(bool $tfa = false): static
+    public static function fromSettings(SmsSettings $settings, bool $tfa = false, ?string $baseUrl = null): static
     {
         throw new \RuntimeException(__CLASS__ . ' wraps an existing SmsProvider; use new ' . __CLASS__ . '($provider)');
     }

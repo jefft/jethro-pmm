@@ -30,8 +30,9 @@ Direction of dependency is Jethro → package, never the reverse.
 
 ## 2. `ifdef()` and `ents()` globals
 
-**Entanglement.** Provider `fromConstants()` methods read configuration via
-Jethro's global `ifdef()`; a handful of user-facing error strings escape
+**Entanglement.** Provider factories used to read configuration via
+Jethro's global `ifdef()` (they now read an injected `SmsSettings`, with
+`ConstantSettings` as the default); a handful of user-facing error strings escape
 HTML via `ents()`. Both are three-line functions defined in `general.php`.
 
 **Resolution.** `src/support.php` defines both, guarded by

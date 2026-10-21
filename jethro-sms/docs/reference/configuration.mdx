@@ -8,15 +8,15 @@ All SMS settings are PHP constants in `conf.php`. Each provider reads its own
 
 ## Design Intent
 
-The jethro-sms pure layer (`jethro-sms/src/`) intentionally reads `SMS_*`
-constants directly via `fromConstants()` static factories. This is **by design**:
-`fromConstants()` is the canonical wiring point where each provider declares
-its required and optional configuration. The bridge layer (`include/jethro_sms.php`)
-does **not** pre-read and inject every constant — constants are the provider's
-interface to the outside world.
+Providers read configuration from an injected `SmsSettings` via their
+`fromSettings()` static factories; `ConstantSettings` (global `SMS_*` constants)
+is the default. `fromSettings()` is the canonical wiring point where each provider
+declares its required and optional configuration. The bridge layer
+(`include/jethro_sms.php`) does **not** pre-read every setting — it passes a
+settings source and the provider looks up what it needs.
 
 **Exception**: provider **URL** constants (`SMS_CELLCAST_URL`, `SMS_5CENTSMS_URL`, etc.)
-may be set to bare paths (starting with `/`) in test configs. `fromConstants()`
+may be set to bare paths (starting with `/`) in test configs. `fromSettings()`
 accepts a `$baseUrl` parameter (`BASE_URL_ABSOLUTE`, defined alongside `BASE_URL` in
 `include/init.php`) and prepends it to resolve bare-path URLs.  Production
 configs use absolute URLs, so the resolution is a no-op.
@@ -39,7 +39,7 @@ iterates providers by `usagePreference()` descending. See
 
 Each provider-specific constant has a `2FA_*` variant tried first when the
 provider is used for two-factor authentication (the `$tfa` flag passed to
-`fromConstants()` and `getSmsProvider()`). This works field-by-field: a 2FA
+`fromSettings()` and `getSmsProvider()`). This works field-by-field: a 2FA
 send can share the same API credentials by simply not defining the `2FA_*`
 variants — they fall through to the standard constants.
 

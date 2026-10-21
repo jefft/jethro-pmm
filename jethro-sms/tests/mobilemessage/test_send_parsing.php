@@ -689,9 +689,9 @@ test('registerSenderNumber(): discovery returns number-entry schema', function (
     assert_eq(count($result->getValue()->fields), 2);
 });
 
-test('fromConstants(): throws without credentials; 2FA variants win per field', function () {
+test('fromSettings(): throws without credentials; 2FA variants win per field', function () {
     assert_throws(
         \RuntimeException::class,
-        fn() => MobileMessageSmsProvider::fromConstants(),
+        fn() => MobileMessageSmsProvider::fromSettings(new \Sms\ConstantSettings()),
     );
 });

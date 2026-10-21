@@ -66,7 +66,7 @@ The three middle decorators are added **only when `$logToDb` is true**. 2FA send
 
 **Every send is a batch.** `send()` takes an array of *entries* (`[{message, recipients[]}, …]`) together with one sender, `$sendAt` and `$preview`. A single message is a batch with one entry. The whole send action, including per-recipient message overrides, passes through the chain in **one** `send()` call.
 
-1. **Raw provider** (MobileMessage, 5CentSMS v5, Cellcast, Template, v4). It is built with `fromConstants($tfa, …)` and given a `SessionSmsCache` keyed by a config fingerprint: xxh3 of the class name plus every `getConstants()` name=value pair. A change to the settings therefore invalidates the cache.
+1. **Raw provider** (MobileMessage, 5CentSMS v5, Cellcast, Template, v4). It is built with `fromSettings(new ConstantSettings(), $tfa, …)` and given a `SessionSmsCache` keyed by a config fingerprint: xxh3 of the class name plus every `getConstants()` name=value pair. A change to the settings therefore invalidates the cache.
 2. **`TokenExpandingSmsProvider`** walks the entries.
    - **Known variables** (`firstname`, `lastname`, `fullname`, from `getAvailableTokens()`): an entry whose message uses one is split into one entry per recipient with the expanded text. Person data comes from the injected token resolver.
    - **Shared numbers**: when an entry carries `logicalRecipients` (see step 3), the expansion is done **per number** instead, with token values joined by " & " ("Hi Alice & Bob, …").
@@ -116,7 +116,7 @@ Providers with a negative preference are left out of the "not configured" help t
 
 ### Config constants and the 2FA fallback
 
-Each provider reads its own constants in `fromConstants(bool $tfa)`. When `$tfa` is true, each field tries its `2FA_*` variant first and falls back to `SMS_*` field by field. A 2FA chain can therefore share credentials with ordinary SMS sends simply by leaving the `2FA_*` constants undefined.
+Each provider reads its own settings from an injected `SmsSettings` in `fromSettings(SmsSettings $settings, bool $tfa)`; `ConstantSettings` (global constants) is the default. When `$tfa` is true, each field tries its `2FA_*` variant first and falls back to `SMS_*` field by field. A 2FA chain can therefore share credentials with ordinary SMS sends simply by leaving the `2FA_*` constants undefined.
 
 `SMS_SENDER` (with `SENDER_ID` as a deprecated fallback) is enforced by `OverridingSmsProvider` and also supplies the default sender in `getSenderFromRequest()`. 2FA takes its sender from `2FA_SENDER_ID`. If that is empty, `User_System` falls back to `SMS_SENDER`, unless `SMS_SENDER` is `_USER_MOBILE_`: nobody is logged in during 2FA, so that case needs a literal `2FA_SENDER_ID`.
 

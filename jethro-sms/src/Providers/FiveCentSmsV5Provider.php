@@ -17,6 +17,7 @@ use Sms\RegistrationStep;
 use Sms\SenderID;
 use Sms\SmsCache;
 use Sms\SmsCapability;
+use Sms\SmsSettings;
 use Sms\SmsDelivery;
 use Sms\SmsDeliveryBatch;
 use Sms\SmsProvider;
@@ -39,7 +40,7 @@ use Sms\statusFromV5Code;
  * normalises them. Numbers the API returns are matched back to ours by
  * PhoneNumber::sameNumberAs() (last 9 digits), so no prefix settings are needed.
  *
- * PHP constants read by fromConstants():
+ * Settings read by fromSettings():
  *   SMS_5CENTSMS_APIKEY_ID    — API key ID (required)
  *   SMS_5CENTSMS_APIKEY — API key secret (required)
  *   SMS_5CENTSMS_URL          — API base URL (default https://www.5centsms.com.au/api/v5)
@@ -93,28 +94,28 @@ class FiveCentSmsV5Provider implements SmsProvider
     }
 
     /**
-     * Create a v5 provider from PHP constants.
+     * Create a v5 provider from the given settings.
      *
-     * Reads SMS_5CENTSMS_* constants from conf.php. When $tfa is true, each field
+     * Reads the SMS_5CENTSMS_* settings. When $tfa is true, each field
      * tries its 2FA_SMS_5CENTSMS_* variant first (2FA_SMS_5CENTSMS_APIKEY_ID,
      * 2FA_SMS_5CENTSMS_APIKEY, 2FA_SMS_5CENTSMS_URL, 2FA_SENDER_ID),
-     * falling back to the standard SMS_5CENTSMS_* constant if the 2FA version is unset.
+     * falling back to the standard SMS_5CENTSMS_* setting if the 2FA version is unset.
      *
-     * @param bool $tfa When true, reads 2FA_* constants first.
+     * @param bool $tfa When true, reads 2FA_* settings first.
      * @param ?string $baseUrl Absolute base URL of the Jethro instance. When non-null
-     *                          and the URL read from constants is a bare path (starts
+     *                          and the URL setting is a bare path (starts
      *                          with '/'), it is prepended to resolve the full URL.
      */
-    public static function fromConstants(bool $tfa = false, ?string $baseUrl = null): static
+    public static function fromSettings(SmsSettings $settings, bool $tfa = false, ?string $baseUrl = null): static
     {
         $keyId = $keySecret = '';
 
         $url = '';
         if ($tfa) {
-            $url = (string)ifdef('2FA_SMS_5CENTSMS_URL', '');
+            $url = (string)$settings['2FA_SMS_5CENTSMS_URL']->val('');
         }
         if ($url === '') {
-            $url = rtrim((string)ifdef('SMS_5CENTSMS_URL', self::CANONICAL_URL), '/');
+            $url = rtrim((string)$settings['SMS_5CENTSMS_URL']->val(self::CANONICAL_URL), '/');
         }
         if ($url !== '' && $url[0] === '/' && $baseUrl !== null) {
             $origin = parse_url($baseUrl, PHP_URL_SCHEME) . '://' . parse_url($baseUrl, PHP_URL_HOST);
@@ -124,27 +125,27 @@ class FiveCentSmsV5Provider implements SmsProvider
         }
 
         if ($tfa) {
-            $keyId = (string)ifdef('2FA_SMS_5CENTSMS_APIKEY_ID', '');
-            $keySecret = (string)ifdef('2FA_SMS_5CENTSMS_APIKEY', '');
+            $keyId = (string)$settings['2FA_SMS_5CENTSMS_APIKEY_ID']->val('');
+            $keySecret = (string)$settings['2FA_SMS_5CENTSMS_APIKEY']->val('');
         }
         if ($keyId === '') {
-            $keyId = (string)ifdef('SMS_5CENTSMS_APIKEY_ID', '');
+            $keyId = (string)$settings['SMS_5CENTSMS_APIKEY_ID']->val('');
         }
         if ($keySecret === '') {
-            $keySecret = (string)ifdef('SMS_5CENTSMS_APIKEY', '');
+            $keySecret = (string)$settings['SMS_5CENTSMS_APIKEY']->val('');
         }
 
         if ($keyId === '' || $keySecret === '') {
             throw new \RuntimeException(
                 'Missing SMS configuration: '
                 . implode(', ', array_filter([
-                    $keyId === '' ? 'SMS_5CENTSMS_APIKEY_ID' : '',
-                    $keySecret === '' ? 'SMS_5CENTSMS_APIKEY' : '',
+                    $keyId === '' ? $settings['SMS_5CENTSMS_APIKEY_ID']->getName() : '',
+                    $keySecret === '' ? $settings['SMS_5CENTSMS_APIKEY']->getName() : '',
                 ]))
             );
         }
 
-        $testMode = filter_var(ifdef('SMS_TESTMODE', false), FILTER_VALIDATE_BOOLEAN);
+        $testMode = filter_var($settings['SMS_TESTMODE']->val(false), FILTER_VALIDATE_BOOLEAN);
         return new static(
             url: $url,
             keyId: $keyId,
@@ -152,9 +153,9 @@ class FiveCentSmsV5Provider implements SmsProvider
             testMode: $testMode,
             httpClient: static::createHttpClient(
                 $testMode,
-                filter_var(ifdef('SMS_VERBOSE', false), FILTER_VALIDATE_BOOLEAN),
+                filter_var($settings['SMS_VERBOSE']->val(false), FILTER_VALIDATE_BOOLEAN),
             ),
-            senderIds: (string)ifdef('SMS_SENDER_OPTIONS', ''),
+            senderIds: (string)$settings['SMS_SENDER_OPTIONS']->val(''),
         );
     }
 

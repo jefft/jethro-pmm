@@ -14,7 +14,7 @@ entry for the whole send action:
 
 ```php
 interface SmsProvider {
-    public static function fromConstants(bool $tfa = false): static;
+    public static function fromSettings(SmsSettings $settings, bool $tfa = false, ?string $baseUrl = null): static;
     public function getKey(): string;
     public static function getConstants(): array;
     public static function usagePreference(): int;
@@ -62,7 +62,7 @@ after adding its own behavior — each layer adds exactly one responsibility.
 ## Adding a New Provider
 
 1. Implement `SmsProvider` in the `Sms\Providers\` namespace
-2. Implement `fromConstants()` to read credentials from `SMS_*` constants
+2. Implement `fromSettings()` to read credentials from the injected `SmsSettings` (`ConstantSettings`, i.e. `SMS_*` constants, is the default)
 3. Register the class in `providerCandidates()` (`jethro-sms/src/factory.php`) so auto-detection can find it
 4. Set `SMS_PROVIDER` to the new provider's short key, or rely on auto-detection once its required constants are defined
 

@@ -7,19 +7,22 @@ namespace Sms;
 interface SmsProvider
 {
     /**
-     * Create a configured provider from PHP constants.
+     * Create a configured provider from an injected settings source.
      *
-     * Reads SMS_* constants from conf.php and constructs a fully-configured
-     * provider instance.  Throws \RuntimeException if required constants
-     * are missing or invalid.
+     * Reads SMS_* settings from $settings and constructs a fully-configured
+     * provider instance.  Throws \RuntimeException if required settings
+     * are missing or invalid.  {@see ConstantSettings} (global constants)
+     * is the default source.
      *
-     * When $tfa is true, 2FA-prefixed constants are tried first for each
+     * When $tfa is true, 2FA-prefixed settings are tried first for each
      * field (e.g. 2FA_SMS_5CENTSMS_APIKEY_ID), falling back to the
-     * standard constant (SMS_5CENTSMS_APIKEY_ID) if the 2FA version is unset.
+     * standard setting (SMS_5CENTSMS_APIKEY_ID) if the 2FA version is unset.
      *
-     * @param bool $tfa Whether to try 2FA_* constants first (two-factor auth).
+     * @param SmsSettings $settings Configuration source.
+     * @param bool $tfa Whether to try 2FA_* settings first (two-factor auth).
+     * @param ?string $baseUrl Absolute base URL used to resolve bare-path URL settings.
      */
-    public static function fromConstants(bool $tfa = false): static;
+    public static function fromSettings(SmsSettings $settings, bool $tfa = false, ?string $baseUrl = null): static;
 
     /**
      * Short, unique key identifying this provider (e.g. '5centsmsv5', 'cellcast').
@@ -48,8 +51,8 @@ interface SmsProvider
      * Return a copy of this provider with the given cache wired in.
      *
      * Providers that don't use caching return $this unchanged.
-     * Called by getSmsProvider() after fromConstants() — keeps
-     * constant-reading and infrastructure-wiring as separate steps.
+     * Called by getSmsProvider() after fromSettings() — keeps
+     * configuration-reading and infrastructure-wiring as separate steps.
      */
     public function withCache(SmsCache $cache): static;
 

@@ -35,6 +35,9 @@ require_once __DIR__ . '/RegistrationStep.php';
 // SendSummary tagged union + implementations
 require_once __DIR__ . '/SendSummary.php';
 
+// Configuration source for provider factories
+require_once __DIR__ . '/SmsSettings.php';
+
 // SmsProvider interface (depends on SmsCapability, RegistrationStep, SendSummary)
 require_once __DIR__ . '/SmsProvider.php';
 

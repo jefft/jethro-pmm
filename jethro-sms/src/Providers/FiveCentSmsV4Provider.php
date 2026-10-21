@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Sms\Providers;
 use Sms\SmsCapability;
+use Sms\SmsSettings;
 
 
 /**
@@ -22,21 +23,21 @@ use Sms\SmsCapability;
  *   responseIdRegex = extract message ID from v4 response
  *   balanceUrl      = https://www.5centsms.com.au/api/v4/account
  *
- * PHP constants read by fromConstants():
+ * Settings read by fromSettings():
  *   When $tfa is false:
  *     SMS_HTTP_URL          → falls back to v4 default
  *     SMS_HTTP_POST_TEMPLATE → falls back to v4 default
- *     ... (same constants as TemplateSmsProvider)
+ *     ... (same settings as TemplateSmsProvider)
  *   When $tfa is true:
- *     2FA_SMS_* constants tried first, then SMS_HTTP_* constants,
+ *     2FA_SMS_* settings tried first, then SMS_HTTP_* settings,
  *     then v4 defaults.
  *
- * @param bool $tfa When true, reads 2FA_SMS_* constants first.
+ * @param bool $tfa When true, reads 2FA_SMS_* settings first.
  * @param string|null $baseUrl When non-null and URL is a bare path, resolves it to an absolute URL.
  */
 class FiveCentSmsV4Provider extends TemplateSmsProvider
 {
-    public static function fromConstants(bool $tfa = false, ?string $baseUrl = null): static
+    public static function fromSettings(SmsSettings $settings, bool $tfa = false, ?string $baseUrl = null): static
     {
         // Read constants with 2FA fallback, same as TemplateSmsProvider.
         // V4-specific defaults override when the corresponding constant is unset;
@@ -44,10 +45,10 @@ class FiveCentSmsV4Provider extends TemplateSmsProvider
 
         $url = '';
         if ($tfa) {
-            $url = (string)ifdef('2FA_SMS_URL', '');
+            $url = (string)$settings['2FA_SMS_URL']->val('');
         }
         if ($url === '') {
-            $url = (string)ifdef('SMS_HTTP_URL', 'https://www.5centsms.com.au/api/v4/sms');
+            $url = (string)$settings['SMS_HTTP_URL']->val('https://www.5centsms.com.au/api/v4/sms');
         }
 
         if ($url !== '' && $url[0] === '/' && $baseUrl !== null) {
@@ -58,55 +59,55 @@ class FiveCentSmsV4Provider extends TemplateSmsProvider
         }
 
         if ($url === '') {
-            throw new \RuntimeException('Missing SMS configuration: SMS_HTTP_URL');
+            throw new \RuntimeException('Missing SMS configuration: ' . $settings['SMS_HTTP_URL']->getName());
         }
 
         $postTemplate = '';
         if ($tfa) {
-            $postTemplate = (string)ifdef('2FA_SMS_POST_TEMPLATE', '');
+            $postTemplate = (string)$settings['2FA_SMS_POST_TEMPLATE']->val('');
         }
         if ($postTemplate === '') {
-            $postTemplate = (string)ifdef('SMS_HTTP_POST_TEMPLATE', 'sender=_USER_MOBILE_&to=_RECIPIENTS_COMMAS_&message=_MESSAGE_');
+            $postTemplate = (string)$settings['SMS_HTTP_POST_TEMPLATE']->val('sender=_USER_MOBILE_&to=_RECIPIENTS_COMMAS_&message=_MESSAGE_');
         }
 
         $headerTemplate = '';
         if ($tfa) {
-            $headerTemplate = (string)ifdef('2FA_SMS_HEADER_TEMPLATE', '');
+            $headerTemplate = (string)$settings['2FA_SMS_HEADER_TEMPLATE']->val('');
         }
         if ($headerTemplate === '') {
-            $headerTemplate = (string)ifdef('SMS_HTTP_HEADER_TEMPLATE', '');
+            $headerTemplate = (string)$settings['SMS_HTTP_HEADER_TEMPLATE']->val('');
         }
 
         $responseOkRegex = '';
         if ($tfa) {
-            $responseOkRegex = (string)ifdef('2FA_SMS_RESPONSE_OK_REGEX', '');
+            $responseOkRegex = (string)$settings['2FA_SMS_RESPONSE_OK_REGEX']->val('');
         }
         if ($responseOkRegex === '') {
-            $responseOkRegex = (string)ifdef('SMS_HTTP_RESPONSE_OK_REGEX', '[{]\s*"destination":\s*"_RECIPIENT_",[^}]*"status":\s*"?(1000|1001|1002|1004|1006|1011|1527)"?,');
+            $responseOkRegex = (string)$settings['SMS_HTTP_RESPONSE_OK_REGEX']->val('[{]\s*"destination":\s*"_RECIPIENT_",[^}]*"status":\s*"?(1000|1001|1002|1004|1006|1011|1527)"?,');
         }
 
         $responseErrorRegex = '';
         if ($tfa) {
-            $responseErrorRegex = (string)ifdef('2FA_SMS_RESPONSE_ERROR_REGEX', '');
+            $responseErrorRegex = (string)$settings['2FA_SMS_RESPONSE_ERROR_REGEX']->val('');
         }
         if ($responseErrorRegex === '') {
-            $responseErrorRegex = (string)ifdef('SMS_HTTP_RESPONSE_ERROR_REGEX', '');
+            $responseErrorRegex = (string)$settings['SMS_HTTP_RESPONSE_ERROR_REGEX']->val('');
         }
 
         $responseIdRegex = '';
         if ($tfa) {
-            $responseIdRegex = (string)ifdef('2FA_SMS_RESPONSE_ID_REGEX', '');
+            $responseIdRegex = (string)$settings['2FA_SMS_RESPONSE_ID_REGEX']->val('');
         }
         if ($responseIdRegex === '') {
-            $responseIdRegex = (string)ifdef('SMS_HTTP_RESPONSE_ID_REGEX', '[{]\s*"destination":\s*"_RECIPIENT_",[^}]*"id":\s*"([^"]+)"[^}]*}');
+            $responseIdRegex = (string)$settings['SMS_HTTP_RESPONSE_ID_REGEX']->val('[{]\s*"destination":\s*"_RECIPIENT_",[^}]*"id":\s*"([^"]+)"[^}]*}');
         }
 
         $balanceUrl = '';
         if ($tfa) {
-            $balanceUrl = (string)ifdef('2FA_SMS_URL_BALANCE', '');
+            $balanceUrl = (string)$settings['2FA_SMS_URL_BALANCE']->val('');
         }
         if ($balanceUrl === '') {
-            $balanceUrl = (string)ifdef('SMS_HTTP_URL_BALANCE', 'https://www.5centsms.com.au/api/v4/account');
+            $balanceUrl = (string)$settings['SMS_HTTP_URL_BALANCE']->val('https://www.5centsms.com.au/api/v4/account');
         }
 
         return new static(
@@ -117,15 +118,15 @@ class FiveCentSmsV4Provider extends TemplateSmsProvider
             responseErrorRegex: $responseErrorRegex,
             responseIdRegex: $responseIdRegex,
             // Empty setting (e.g. blank row in `setting` table) means "use default".
-            localPrefix: (string)ifdef('SMS_LOCAL_PREFIX', '') ?: '0',
-            internationalPrefix: (string)ifdef('SMS_INTERNATIONAL_PREFIX', '') ?: '61',
-            recipientArrayParameter: (string)ifdef('SMS_RECIPIENT_ARRAY_PARAMETER', ''),
+            localPrefix: (string)$settings['SMS_LOCAL_PREFIX']->val('') ?: '0',
+            internationalPrefix: (string)$settings['SMS_INTERNATIONAL_PREFIX']->val('') ?: '61',
+            recipientArrayParameter: (string)$settings['SMS_RECIPIENT_ARRAY_PARAMETER']->val(''),
             balanceUrl: $balanceUrl,
             httpClient: static::createHttpClient(
-                filter_var(ifdef('SMS_TESTMODE', false), FILTER_VALIDATE_BOOLEAN),
-                filter_var(ifdef('SMS_VERBOSE', false), FILTER_VALIDATE_BOOLEAN),
+                filter_var($settings['SMS_TESTMODE']->val(false), FILTER_VALIDATE_BOOLEAN),
+                filter_var($settings['SMS_VERBOSE']->val(false), FILTER_VALIDATE_BOOLEAN),
             ),
-            senderIds: (string)ifdef('SMS_SENDER_OPTIONS', ''),
+            senderIds: (string)$settings['SMS_SENDER_OPTIONS']->val(''),
         );
     }
 
