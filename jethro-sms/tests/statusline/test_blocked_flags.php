@@ -63,6 +63,25 @@ test('sufficient balance -> not blocked', function () {
     assert_eq($res['blockReason'], '');
 });
 
+test('advisory balance (balanceBlocksSend false): over balance warns, keeps the cost line, does not block', function () {
+    $cfg = new SmsStatuslineConfig(segmentCost: 0.05, balance: 1, balanceBlocksSend: false);
+    $msg = str_repeat('a', 29);
+    $deliveries = [_prow(1, $msg), _prow(2, $msg), _prow(3, $msg), _prow(4, $msg)];
+    $res = renderStatusline($msg, $deliveries, $cfg);
+    assert_false($res['blocked']);
+    assert_eq($res['blockReason'], '');
+    assert_contains($res['html'], 'Not enough SMS credit: 4 segments needed, 1 remaining.');
+    assert_contains($res['html'], '$0.20');
+});
+
+test('advisory balance: a negative balance still only warns', function () {
+    $cfg = new SmsStatuslineConfig(segmentCost: 0.05, balance: -3, balanceBlocksSend: false);
+    $msg = str_repeat('a', 29);
+    $res = renderStatusline($msg, [_prow(1, $msg)], $cfg);
+    assert_false($res['blocked']);
+    assert_contains($res['html'], '1 segment needed, -3 remaining.');
+});
+
 test('balance check does NOT fire on raw-text estimate (no preview deliveries)', function () {
     // No deliveries -> recipientCount assumed 1, balance check skipped entirely.
     $cfg = new SmsStatuslineConfig(segmentCost: 0.05, balance: 0);

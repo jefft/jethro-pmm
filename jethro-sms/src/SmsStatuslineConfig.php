@@ -22,6 +22,8 @@ final class SmsStatuslineConfig
         public int $ucs2SegmentLength = 70,
         public float $segmentCost = 0.0,
         public ?int $balance = null,
+        /** Whether exceeding $balance blocks Send. False when the provider's balance is advisory (SmsCapability::OVERDRAFT): over-balance then only warns. */
+        public bool $balanceBlocksSend = true,
         public bool $shortenUrls = false,
         public bool $testMode = false,
         public string $unicodeMode = 'enabled', // 'enabled' | 'when_free' | 'disabled'

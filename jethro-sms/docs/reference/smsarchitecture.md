@@ -138,8 +138,11 @@ Other cross-cutting constants (`SMS_SEND_COOLOFF`, `SMS_SHORTEN_URLS`, …) are 
 | `REMOVE_OPT_OUT` | `removeOptOut()` | ✓ | | ✓ |
 | `BATCH_DELIVERY_QUERY` | `listRecentDeliveries()` | ✓ | ✓ | ✓ |
 | `LIST_HISTORY` | used by `synchronizeHistory()` | ✓ | ✓ | ✓ |
+| `OVERDRAFT` | (balance is advisory) | | | |
 
 v4 has `GET_BALANCE` only. Template has `GET_BALANCE` only when a balance URL is configured.
+
+`OVERDRAFT` means the balance is advisory: it may go negative and sends never fail for lack of credit. No built-in provider declares it. A host-supplied provider that does makes the compose statusline warn ("⚠ Not enough SMS credit: …") instead of blocking Send when a send needs more segments than the balance (`SmsStatuslineConfig::$balanceBlocksSend`, set by `makeStatuslineConfig()`).
 
 - `getSenderIds(bool $getAll = false)` returns only ACMA-approved sender IDs unless `$getAll` is true.
 - `listRecentDeliveries(?int $since = null)` returns delivery statuses since a timestamp (default: the last 24 h) from one paginated upstream query. Providers without the capability return `[]`, and callers then fall back to per-delivery `updateDelivery()`.

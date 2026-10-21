@@ -46,4 +46,11 @@ enum SmsCapability
      * (Synchronize History).
      */
     case LIST_HISTORY;
+
+    /**
+     * The balance is advisory: it may go negative and sends never fail for lack of
+     * credit, so the compose statusline warns instead of blocking Send when a send
+     * needs more segments than the balance.
+     */
+    case OVERDRAFT;
 }

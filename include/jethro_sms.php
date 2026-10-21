@@ -2455,9 +2455,12 @@ function getAvailableTokens(): array
 function makeStatuslineConfig(bool $shortenUrls = false): \Sms\SmsStatuslineConfig
 {
     $segmentCost = 0.0;
+    $balanceBlocksSend = true;
     $providerResult = \Jethro\Sms\getSmsProvider();
     if ($providerResult->isSuccess()) {
-        $segmentCost = $providerResult->getValue()->getSegmentCost() / 100000;
+        $provider = $providerResult->getValue();
+        $segmentCost = $provider->getSegmentCost() / 100000;
+        $balanceBlocksSend = !$provider->hasCapability(\Sms\SmsCapability::OVERDRAFT);
     }
 
     $smsUnicode = ifdef('SMS_UNICODE_PERMITTED', 'when_free');
@@ -2475,9 +2478,11 @@ function makeStatuslineConfig(bool $shortenUrls = false): \Sms\SmsStatuslineConf
         ucs2SegmentLength: 70,
         segmentCost: $segmentCost,
         // The statusline warns and blocks Send when a send needs more segments
-        // than the account has. Providers cache the balance for 300s, so typing
-        // does not call the provider's API every time.
+        // than the account has (only warns when the balance is advisory,
+        // SmsCapability::OVERDRAFT). Providers cache the balance for 300s, so
+        // typing does not call the provider's API every time.
         balance: getSmsBalance(),
+        balanceBlocksSend: $balanceBlocksSend,
         shortenUrls: $shortenUrls && ifdef('URLSHORTENER', 'https://jethro.au') !== '',
         testMode: filter_var(ifdef('SMS_TESTMODE', false), FILTER_VALIDATE_BOOLEAN),
         unicodeMode: $unicodeMode,

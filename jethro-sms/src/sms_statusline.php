@@ -410,15 +410,25 @@ function renderStatusline(string $message, array $deliveries, SmsStatuslineConfi
 
     // ---------------------------------------------------------------
     // BALANCE CHECK — only runs when we have preview data.
+    // Over balance blocks Send, unless the balance is advisory
+    // ($cfg->balanceBlocksSend false, SmsCapability::OVERDRAFT): then it
+    // only warns, alongside the normal cost line.
     // ---------------------------------------------------------------
     $balanceBlocked = false;
     $balanceMsg = '';
+    $balanceWarning = '';
     if ($deliveries !== [] && $cfg->balance !== null && $segs > 0) {
         $totalSegments = $segs * $recipientCount;
-        $balanceBlocked = $totalSegments > $cfg->balance;
-        if ($balanceBlocked) {
-            $balanceMsg = '⚠ Insufficient balance: ' . $totalSegments . ' segment'
-                . ($totalSegments > 1 ? 's' : '') . ' needed, ' . $cfg->balance . ' available.';
+        $plural = $totalSegments > 1 ? 's' : '';
+        if ($totalSegments > $cfg->balance) {
+            if ($cfg->balanceBlocksSend) {
+                $balanceBlocked = true;
+                $balanceMsg = '⚠ Insufficient balance: ' . $totalSegments . ' segment'
+                    . $plural . ' needed, ' . $cfg->balance . ' available.';
+            } else {
+                $balanceWarning = '⚠ Not enough SMS credit: ' . $totalSegments . ' segment'
+                    . $plural . ' needed, ' . $cfg->balance . ' remaining.';
+            }
         }
     }
 
@@ -443,6 +453,10 @@ function renderStatusline(string $message, array $deliveries, SmsStatuslineConfi
         } else {
             $parts[] = '<p>' . \ents($segChars . ' chars = ' . $segs . ' ' . $segLabel . 's') . '</p>';
         }
+    }
+
+    if ($balanceWarning !== '') {
+        $parts[] = '<p>' . \ents($balanceWarning) . '</p>';
     }
 
     // UNICODE COST-DOUBLING WARNING
