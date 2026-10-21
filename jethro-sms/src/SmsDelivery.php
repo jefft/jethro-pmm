@@ -83,6 +83,30 @@ readonly class SmsDelivery
         );
     }
 
+    /**
+     * Return a copy with no provider-reported per-segment cost.
+     *
+     * with() can't clear a field (null means "keep"), so this is the way to
+     * drop a reported price — e.g. so a host records its own configured price
+     * instead. Like with(), returns the base SmsDelivery class.
+     */
+    public function withoutPerSegmentCost(): self
+    {
+        return new self(
+            recipient: $this->recipient,
+            status: $this->status,
+            remoteId: $this->remoteId,
+            deliveryTimestamp: $this->deliveryTimestamp,
+            sendTimestamp: $this->sendTimestamp,
+            rawResponse: $this->rawResponse,
+            message: $this->message,
+            statusDetail: $this->statusDetail,
+            segmentsUsed: $this->segmentsUsed,
+            perSegmentCost: null,
+            costBearer: $this->costBearer,
+        );
+    }
+
     public function recipient(): PhoneNumber
     {
         return $this->recipient;
