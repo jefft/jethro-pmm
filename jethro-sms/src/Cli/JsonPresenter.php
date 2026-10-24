@@ -8,7 +8,6 @@ use Sms\FormField;
 use Sms\OptOutEntry;
 use Sms\PhoneNumber;
 use Sms\RegistrationStep;
-use Sms\SenderID;
 use Sms\SmsDelivery;
 use Sms\SendSummary;
 
@@ -63,7 +62,7 @@ final class JsonPresenter implements Presenter
         }
         return match ($outcome->action) {
             'sms'                    => $this->send($data),
-            'senderids'              => $this->senderIds($data),
+            'senderids'              => $data,
             'sendernums'             => array_map(static fn (PhoneNumber $n) => ['number' => $n->value], $data),
             'sendernums-unregistered' => $data,
             'verify-sender'          => $data,
@@ -113,15 +112,6 @@ final class JsonPresenter implements Presenter
             'summary'    => $summaryJson,
             'deliveries' => array_map(fn (SmsDelivery $d) => $this->delivery($d), $data['deliveries']),
         ];
-    }
-
-    /** @param SenderID[] $senderIds */
-    private function senderIds(array $senderIds): array
-    {
-        return array_map(
-            static fn (SenderID $s) => ['value' => $s->value, 'acmaApproved' => $s->acmaApproved],
-            $senderIds,
-        );
     }
 
     /** @param array{provider: string, extra: array<string,string>, constants: list<array{key:string, required:string, defined:bool, value:mixed}>} $data */

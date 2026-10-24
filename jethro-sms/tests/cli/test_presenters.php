@@ -14,7 +14,7 @@
 namespace Test\Sms\CliPresenters;
 
 use function \Test\{test, assert_eq, assert_true, assert_contains};
-use \Sms\{PhoneNumber, SenderID, OptOutEntry, RegistrationStep, FormField, SmsStatus, SmsDelivery};
+use \Sms\{PhoneNumber, OptOutEntry, RegistrationStep, FormField, SmsStatus, SmsDelivery};
 use \Sms\Cli\{CliOutcome, TextPresenter, JsonPresenter};
 
 // ---------------------------------------------------------------------------
@@ -76,14 +76,14 @@ test('text: sender IDs, empty and populated', function () {
 	);
 
 	$out = renderText(CliOutcome::success('senderids', [
-		new SenderID('MYCHURCH', true),
-		new SenderID('NEWID', false),
-		new SenderID('UNKNOWN', null),
+		['value' => 'MYCHURCH', 'acmaApproved' => true, 'registeredAt' => 1785788740],
+		['value' => 'NEWID', 'acmaApproved' => false, 'registeredAt' => null],
+		['value' => 'UNKNOWN', 'acmaApproved' => null, 'registeredAt' => 1744784026],
 	]));
 	assert_eq($out, "Sender IDs:\n"
-		. "  MYCHURCH (approved)\n"
+		. "  MYCHURCH (approved)  (attempted 2026-08-03)\n"
 		. "  NEWID (not approved — hidden from senders)\n"
-		. "  UNKNOWN\n");
+		. "  UNKNOWN  (attempted 2025-04-16)\n");
 });
 
 test('text: sender numbers and balance', function () {
@@ -345,10 +345,13 @@ test('json: envelope for success, failure and note', function () {
 
 test('json: sender IDs and numbers', function () {
 	assert_eq(
-		renderJson(CliOutcome::success('senderids', [new SenderID('MYCHURCH', true), new SenderID('X', null)]))['data'],
+		renderJson(CliOutcome::success('senderids', [
+			['value' => 'MYCHURCH', 'acmaApproved' => true, 'registeredAt' => 1785788740],
+			['value' => 'X', 'acmaApproved' => null, 'registeredAt' => null],
+		]))['data'],
 		[
-			['value' => 'MYCHURCH', 'acmaApproved' => true],
-			['value' => 'X', 'acmaApproved' => null],
+			['value' => 'MYCHURCH', 'acmaApproved' => true, 'registeredAt' => 1785788740],
+			['value' => 'X', 'acmaApproved' => null, 'registeredAt' => null],
 		],
 	);
 	assert_eq(

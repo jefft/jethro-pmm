@@ -286,7 +286,29 @@ function handleSenderIds(CliEnvironment $env, Presenter $ui): CliOutcome
 		throw new CliError('Failed to fetch sender IDs: ' . $result->getError());
 	}
 
-	return CliOutcome::success('senderids', $result->getValue());
+	// Enrich with record-level data where the provider has it.  Records
+	// include alphanumeric IDs (despite the method's name) and carry the
+	// registration attempt date derived from the gateway record id; a
+	// provider without a record-level list (or a failed call) just means the
+	// date is unknown, not that the listing failed.
+	$records = [];
+	$recordsResult = $provider->getSenderNumberRecords();
+	if ($recordsResult->isSuccess()) {
+		foreach ($recordsResult->getValue() as $record) {
+			$records[$record->value] = $record;
+		}
+	}
+
+	$rows = [];
+	foreach ($result->getValue() as $senderId) {
+		$rows[] = [
+			'value'        => $senderId->value,
+			'acmaApproved' => $senderId->acmaApproved,
+			'registeredAt' => ($records[$senderId->value] ?? null)?->registeredAt,
+		];
+	}
+
+	return CliOutcome::success('senderids', $rows);
 }
 
 function handleSenderNums(CliEnvironment $env, Presenter $ui): CliOutcome

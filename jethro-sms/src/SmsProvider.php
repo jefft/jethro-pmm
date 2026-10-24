@@ -203,6 +203,11 @@ interface SmsProvider
      * AND alphanumeric IDs, approved or awaiting verification, with the
      * registration date and the provider's record id where available.
      *
+     * NB the name is historical: despite "Number", alphanumeric sender IDs
+     * share the same upstream list and are included here. Callers that want
+     * only numbers filter with {@see SenderNumberRecord::isPhoneNumber()};
+     * `senderids` uses the alphanumeric entries to date each ID.
+     *
      * The admin status panel uses this to surface stale pending entries
      * (e.g. a number attempted long ago that silently blocks re-registration);
      * `getSenderNumbers()` remains the simple approved-numbers filter.

@@ -8,7 +8,6 @@ use Sms\FormField;
 use Sms\OptOutEntry;
 use Sms\PhoneNumber;
 use Sms\RegistrationStep;
-use Sms\SenderID;
 use Sms\SmsDelivery;
 use Sms\SendSummary;
 
@@ -82,7 +81,7 @@ final class TextPresenter implements Presenter
         };
     }
 
-    /** @param SenderID[] $senderIds */
+    /** @param list<array{value: string, acmaApproved: ?bool, registeredAt: ?int}> $senderIds */
     private function senderIds(array $senderIds): void
     {
         if ($senderIds === []) {
@@ -91,12 +90,16 @@ final class TextPresenter implements Presenter
         }
         echo "Sender IDs:\n";
         foreach ($senderIds as $senderId) {
-            $status = match ($senderId->acmaApproved) {
+            $status = match ($senderId['acmaApproved']) {
                 true  => ' (approved)',
                 false => ' (not approved — hidden from senders)',
                 null  => '',
             };
-            echo '  ' . $senderId->value . $status . "\n";
+            $line = '  ' . $senderId['value'] . $status;
+            if ($senderId['registeredAt'] !== null) {
+                $line .= '  (attempted ' . date('Y-m-d', $senderId['registeredAt']) . ')';
+            }
+            echo $line . "\n";
         }
     }
 

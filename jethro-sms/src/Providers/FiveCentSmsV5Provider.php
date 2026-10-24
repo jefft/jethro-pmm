@@ -504,10 +504,12 @@ class FiveCentSmsV5Provider implements SmsProvider
      * Sender-number records as the 5centsms account lists them.
      *
      * GET /senderid returns every sender record — approved, pending and
-     * unverified — each carrying the gateway record id and the status.  The
-     * record id is a Mongo ObjectId whose first 8 hex chars encode the
-     * creation time: that is the date the number was (last) registered, the
-     * only date the v5 API exposes for a sender record.
+     * unverified, alphanumeric sender IDs included (the method name is
+     * historical; filter with isPhoneNumber() for numbers only) — each
+     * carrying the gateway record id and the status.  The record id is a
+     * Mongo ObjectId whose first 8 hex chars encode the creation time: that
+     * is the date the entry was (last) registered, the only date the v5 API
+     * exposes for a sender record.
      *
      * @return \Result<SenderNumberRecord[], string>
      */
