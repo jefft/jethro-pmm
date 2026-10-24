@@ -86,6 +86,22 @@ account's state — senders, unsubscribes — so list replies compare equal), in
 (raw files excluded). It needs no credentials, so Jethro's `smsmock-recordings`
 functional test simply runs it.
 
+Two coverage rules are enforced by `tests/run.php`:
+
+- **Route coverage** — every route a provider's mock serves
+  (`ProviderInterface::routes()`) must have a recorded case, or be listed in
+  the cases class' `unrecordable()` with a reason (normally: recording it
+  would have real-world side effects, e.g. Cellcast's registration endpoints
+  text a live OTP). A mock route without a recording is how a hand-written
+  handler can drift from reality unnoticed.
+- **Doc pins** — reference docs under `docs/docs/developer/reference/sms/**`
+  may pin the recordings they describe with a Source Reference row of the
+  form `| Recording … | `smsmockserver/recordings/<p>/actual/<case>.json` —
+  sha1 `<40 hex>` |`. The suite re-hashes each pinned recording and fails on
+  a mismatch, so a doc cannot quietly keep describing a contract the live
+  API no longer has. After a re-record that changes a pinned file, re-check
+  the doc and update its hash (the failure message shows the current hash).
+
 Re-record against the live API (by hand, e.g. before a release, or when a
 provider announces API changes), review the diff, then fix the mock:
 

@@ -188,6 +188,56 @@ foreach (Providers::all() as $name => $config) {
     });
 }
 
+// ── Docs: recording hashes pinned in the reference docs ────────────────
+
+// Reference docs under docs/docs/developer/reference/sms/** may pin the
+// recordings they describe: a Source Reference row of the form
+//   | Recording … | `smsmockserver/recordings/<provider>/actual/<name>.json` — sha1 `<40 hex>` |
+// This fails when the recording has changed since the doc was written, so
+// docs cannot quietly drift from the recorded contract.
+
+const DOCS_DIR = __DIR__ . '/../../docs/docs/developer/reference/sms';
+
+test('docs: pinned recording hashes match the recordings', function () {
+    if (!is_dir(DOCS_DIR)) {
+        echo '      (no reference docs in this checkout — skipped)';
+        return;
+    }
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator(DOCS_DIR, FilesystemIterator::SKIP_DOTS),
+    );
+    $pins = [];
+    foreach ($iterator as $file) {
+        if (!$file->isFile() || !str_ends_with($file->getPathname(), '.md')) continue;
+        $relative = substr($file->getPathname(), strlen(DOCS_DIR) + 1);
+        $text = file_get_contents($file->getPathname());
+        preg_match_all(
+            '#recordings/([a-z0-9]+)/actual/([^`\s]+\.json)` — sha1 `([0-9a-f]{40})#',
+            $text,
+            $matches,
+            PREG_SET_ORDER,
+        );
+        foreach ($matches as $m) {
+            $pins["$relative: {$m[2]}"] = [$m[1], $m[2], $m[3]];
+        }
+    }
+    check($pins !== [], 'no pinned recordings found under ' . DOCS_DIR . ' — if this suite runs in a repo without docs, delete this test');
+    $problems = [];
+    foreach ($pins as $where => [$provider, $name, $expected]) {
+        $path = __DIR__ . "/../recordings/$provider/actual/$name";
+        if (!is_file($path)) {
+            $problems[] = "$where: recording not found at recordings/$provider/actual/$name";
+            continue;
+        }
+        $actual = sha1_file($path);
+        if ($actual !== $expected) {
+            $problems[] = "$where: recording changed — doc pins sha1 $expected, current is $actual. Re-check the doc against the new recording, then update the hash.";
+        }
+    }
+    check($problems === [], implode("\n", $problems));
+    echo '      ' . count($pins) . " pins verified\n";
+});
+
 // ── The mock's replies vs the live recordings ─────────────────────────
 
 Profile::loadProfiles(__DIR__ . '/../profiles');

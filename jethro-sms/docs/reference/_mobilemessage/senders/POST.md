@@ -31,29 +31,35 @@ in the JSON body.
 | `label`  | string | No       | Human label (GET /v1/senders items return it back as `label`)  |
 
 **The number must be under `number`.** POSTing it as `sender` (the key the
-*GET* items use) is rejected with `{"error":"\"number\" is required."}`.
+*GET* items use) is rejected exactly like a missing number.
 
 A successful creation texts a verification link to the number; the owner must
 click it on the handset (max 3 pending verifications at a time). There is no
 API to complete or poll the click — poll `GET /v1/senders` instead.
 
-## Responses
+## Responses — recorded live 2026-10
 
-Observed (2026-10, live account):
+Missing number:
 
 ```json
-{"error": "This number is already an active sender on your account."}
+{"status": 400, "error": "\"number\" is required."}
 ```
 
-The API surfaces refusals as an `error` key; the provider turns any non-empty
-`error` into a `Result::failure` — except "already an active sender", which
-`registerSenderNumber()` reports as a completed registration
-(`registered: true`), matching the Cellcast/v5 treatment of
-already-registered numbers.
+Number already on the account (shared, own or verified):
 
-The success envelope is not yet captured — `{"status":"complete", …}` is
-expected but unverified. The provider does not read the success body beyond
-checking for the error envelope.
+```json
+{"status": 409, "error": "This number is already an active sender on your account."}
+```
+
+The provider turns any `error` envelope into a `Result::failure` — except
+"already an active sender", which `registerSenderNumber()` reports as a
+completed registration (`registered: true`), matching the Cellcast/v5
+treatment of already-registered numbers.
+
+The success envelope is not recorded — creating would text a real handset —
+so the mock's `200 {"status":"complete","sender":…}` is plausible, not
+verified; the provider does not read the success body beyond checking for
+the error envelope.
 
 ## Related
 
@@ -69,3 +75,5 @@ checking for the error envelope.
 | `MobileMessageSmsProvider::fetchSenders()` | same | 344 |
 | `MobileMessageSmsProvider::getSenderNumbers()` | same | 408 |
 | `MobileMessageSmsProvider::verifySenderNumber()` | same | 428 |
+| Recording (missing number) | `smsmockserver/recordings/mobilemessage/actual/senders.register-missing.json` — sha1 `225450878a5ca44770a09ecd6e004b5e4ee0a007` | |
+| Recording (already active) | `smsmockserver/recordings/mobilemessage/actual/senders.register-active.json` — sha1 `eda2fad84fcc382be7d3208f3df0d5448b88be14` | |

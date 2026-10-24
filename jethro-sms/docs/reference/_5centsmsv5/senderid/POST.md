@@ -55,6 +55,7 @@ Send the Sender ID to be created. The API call creates the record upstream; the 
 ```json
 {
   "error": "",
+  "id": "6acf0a2e1d4c8a0046b3d123",
   "message": "Sender ID created"
 }
 ```
@@ -62,18 +63,29 @@ Send the Sender ID to be created. The API call creates the record upstream; the 
 | Field     | Type   | Description                                                    |
 |-----------|--------|----------------------------------------------------------------|
 | `error`   | string | Empty string on success; non-empty string describes the error  |
+| `id`      | string | 24-hex upstream registration ID                                |
 | `message` | string | Human-readable confirmation message                            |
 
-#### Error Response
+#### Error Responses
+
+Missing `senderid` — recorded live 2026-10:
 
 ```json
-{
-  "error": "Sender ID already exists",
-  "message": ""
-}
+{"status": 400, "error": "Missing Sender ID"}
 ```
 
-If `error` is a non-empty string, the registration failed. The provider surfaces this as a `Result::failure($errorMsg)`.
+Re-POSTing a sender ID **already on this account** is *not* an error: it
+re-creates it and returns the success envelope above with a fresh `id`
+(recorded live 2026-10 against an ACMA-approved ID; the account list shows
+no duplicate afterwards). The previously documented refusal
+
+```json
+{"error": "Sender ID already exists"}
+```
+
+therefore applies to IDs owned by **other** accounts `[INFERENCE]` — it could
+not be reproduced from an account that owns the ID. If `error` is a
+non-empty string, the provider surfaces a `Result::failure($errorMsg)`.
 
 ---
 
@@ -167,7 +179,9 @@ This prevents accidental real registrations during development and testing. All 
 
 ## Error Response Structure
 
-Unknown — not yet documented.
+Documented under [Error Responses](#error-responses) — a missing `senderid`
+is `400 "Missing Sender ID"`; an ID already on this account re-creates
+instead of refusing.
 
 ---
 
@@ -175,12 +189,14 @@ Unknown — not yet documented.
 
 | Symbol                               | File              | Lines       |
 |--------------------------------------|-------------------|-------------|
-| `FiveCentSmsV5Provider::registerSenderId()` | `jethro-sms/src/sms.php` | ~2428–2474 |
-| `FiveCentSmsV5Provider::createSenderViaApi()` | `jethro-sms/src/sms.php` | ~2491–2518 |
-| `FiveCentSmsV5Provider::getSenderIdFieldSchema()` | `jethro-sms/src/sms.php` | ~2532–2545 |
-| `FiveCentSmsV5Provider::buildSenderIdFormData()` | `jethro-sms/src/sms.php` | ~2556–2563 |
-| `FiveCentSmsV5FakeHttpClient::expectedResponses()` | `jethro-sms/src/sms.php` | ~3206–3214 |
-| `RegistrationStep` (value object)    | `jethro-sms/src/sms.php` | ~153–201    |
-| `FormField` (schema item)            | `jethro-sms/src/sms.php` | ~126–140    |
+| `FiveCentSmsV5Provider::registerSenderId()` | `jethro-sms/src/Providers/FiveCentSmsV5Provider.php` | 578 |
+| `FiveCentSmsV5Provider::createSenderViaApi()` | same | 641 |
+| `FiveCentSmsV5Provider::getSenderIdFieldSchema()` | same | 682 |
+| `FiveCentSmsV5Provider::buildSenderIdFormData()` | same | 706 |
+| `FiveCentSmsV5FakeHttpClient::expectedResponses()` | `jethro-sms/src/Providers/FiveCentSmsV5FakeHttpClient.php` | ~28 |
+| `RegistrationStep` (value object)    | `jethro-sms/src/RegistrationStep.php` | |
+| `FormField` (schema item)            | `jethro-sms/src/FormField.php` | |
+| Recording (missing ID) | `smsmockserver/recordings/5centsmsv5/actual/senderid.register-missing.json` — sha1 `b8e5a43882b949f5794892918656b265269104f2` | |
+| Recording (existing ID) | `smsmockserver/recordings/5centsmsv5/actual/senderid.register-existing.json` — sha1 `f78372410d30c919818b45b70e6fd8ce1c85cd85` | |
 
 External reference: [5CentSMS Sender ID docs](https://docs.5centsms.com.au/#06c16433-59d6-4431-8558-499922dc6b02)
