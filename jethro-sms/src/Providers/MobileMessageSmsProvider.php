@@ -14,6 +14,7 @@ use Sms\OptOutEntry;
 use Sms\PhoneNumber;
 use Sms\RegistrationStep;
 use Sms\SenderID;
+use Sms\SenderNumberRecord;
 use Sms\SmsCache;
 use Sms\SmsCapability;
 use Sms\SmsSettings;
@@ -417,6 +418,39 @@ class MobileMessageSmsProvider implements SmsProvider
 			}
 			return $numbers;
 		});
+	}
+
+	/**
+	 * Sender records from GET /v1/senders.  The live list carries no record
+	 * ids or dates ({sender, type, label, is_default}), so only the value and
+	 * status are populated.  A listed number is a usable sender — own/shared/
+	 * dedicated normalise to 'active'; 'alpha' marks alphanumeric IDs.
+	 *
+	 * @return \Result<SenderNumberRecord[], string>
+	 */
+	public function getSenderNumberRecords(): \Result
+	{
+		return $this->fetchSenders()->map(function (array $items) {
+			$records = [];
+			foreach ($items as $item) {
+				$sender = isset($item['sender']) ? trim((string) $item['sender']) : '';
+				if ($sender === '') continue;
+				$type = isset($item['type']) && \is_string($item['type']) ? $item['type'] : null;
+				$records[] = new SenderNumberRecord(
+					$sender,
+					$type === 'alpha' ? 'alpha' : ($type !== null ? 'active' : null),
+					null,
+					null,
+				);
+			}
+			return $records;
+		});
+	}
+
+	/** @inheritDoc */
+	public function deleteSenderNumber(PhoneNumber $number): \Result
+	{
+		return \Result::failure('MobileMessage does not support deleting sender numbers via the API — remove them in the MobileMessage dashboard.');
 	}
 
 	/**

@@ -29,6 +29,9 @@ enum SmsCapability
     /** The provider requires sender phone number registration before use. */
     case REGISTER_SENDER_NUMBER;
 
+    /** The provider can remove a previously registered sender phone number from the account. */
+    case DELETE_SENDER_NUMBER;
+
     /** The provider supports registering a sender ID (business identity) with the upstream gateway. */
     case REGISTER_SENDER_ID;
 

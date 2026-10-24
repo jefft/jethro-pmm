@@ -13,6 +13,7 @@ use Sms\OptOutEntry;
 use Sms\PhoneNumber;
 use Sms\RegistrationStep;
 use Sms\SenderID;
+use Sms\SenderNumberRecord;
 use Sms\SmsCache;
 use Sms\SmsCapability;
 use Sms\SmsSettings;
@@ -688,6 +689,40 @@ class CellcastSmsProvider implements SmsProvider
 			}
 			return $numbers;
 		});
+	}
+
+	/**
+	 * Sender records as the account's customNumber list reports them.
+	 *
+	 * Items carry `_id`, `status` and `createdAt` (recorded live — see
+	 * docs/docs/developer/reference/sms/_cellcast/customNumber/GET.md), so
+	 * records expose the registration date and the record id.
+	 *
+	 * @return \Result<SenderNumberRecord[], string>
+	 */
+	public function getSenderNumberRecords(): \Result
+	{
+		return $this->fetchSenderItems()->map(function (array $items) {
+			$records = [];
+			foreach ($items as $item) {
+				$value = isset($item['number']) && \is_string($item['number']) ? $item['number'] : '';
+				if ($value === '') continue;
+				$created = isset($item['createdAt']) && \is_string($item['createdAt']) ? strtotime($item['createdAt']) : false;
+				$records[] = new SenderNumberRecord(
+					$value,
+					isset($item['status']) && \is_string($item['status']) ? $item['status'] : null,
+					$created !== false ? $created : null,
+					isset($item['_id']) && \is_scalar($item['_id']) ? (string) $item['_id'] : null,
+				);
+			}
+			return $records;
+		});
+	}
+
+	/** @inheritDoc */
+	public function deleteSenderNumber(PhoneNumber $number): \Result
+	{
+		return \Result::failure('Cellcast does not support deleting sender numbers via the API.');
 	}
 
 	/**

@@ -79,6 +79,8 @@ final class SpySmsProvider implements SmsProvider
     public function verifySenderNumber(PhoneNumber $number): \Result { return \Result::success(true); }
     public function registerSenderNumber(?\Sms\ContactPhoneNumber $contact = null, ?array $validationParams = null): \Result { return \Result::failure('unsupported'); }
     public function registerSenderId(?\Sms\SenderID $senderId = null, ?array $validationParams = null): \Result { return \Result::failure('unsupported'); }
+    public function deleteSenderNumber(PhoneNumber $number): \Result { return \Result::failure('unsupported'); }
+    public function getSenderNumberRecords(): \Result { return \Result::failure('unsupported'); }
     public function getDescription(): string { return 'spy'; }
     public function hasCapability(\Sms\SmsCapability $cap): bool { return false; }
     public function listOptOuts(): \Result { return \Result::failure('unsupported'); }

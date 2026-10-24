@@ -127,6 +127,17 @@ The filter is `Sms\excludeUnapprovedSenderIds()` in `jethro-sms/src/functions.ph
 shared by all providers.  `getAll: true` (admin status panel, `jethro-sms senderids`)
 returns everything; the CLI annotates each ID with its approval state.
 
+#### Record id = registration date
+
+The `id` on object items is a Mongo ObjectId: its first 8 hex chars encode the
+unix seconds the gateway created the record — the date the sender was (last)
+registered, the only date the v5 API exposes for a sender record.  Re-POSTing
+an ID already on the account re-creates the record with a fresh id (see
+[POST.md](POST.md)), so the timestamp is the most recent registration attempt.
+`FiveCentSmsV5Provider::getSenderNumberRecords()` exposes it as `registeredAt`
+and is what the admin status panel uses to date stale `pending`/`unverified`
+entries.
+
 ### Phone-number Filtering
 
 Entries that are entirely numeric and seven or more characters long are

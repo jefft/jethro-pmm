@@ -131,6 +131,18 @@ class DecoratingSmsProvider implements SmsProvider
     }
 
     /** @inheritDoc */
+    public function deleteSenderNumber(PhoneNumber $number): \Result
+    {
+        return $this->inner->deleteSenderNumber($number);
+    }
+
+    /** @inheritDoc */
+    public function getSenderNumberRecords(): \Result
+    {
+        return $this->inner->getSenderNumberRecords();
+    }
+
+    /** @inheritDoc */
     public function listOptOuts(): \Result
     {
         return $this->inner->listOptOuts();

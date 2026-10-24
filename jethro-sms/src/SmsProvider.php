@@ -185,6 +185,34 @@ interface SmsProvider
     public function registerSenderId(?SenderID $senderId = null, ?array $params = null): \Result;
 
     /**
+     * Remove a registered sender phone number from the provider account.
+     *
+     * Gated on the DELETE_SENDER_NUMBER capability.  Providers that don't
+     * support removal return a failure.
+     *
+     * Callers identify the sender by phone number; providers that key
+     * deletion on a gateway-assigned record id resolve it themselves
+     * (e.g. 5CentSMS lists the account, matches the number, deletes by id).
+     *
+     * @return \Result<bool, string>  true on success; failure with a plain-text error
+     */
+    public function deleteSenderNumber(PhoneNumber $number): \Result;
+
+    /**
+     * Sender-number records as the provider's account lists them — numbers
+     * AND alphanumeric IDs, approved or awaiting verification, with the
+     * registration date and the provider's record id where available.
+     *
+     * The admin status panel uses this to surface stale pending entries
+     * (e.g. a number attempted long ago that silently blocks re-registration);
+     * `getSenderNumbers()` remains the simple approved-numbers filter.
+     *
+     * @return \Result<SenderNumberRecord[], string>  failure when the provider
+     *         has no record-level list endpoint.
+     */
+    public function getSenderNumberRecords(): \Result;
+
+    /**
      * Human-readable description of this provider for admin status panels.
      *
      * Examples: "5CentSMS (v5)", "Cellcast", "https://my-gateway.example.com/api"

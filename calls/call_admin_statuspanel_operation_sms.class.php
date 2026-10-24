@@ -52,6 +52,7 @@ class Call_Admin_Statuspanel_Operation_Sms extends Call_Admin_Statuspanel_Operat
         match ($this->operation()) {
             'synchronizeHistory' => $this->doSynchronizeHistory(),
             'registerSenderId'   => $this->doRegisterSenderId(),
+            'deleteSenderNumber' => $this->doDeleteSenderNumber(),
             default              => $this->echoContainer('<p class="text-error">Unknown operation.</p>'),
         };
     }
@@ -141,6 +142,100 @@ class Call_Admin_Statuspanel_Operation_Sms extends Call_Admin_Statuspanel_Operat
         $this->echoContainer(
             \Jethro\Sms\renderRegistrationStepHtml($step, 'registerSenderId', '?call=' . $this->callName())
         );
+    }
+
+    /**
+     * GET  — show the delete-sender-number confirmation form.
+     * POST — delete the number from the provider account.
+     *
+     * Reached from the "(delete)" links beside each sender number in the
+     * status panel details (and from the Delete Sender Number button, which
+     * shows the empty form).  On success the whole panel is re-rendered in
+     * the same response so the numbers list reflects the deletion without a
+     * manual reload: Datastar morphs each top-level element by ID, so the
+     * panel is echoed BEFORE the confirmation container — morphing the panel
+     * first replaces the (empty) operations container it contains, and the
+     * confirmation morph then lands in the fresh one.
+     */
+    private function doDeleteSenderNumber(): void
+    {
+        $numberRaw = trim((string) ($_REQUEST['number'] ?? ''));
+        if ($numberRaw === '') {
+            $this->echoContainer('<p class="text-error">No number given.</p>');
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            $this->echoContainer($this->buildDeleteForm($numberRaw));
+            return;
+        }
+
+        $provider = $this->getSmsProvider();
+        if ($provider === null) {
+            return;
+        }
+
+        if (!$provider->hasCapability(\Sms\SmsCapability::DELETE_SENDER_NUMBER)) {
+            $this->echoContainer('<p class="text-error">This provider cannot delete sender numbers via the API.</p>');
+            return;
+        }
+
+        $result = $provider->deleteSenderNumber(new \Sms\PhoneNumber($numberRaw));
+        if ($result->isFailure()) {
+            $this->echoContainer(
+                '<div class="alert alert-error"><strong>Error:</strong> ' . ents($result->getError()) . '</div>'
+            );
+            return;
+        }
+
+        echo $this->renderSmsPanel();
+        $this->echoContainer(
+            '<div class="alert alert-success"><strong>Deleted.</strong> '
+            . ents($numberRaw) . ' is no longer registered with the provider.</div>'
+        );
+    }
+
+    /**
+     * Build the delete confirmation form.
+     *
+     * Returns a <form> fragment for {@see echoContainer()} to wrap; the
+     * confirm button carries the Datastar @post attribute (see
+     * {@see buildSyncHistoryForm()}).
+     */
+    private function buildDeleteForm(string $number): string
+    {
+        $postUrl = ents('?call=' . $this->callName());
+        $numE = ents($number);
+        return <<<HTML
+            <form onsubmit="return false" class="status-panel-op-form" data-operation="deleteSenderNumber">
+                <input type="hidden" name="operation" value="deleteSenderNumber">
+                <input type="hidden" name="number" value="{$numE}">
+                <div class="alert alert-danger">
+                    <strong>Delete sender number {$numE}?</strong> This removes it from the
+                    provider account and cannot be undone; to use it as a sender again it
+                    must be re-registered and re-verified. If it is a stale unverified
+                    entry, deleting it un-blocks fresh registration attempts.
+                </div>
+                <button type="button" class="btn btn-danger"
+                        data-on:click="@post('{$postUrl}', {contentType: 'form'})">
+                    <i class="icon-trash icon-white"></i> Confirm delete
+                </button>
+            </form>
+            HTML;
+    }
+
+    /**
+     * Render the SMS Gateway status panel (fresh, post-deletion state).
+     *
+     * Re-runs the panel call directly — same permission check, same output —
+     * capturing its echo instead of letting it hit the response.
+     */
+    private function renderSmsPanel(): string
+    {
+        require_once __DIR__ . '/call_admin_statuspanel_sms.class.php';
+        ob_start();
+        (new Call_Admin_Statuspanel_Sms())->run();
+        return (string) ob_get_clean();
     }
 
     /**

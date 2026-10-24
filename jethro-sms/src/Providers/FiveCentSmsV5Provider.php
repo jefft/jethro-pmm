@@ -15,6 +15,7 @@ use Sms\OverridingSmsProvider;
 use Sms\PhoneNumber;
 use Sms\RegistrationStep;
 use Sms\SenderID;
+use Sms\SenderNumberRecord;
 use Sms\SmsCache;
 use Sms\SmsCapability;
 use Sms\SmsSettings;
@@ -499,6 +500,183 @@ class FiveCentSmsV5Provider implements SmsProvider
         return \Result::success(false);
     }
 
+    /**
+     * Sender-number records as the 5centsms account lists them.
+     *
+     * GET /senderid returns every sender record — approved, pending and
+     * unverified — each carrying the gateway record id and the status.  The
+     * record id is a Mongo ObjectId whose first 8 hex chars encode the
+     * creation time: that is the date the number was (last) registered, the
+     * only date the v5 API exposes for a sender record.
+     *
+     * @return \Result<SenderNumberRecord[], string>
+     */
+    public function getSenderNumberRecords(): \Result
+    {
+        return $this->fetchSenderRecords()->map(
+            fn (array $items) => array_values(array_filter(
+                array_map(self::recordFromItem(...), $items),
+                static fn (?SenderNumberRecord $r): bool => $r !== null,
+            ))
+        );
+    }
+
+    /**
+     * Fetch the account's sender records as raw list items — a fresh call,
+     * never the session cache (it stores SenderID values only, dropping
+     * status and record ids).
+     *
+     * Unlike {@see parseSenderIds()}, failures are surfaced: the admin
+     * status panel distinguishes "no records" from "could not list".
+     *
+     * @return \Result<array<int, mixed>, string>
+     */
+    private function fetchSenderRecords(): \Result
+    {
+        $body = json_encode([
+            'key-id' => $this->keyId,
+            'key-secret' => $this->keySecret,
+        ]);
+        $request = new HttpRequest(
+            url: $this->url . '/senderid',
+            method: 'GET',
+            headers: "Content-Type: application/json\r\n"
+                . 'Content-Length: ' . \strlen($body) . "\r\n",
+            body: $body,
+            timeout: 5,
+        );
+
+        $response = $this->httpClient->send($request);
+        if ($response->isFailure()) {
+            return \Result::failure('Could not list sender numbers: ' . $response->getError());
+        }
+
+        $data = json_decode($response->getValue()->body, true);
+        if (!\is_array($data)) {
+            return \Result::failure('Invalid JSON response from sender ID list API. Raw: ' . $response->getValue()->body);
+        }
+        if (!empty($data['error'])) {
+            return \Result::failure((string) $data['error']);
+        }
+
+        $items = $data['senderids'] ?? $data['sender_ids'] ?? $data['data'] ?? $data['senderid'] ?? null;
+        return \Result::success(\is_array($items) ? $items : []);
+    }
+
+    /**
+     * Map one raw list item to a record; null for shapes carrying no value.
+     *
+     * Mirrors the historical key shapes {@see parseSenderIds()} tolerates
+     * (senderid / sender_id / id-only / plain string).
+     */
+    private static function recordFromItem(mixed $item): ?SenderNumberRecord
+    {
+        if (\is_string($item)) {
+            return new SenderNumberRecord($item, null, null, null);
+        }
+        if (!\is_array($item)) {
+            return null;
+        }
+        $value = isset($item['senderid']) ? (string) $item['senderid']
+            : (isset($item['sender_id']) ? (string) $item['sender_id']
+            : (isset($item['id']) && !isset($item['senderid']) ? (string) $item['id'] : null));
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $id = isset($item['id']) && \is_scalar($item['id']) ? (string) $item['id'] : null;
+        return new SenderNumberRecord(
+            $value,
+            isset($item['status']) && \is_string($item['status']) ? $item['status'] : null,
+            $id !== null ? self::recordIdTimestamp($id) : null,
+            $id,
+        );
+    }
+
+    /**
+     * Creation time of a Mongo ObjectId-style record id: the first 8 hex
+     * chars are the unix epoch seconds the gateway created the record.
+     * This is the "date the number was (last) registered" — re-registering
+     * an existing number re-creates the record with a fresh id.
+     */
+    private static function recordIdTimestamp(string $id): ?int
+    {
+        if (!\preg_match('/^[0-9a-f]{24}$/i', $id)) {
+            return null;
+        }
+        $ts = (int) \hexdec(substr($id, 0, 8));
+        return $ts > 1000000000 ? $ts : null; // sanity: after 2001
+    }
+
+    /**
+     * Remove a registered sender phone number from the 5centsms account.
+     *
+     * Two calls: GET /senderid to resolve the number to its gateway-assigned
+     * record id (the DELETE endpoint keys on that id, not on the number —
+     * the session cache stores SenderID values only, so this is always a
+     * fresh call), then DELETE /senderid/{id} with credentials in the JSON
+     * body — a DELETE request with a body, as the v5 API requires (same
+     * pattern as {@see removeOptOut()}).
+     *
+     * A non-empty `error` field on either response is a hard failure, per
+     * the API's error convention.
+     *
+     * @return \Result<bool, string>  true on success
+     * @see docs/docs/developer/reference/sms/_5centsmsv5/senderid/DELETE.md
+     */
+    public function deleteSenderNumber(PhoneNumber $number): \Result
+    {
+        $listResult = $this->fetchSenderRecords();
+        if ($listResult->isFailure()) {
+            return $listResult;
+        }
+
+        $record = null;
+        foreach ($listResult->getValue() as $item) {
+            $candidate = self::recordFromItem($item);
+            if ($candidate === null || !$candidate->isPhoneNumber() || $candidate->recordId === null) {
+                continue;
+            }
+            if ((new PhoneNumber($candidate->value))->sameNumberAs($number)) {
+                $record = $candidate;
+                break;
+            }
+        }
+
+        if ($record === null) {
+            return \Result::failure($number->value . ' is not registered as a sender on this account.');
+        }
+
+        $body = json_encode([
+            'key-id' => $this->keyId,
+            'key-secret' => $this->keySecret,
+        ]);
+        $request = new HttpRequest(
+            url: $this->url . '/senderid/' . urlencode($record->recordId),
+            method: 'DELETE',
+            headers: "Content-Type: application/json\r\n"
+                . 'Content-Length: ' . \strlen($body) . "\r\n",
+            body: $body,
+            timeout: 10,
+        );
+
+        $response = $this->httpClient->send($request);
+        if ($response->isFailure()) {
+            return \Result::failure('Sender number deletion failed: ' . $response->getError());
+        }
+
+        $data = json_decode($response->getValue()->body, true);
+        if (!\is_array($data)) {
+            return \Result::failure('Invalid JSON response from sender number deletion API. Raw: ' . $response->getValue()->body);
+        }
+
+        if (!empty($data['error'])) {
+            return \Result::failure((string) $data['error']);
+        }
+
+        $this->cache?->delete('sms_senderids');
+        return \Result::success(true);
+    }
+
     /** @inheritDoc */
     public function registerSenderNumber(?ContactPhoneNumber $contact = null, ?array $validationParams = null): \Result
     {
@@ -721,6 +899,7 @@ class FiveCentSmsV5Provider implements SmsProvider
             SmsCapability::DEFERRED_SEND_CANCEL,
             SmsCapability::REGISTER_SENDER_ID,
             SmsCapability::REGISTER_SENDER_NUMBER,
+            SmsCapability::DELETE_SENDER_NUMBER,
             SmsCapability::LIST_OPT_OUTS,
             SmsCapability::REMOVE_OPT_OUT,
             SmsCapability::BATCH_DELIVERY_QUERY,

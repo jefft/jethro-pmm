@@ -31,6 +31,7 @@ require_once __DIR__ . '/SmsSender.php';
 // Value objects
 require_once __DIR__ . '/FormField.php';
 require_once __DIR__ . '/RegistrationStep.php';
+require_once __DIR__ . '/SenderNumberRecord.php';
 
 // SendSummary tagged union + implementations
 require_once __DIR__ . '/SendSummary.php';

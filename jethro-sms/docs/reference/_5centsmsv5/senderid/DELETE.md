@@ -4,7 +4,11 @@
 
 Remove a registered Sender ID from the account. The `{id}` path parameter is the gateway-assigned record ID, not the alphanumeric sender ID string itself.
 
-> **Not yet implemented** in `jethro-sms/src/sms.php`. The `FiveCentSmsV5Provider` currently has no `deleteSenderId()` method or equivalent. This document describes the upstream API contract for future integration work.
+> **Implemented** — `FiveCentSmsV5Provider::deleteSenderNumber()` (jethro-sms) resolves the
+> record id via `GET /senderid` and deletes by it; callers pass the phone number. Exposed as
+> `sms.php delete-sender-number --phonenumber=<number>` and by the System Configuration page's
+> SMS Gateway panel ("(delete)" links / Delete Sender Number operation). The mock server
+> simulates this endpoint (see `smsmockserver`).
 
 ---
 
@@ -19,7 +23,7 @@ Content-Type: application/json
 
 | Parameter | Type   | Required | Description                                                                 |
 |-----------|--------|----------|-----------------------------------------------------------------------------|
-| `{id}`    | string | Yes      | Gateway-assigned record ID for the Sender ID (returned by `GET /senderids` as the `id` field on each object item). URL-encode before insertion. |
+| `{id}`    | string | Yes      | Gateway-assigned record ID for the Sender ID (returned by `GET /senderid` as the `id` field on each object item). URL-encode before insertion. |
 
 ---
 
@@ -91,8 +95,8 @@ A non-empty `error` field indicates failure. The specific message is gateway-def
 
 ## Behavior Notes
 
-- The `id` to pass here is the `id` field from the object items returned by `GET /senderids` (e.g. `"682b799beb1416819405256a"`). It is **not** the alphanumeric sender ID string (e.g. `"MYCHURCH"`).
-- Successful deletion should be followed by a cache invalidation of the `sms_senderids` key (see `GET /senderids` — responses are cached for 1800 seconds).
+- The `id` to pass here is the `id` field from the object items returned by `GET /senderid` (e.g. `"682b799beb1416819405256a"`). It is **not** the alphanumeric sender ID string (e.g. `"MYCHURCH"`).
+- Successful deletion should be followed by a cache invalidation of the `sms_senderids` key (see `GET /senderid` — responses are cached for 1800 seconds).
 - The Postman schema contains no example response beyond the success shape above (`response: []`); error shapes are inferred from the API's general error convention.
 
 ---
@@ -101,7 +105,7 @@ A non-empty `error` field indicates failure. The specific message is gateway-def
 
 | Method | Path                  | Description                              |
 |--------|-----------------------|------------------------------------------|
-| GET    | `/api/v5/senderids`   | List all Sender IDs; returns the `id` field needed here. |
+| GET    | `/api/v5/senderid`   | List all Sender IDs; returns the `id` field needed here. |
 | POST   | `/api/v5/senderid`    | Register a new Sender ID.                |
 
 ---

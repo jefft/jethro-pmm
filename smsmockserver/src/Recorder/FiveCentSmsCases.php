@@ -135,6 +135,11 @@ final class FiveCentSmsCases implements ProviderCases
 
     public function unrecordable(): array
     {
-        return []; // every served v5 route is recorded
+        // DELETE /senderid/{id} removes a sender from the live account —
+        // destructive, so it is never exercised during recording. The mock
+        // implements the documented contract (see
+        // jethro-sms/docs/reference/_5centsmsv5/senderid/DELETE.md); the
+        // provider-level contract is pinned by unit tests instead.
+        return ['DELETE /senderid/{id}' => 'deletes a sender from the live account'];
     }
 }

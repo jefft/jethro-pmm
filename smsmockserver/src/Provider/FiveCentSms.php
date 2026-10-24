@@ -21,6 +21,7 @@ final class FiveCentSms implements ProviderInterface
             'DELETE /sms/{id}',
             'POST /senderid',
             'GET /senderid',
+            'DELETE /senderid/{id}',
             'GET /balance',
             'GET /optouts',
             'DELETE /optouts/{id}',
@@ -67,6 +68,8 @@ final class FiveCentSms implements ProviderInterface
                 $this->handlePostSenderIdV5($ctx);
             case $method === 'GET' && $path === '/senderid':
                 $this->handleGetSenderIdV5($ctx);
+            case $method === 'DELETE' && preg_match('#^/senderid/([^/]+)$#', $path, $m):
+                $this->handleDeleteSenderIdV5($ctx, $m[1]);
             case $method === 'GET' && $path === '/optouts':
                 $this->handleOptOutsV5($ctx);
             case $method === 'DELETE' && preg_match('#^/optouts/([^/]+)$#', $path, $m):
@@ -593,9 +596,46 @@ final class FiveCentSms implements ProviderInterface
     private static function senderIdItem(array $item): array
     {
         return $item + [
-            'id' => substr(md5((string) $item['senderid']), 0, 24),
+            'id' => self::syntheticSenderId((string) $item['senderid']),
             'shared' => false,
         ];
+    }
+
+    /** The synthetic 24-hex record id a GET /senderid item carries — the
+     *  list has no stored ids, so they are derived from the sender value. */
+    private static function syntheticSenderId(string $senderId): string
+    {
+        return substr(md5($senderId), 0, 24);
+    }
+
+    /** DELETE /senderid/{id} for the FiveCentSmsV5Provider format. The path
+     *  id is the synthetic id the list returns (see syntheticSenderId()).
+     *  Store-registered senders are removed; the profile's built-in senders
+     *  are constants, not registrations, and answer with an error. */
+    private function handleDeleteSenderIdV5(Ctx $ctx, string $recordId): void
+    {
+        $candidates = [];
+        foreach (FiveCentSmsProfile::get($ctx->profileName)?->senders ?? [] as $sender) {
+            $candidates[$sender['senderid']] = null;
+        }
+        foreach ($ctx->store->listRegistrationsForScope($ctx->profileName, '5centsms') as $row) {
+            if ($row['kind'] === 'senderid') {
+                $candidates[$row['value']] = (int) $row['id'];
+            }
+        }
+
+        foreach ($candidates as $senderId => $rowId) {
+            if (self::syntheticSenderId($senderId) !== $recordId) {
+                continue;
+            }
+            if ($rowId !== null) {
+                $ctx->store->deleteRegistration($rowId);
+                \SmsMockServer\Util::json(200, ['error' => '']);
+            }
+            \SmsMockServer\Util::json(400, ['error' => 'Profile senders cannot be deleted']);
+        }
+
+        \SmsMockServer\Util::json(400, ['error' => 'Sender ID not found or already deleted.']);
     }
 
     /** DELETE /optouts/{number}. Recorded live: 400 "Number not found" for a

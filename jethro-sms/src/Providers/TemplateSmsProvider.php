@@ -427,6 +427,16 @@ class TemplateSmsProvider implements SmsProvider
         return \Result::failure('Not supported');
     }
 
+    public function deleteSenderNumber(PhoneNumber $number): \Result
+    {
+        return \Result::failure('Not supported');
+    }
+
+    public function getSenderNumberRecords(): \Result
+    {
+        return \Result::failure('Not supported');
+    }
+
     public function hasCapability(SmsCapability $cap): bool
     {
         if ($cap === SmsCapability::GET_BALANCE && $this->balanceUrl !== '') {

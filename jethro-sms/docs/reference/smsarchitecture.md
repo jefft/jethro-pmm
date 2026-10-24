@@ -328,6 +328,8 @@ Auth: `key-id` and `key-secret` in the JSON body of **every** request, GETs incl
 | `cancel()` (per delivery) | `DELETE /v5/sms/{id}` |
 | `listOptOuts()` | `GET /optouts` (paged with `?after=`) |
 | `registerSenderNumber()` / `registerSenderId()` | `POST /v5/senderid` (+ compliance form for IDs) |
+| `getSenderNumberRecords()` | `GET /v5/senderid` — every record with status; `registeredAt` derived from the record id's ObjectId timestamp |
+| `deleteSenderNumber()` | `GET /v5/senderid` (resolve number → record id) then `DELETE /v5/senderid/{id}` with credentials in the body; deletes require the `DELETE_SENDER_NUMBER` capability (5CentSMS only) |
 
 ### Cellcast
 
@@ -338,6 +340,7 @@ Auth: Bearer token. In test mode the HTTP client is wrapped in `CellcastFakeHttp
 | `send()` | `POST /api/v1/gateway` |
 | `getBalance()` | `GET /api/v1/apiClient/account` |
 | `getSenderNumbers()` | `GET /api/v1/customNumber` |
+| `getSenderNumberRecords()` | `GET /api/v1/customNumber` — items carry `_id`/`status`/`createdAt`; deletion of sender numbers is not supported by the Cellcast API |
 | `getSenderIds()` | `GET /api/v1/business` (undocumented) |
 | `updateDelivery()` | `GET /api/v2/report/message/{id}` |
 | `listRecentDeliveries()` | `GET /api/v2/report/message?campType=sms&fromDate=…&page=N&limit=100` |
@@ -365,6 +368,7 @@ marker. All of this was verified against the live API.
 | `send()` | `POST /v1/messages` |
 | `getBalance()` | `GET /v1/account` |
 | `getSenderIds()` / `getSenderNumbers()` | `GET /v1/senders` (not paginated; `type: alpha` = IDs, `own`/`dedicated`/`shared` = numbers) |
+| `getSenderNumberRecords()` | `GET /v1/senders` — the list carries no ids or dates, so only value + normalised status (`active`/`alpha`); sender-number deletion is not supported by the MobileMessage API (dashboard only) |
 | `updateDelivery()` | `GET /v1/messages?message_id={uuid}` (the message is in `results[0]`; the envelope `status` is always `complete`) |
 | `listRecentDeliveries()` | `GET /v1/messages?from=&to=&limit=&offset=` (day-granular UTC `from`/`to`, exclusive `to`; refined client-side; items carry `message_id`) |
 | `cancel()` (per delivery) | `DELETE /v1/messages` with JSON body `{"message_id"}` (query parameters are ignored on DELETE); replies `cancelled: true` and refunds the credit, or refuses with "Message is not in a scheduled state." |

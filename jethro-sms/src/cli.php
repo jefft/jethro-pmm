@@ -40,8 +40,8 @@ function main(array $argv, CliEnvironment $env): never
 
 	$known = array_merge(
 		['sms', 'senderids', 'sendernums', 'balance', 'smsinfo', 'cancel',
-		 'register-sender-number', 'validate-sender-number', 'register-sender-id',
-		 'optouts', 'remove-optout', 'info', 'list'],
+		 'register-sender-number', 'validate-sender-number', 'delete-sender-number',
+		 'register-sender-id', 'optouts', 'remove-optout', 'info', 'list'],
 		array_keys($env->extraActions),
 	);
 
@@ -54,6 +54,7 @@ function main(array $argv, CliEnvironment $env): never
 		'cancel'                 => handleCancel($env, $args),
 		'register-sender-number' => handleRegisterSenderNumber($env, $args),
 		'validate-sender-number' => handleValidateSenderNumber($env, $args),
+		'delete-sender-number'   => handleDeleteSenderNumber($env, $args),
 		'register-sender-id'     => handleRegisterSenderId($env, $args),
 		'optouts'                => handleOptOuts($env),
 		'remove-optout'          => handleRemoveOptOut($env, $args),
@@ -523,6 +524,48 @@ function handleValidateSenderNumber(CliEnvironment $env, array $args): void
 	exit(0);
 }
 
+/**
+ * Remove a registered sender phone number from the provider account.
+ *
+ * Usage: delete-sender-number --phonenumber=<number>
+ *
+ * Gated on the DELETE_SENDER_NUMBER capability.  The provider resolves the
+ * number to its own record id (5CentSMS deletes by gateway record id, not
+ * by number), so the CLI only needs the number.  Irreversible upstream —
+ * the number must re-verify before it can be used again.
+ */
+function handleDeleteSenderNumber(CliEnvironment $env, array $args): void
+{
+	$opts = $pos = [];
+	parseArgs(array_slice($args, 1), $opts, $pos);
+
+	$phoneNumber = $opts['phonenumber'][0] ?? null;
+	if ($phoneNumber === null) {
+		exitWithError("--phonenumber=<number> is required for 'delete-sender-number' action.\n");
+	}
+
+	$provider = requireProvider($env, logToDb: true);
+
+	if (!$provider->hasCapability(\Sms\SmsCapability::DELETE_SENDER_NUMBER)) {
+		echo "This API provider lacks the ability to delete Sender Numbers.\n";
+		exit(0);
+	}
+
+	$number = new \Sms\PhoneNumber($phoneNumber);
+
+	echo "Deleting sender number {$number->value}...\n";
+
+	$result = $provider->deleteSenderNumber($number);
+
+	if ($result->isFailure()) {
+		exitWithError('Deletion failed: ' . $result->getError());
+	}
+
+	echo "Done. The number is no longer registered with the provider.\n";
+
+	exit(0);
+}
+
 function handleRegisterSenderId(CliEnvironment $env, array $args): void
 {
 	$opts = $pos = [];
@@ -842,6 +885,9 @@ Actions:
 
   validate-sender-number   Complete verification of a registered sender number{$validateNumberNote}
 
+  delete-sender-number     Remove a registered sender number from the account
+                           Required: --phonenumber=<number>  (irreversible)
+
   register-sender-id       Register a sender ID (business identity){$senderIdBlock}
 {$extraActionLines}
 Examples:
@@ -852,6 +898,7 @@ Examples:
   {$prog} sendernums
   {$prog} optouts
   {$prog} remove-optout --number=61414972051
+  {$prog} delete-sender-number --phonenumber=0434199553
   {$prog} info
   {$prog} smsinfo --id=6a1439267bbc1d12b20627ea
   {$prog} list
