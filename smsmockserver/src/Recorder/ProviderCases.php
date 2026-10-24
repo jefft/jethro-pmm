@@ -39,4 +39,14 @@ interface ProviderCases
 
     /** @return array{method: string, path: string, body: array<string, mixed>} Cancels a message this run created */
     public function cancelRequest(string $messageId): array;
+
+    /**
+     * Routes the mock serves that deliberately have no recorded case, with
+     * the reason (normally: recording them would have real-world side
+     * effects). The route-coverage check requires every other route the
+     * provider serves to have a recorded case.
+     *
+     * @return array<string, string> "METHOD /path" => reason
+     */
+    public function unrecordable(): array;
 }

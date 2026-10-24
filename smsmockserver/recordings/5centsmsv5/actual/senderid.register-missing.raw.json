@@ -1,0 +1,13 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/senderid",
+        "body": []
+    },
+    "response": {
+        "status": 400,
+        "body": {
+            "error": "Missing Sender ID"
+        }
+    }
+}

@@ -7,7 +7,7 @@
         "status": 200,
         "body": {
             "status": "complete",
-            "credit_balance": 49,
+            "credit_balance": 50,
             "credit_price": null
         }
     }

@@ -1,0 +1,16 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/v1/senders",
+        "body": {
+            "number": "04xxxxxxxx",
+            "label": "Jethro smsmockserver recording"
+        }
+    },
+    "response": {
+        "status": 409,
+        "body": {
+            "error": "This number is already an active sender on your account."
+        }
+    }
+}

@@ -39,6 +39,8 @@ final class Providers
                     'FIVECENTSMS_APIKEY' => 'mock',
                     'FIVECENTSMS_TEST_NUMBER' => '0491570158',
                     'FIVECENTSMS_TEST_SENDER' => '61491570158',
+                    // Must match a sender ID in the recording-5centsmsv5 profile.
+                    'FIVECENTSMS_EXISTING_SENDERID' => 'MockChurch',
                 ],
             ],
             'mobilemessage' => [
@@ -49,6 +51,10 @@ final class Providers
                     'MOBILEMESSAGE_USERNAME' => 'mock',
                     'MOBILEMESSAGE_PASSWORD' => 'mock',
                     'MOBILEMESSAGE_TEST_NUMBER' => '0491570158',
+                    // Must be a number the recording-mobilemessage profile
+                    // lists, so the registration case hits the recorded
+                    // already-active refusal.
+                    'MOBILEMESSAGE_TEST_SENDER' => '0491570157',
                 ],
             ],
         ];

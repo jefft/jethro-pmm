@@ -1,0 +1,17 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/senderid",
+        "body": {
+            "senderid": "CoastEC"
+        }
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "error": "",
+            "message": "Sender ID created",
+            "id": "6ac5fb44184ad2699b09e485"
+        }
+    }
+}

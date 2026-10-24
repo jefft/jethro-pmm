@@ -3,7 +3,7 @@
         "method": "GET",
         "path": "/v1/messages",
         "query": {
-            "message_id": "d014bada-94a3-48e2-8c86-9ccc371ca499"
+            "message_id": "f849f8d9-e111-4ba0-979e-183f6a450fd9"
         }
     },
     "response": {
@@ -18,9 +18,9 @@
                     "custom_ref": null,
                     "status": "cancelled",
                     "cost": "0.00",
-                    "message_id": "d014bada-94a3-48e2-8c86-9ccc371ca499",
-                    "requested_at": "2026-10-17 12:19:47",
-                    "scheduled_for": "2026-10-18 12:19:46"
+                    "message_id": "f849f8d9-e111-4ba0-979e-183f6a450fd9",
+                    "requested_at": "2026-10-24 02:49:31",
+                    "scheduled_for": "2026-10-25 02:49:30"
                 }
             ]
         }

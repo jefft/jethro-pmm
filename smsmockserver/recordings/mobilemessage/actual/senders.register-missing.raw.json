@@ -1,0 +1,15 @@
+{
+    "request": {
+        "method": "POST",
+        "path": "/v1/senders",
+        "body": {
+            "label": "Jethro smsmockserver recording"
+        }
+    },
+    "response": {
+        "status": 400,
+        "body": {
+            "error": "\"number\" is required."
+        }
+    }
+}

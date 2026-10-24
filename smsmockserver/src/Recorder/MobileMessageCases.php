@@ -82,6 +82,15 @@ final class MobileMessageCases implements ProviderCases
             ['name' => 'account', 'method' => 'GET', 'path' => '/v1/account'],
             ['name' => 'account.no-auth', 'method' => 'GET', 'path' => '/v1/account', 'auth' => false],
             ['name' => 'senders', 'method' => 'GET', 'path' => '/v1/senders'],
+            // Registration is pinned with refusal replies only: a number the
+            // account already has ({sender}) is refused without texting
+            // anything, and so is a body without "number" — the key the API
+            // requires (POSTed as "sender" it is rejected). The created path
+            // texts a real handset, so it stays unrecorded.
+            ['name' => 'senders.register-missing', 'method' => 'POST', 'path' => '/v1/senders',
+             'body' => ['label' => 'Jethro smsmockserver recording']],
+            ['name' => 'senders.register-active', 'method' => 'POST', 'path' => '/v1/senders',
+             'body' => ['number' => '{sender}', 'label' => 'Jethro smsmockserver recording']],
             ['name' => 'unsubscribes', 'method' => 'GET', 'path' => '/v1/unsubscribes', 'query' => ['limit' => '200', 'offset' => '0']],
             ['name' => 'unsubscribes.remove-unlisted', 'method' => 'DELETE', 'path' => '/v1/unsubscribes', 'body' => ['number' => '{unlisted_number}']],
             // DELETEs read only a JSON body: a query string is "missing".
@@ -117,5 +126,10 @@ final class MobileMessageCases implements ProviderCases
     public function cancelRequest(string $messageId): array
     {
         return ['method' => 'DELETE', 'path' => '/v1/messages', 'body' => ['message_id' => $messageId]];
+    }
+
+    public function unrecordable(): array
+    {
+        return []; // the created path stays unrecorded by not having a case; every served route is pinned
     }
 }

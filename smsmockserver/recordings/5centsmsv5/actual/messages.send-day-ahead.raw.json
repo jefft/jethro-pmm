@@ -7,7 +7,7 @@
             "to": "04xxxxxxxx",
             "message": "Jethro smsmockserver recording: scheduled a day ahead, then cancelled",
             "test": false,
-            "schedule": 1792337160
+            "schedule": 1792896572
         }
     },
     "response": {
@@ -17,11 +17,11 @@
             "messages": [
                 {
                     "destination": "04xxxxxxxx",
-                    "id": "6ad39388fe59595fdf0d276d",
+                    "id": "6adc1cbc65e153c4ef071e86",
                     "status": 1005,
                     "status_text": "Scheduled",
                     "credits": 1,
-                    "schedule": 1792337160
+                    "schedule": 1792896572
                 }
             ]
         }

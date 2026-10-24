@@ -1,0 +1,17 @@
+{
+    "request": {
+        "body": {
+            "senderid": "<sender-id>"
+        },
+        "method": "POST",
+        "path": "/senderid"
+    },
+    "response": {
+        "status": 200,
+        "body": {
+            "error": "",
+            "id": "<24-hex>",
+            "message": "Sender ID created"
+        }
+    }
+}

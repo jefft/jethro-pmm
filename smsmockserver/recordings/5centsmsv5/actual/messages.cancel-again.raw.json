@@ -1,7 +1,7 @@
 {
     "request": {
         "method": "DELETE",
-        "path": "/sms/6ad39388fe59595fdf0d276d"
+        "path": "/sms/6adc1cbc65e153c4ef071e86"
     },
     "response": {
         "status": 200,
@@ -9,7 +9,7 @@
             "error": "",
             "messages": {
                 "destination": "",
-                "id": "6ad39388fe59595fdf0d276d",
+                "id": "6adc1cbc65e153c4ef071e86",
                 "status": 1007,
                 "status_text": "Cancelled",
                 "message_text": "DELETED"

@@ -123,4 +123,16 @@ final class CellcastCases implements ProviderCases
             'body' => ['messageId' => $messageId, 'type' => 'sms'],
         ];
     }
+
+    public function unrecordable(): array
+    {
+        return [
+            // Recording a creation texts a real verification OTP to a handset.
+            'POST /api/v1/customNumber/add' => 'texts a verification OTP to a real handset',
+            // Completing a verification needs a live OTP from a real creation.
+            'POST /api/v1/customNumber/verifyCustomNumber' => 'needs a live OTP from a real creation',
+            // Creating a business name registers it on the account.
+            'POST /api/v1/business/add' => 'creates a business-name registration on the account',
+        ];
+    }
 }

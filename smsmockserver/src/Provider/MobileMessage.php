@@ -24,6 +24,20 @@ final class MobileMessage implements ProviderInterface
 
     public function name(): string { return self::PROVIDER; }
 
+    public static function routes(): array
+    {
+        return [
+            'POST /v1/messages',
+            'GET /v1/messages',
+            'DELETE /v1/messages',
+            'GET /v1/account',
+            'GET /v1/senders',
+            'POST /v1/senders',
+            'GET /v1/unsubscribes',
+            'DELETE /v1/unsubscribes',
+        ];
+    }
+
     public function handle(Ctx $ctx): void
     {
         \SmsMockServer\Util::jsonHeader();
@@ -213,14 +227,28 @@ final class MobileMessage implements ProviderInterface
         Util::json(200, ['status' => 'complete', 'results' => array_values($out)]);
     }
 
-    /** POST /v1/senders {"sender", "label"?}: texts the number a verification
-     *  link; the number is listed once verified (approvalDelay). The success
-     *  body was not recorded live; Jethro reads only an error. */
+    /** POST /v1/senders {"number", "label"?}: texts the number a verification
+     *  link; the number is listed once verified (approvalDelay). Refusals are
+     *  recorded live (2026-10): a body without "number" is a 400, and a
+     *  number already on the account (shared, profile or verified) is a 409.
+     *  The success body was not recorded live; Jethro reads only an error. */
     private function handleRegisterSender(Ctx $ctx, array $body): never
     {
-        $number = self::international((string) ($body['sender'] ?? ''));
+        $number = self::international((string) ($body['number'] ?? ''));
         if ($number === '') {
-            Util::json(400, ['error' => '"sender" is required.']);
+            Util::json(400, ['error' => '"number" is required.']);
+        }
+        $active = [self::SHARED_NUMBER];
+        foreach (MobileMessageProfile::get($ctx->profileName)?->senders ?? [] as $s) {
+            $active[] = $s['sender'];
+        }
+        foreach ($ctx->store->listRegistrationsForScope($ctx->profileName, self::PROVIDER) as $row) {
+            if ($ctx->state->deriveApproval($row, $ctx->now) === State::APPROVAL_APPROVED) {
+                $active[] = $row['value'];
+            }
+        }
+        if (\in_array($number, $active, true)) {
+            Util::json(409, ['error' => 'This number is already an active sender on your account.']);
         }
         $ctx->store->upsertRegistration(
             $ctx->profileName, self::PROVIDER, 'number', $number, (string) ($body['label'] ?? $number),

@@ -27,6 +27,7 @@ final class FiveCentSmsCases implements ProviderCases
         private readonly string $keySecret,
         private readonly string $testNumber,
         private readonly string $sender,
+        private readonly string $existingSenderid,
     ) {}
 
     public static function fromEnv(): self
@@ -45,6 +46,10 @@ final class FiveCentSmsCases implements ProviderCases
             $env('FIVECENTSMS_APIKEY'),
             $testNumber,
             $env('FIVECENTSMS_TEST_SENDER', preg_replace('/^0/', '61', $testNumber)),
+            // Must be an alphanumeric Sender ID already on the account, so
+            // recording the registration refusal has no side effects. The
+            // mock profile's equivalent is 'MockChurch'.
+            $env('FIVECENTSMS_EXISTING_SENDERID', 'MockChurch'),
         );
     }
 
@@ -63,6 +68,7 @@ final class FiveCentSmsCases implements ProviderCases
         return [
             'test_number' => $this->testNumber,
             'sender' => $this->sender,
+            'existing_senderid' => $this->existingSenderid,
             'day_ahead' => time() + 86400,
             'too_soon' => time() + 30,
             'unknown_id' => self::UNKNOWN_ID,
@@ -83,6 +89,14 @@ final class FiveCentSmsCases implements ProviderCases
         return [
             ['name' => 'balance', 'method' => 'GET', 'path' => '/balance'],
             ['name' => 'senderid', 'method' => 'GET', 'path' => '/senderid'],
+            // Registration is pinned with refusal replies only: an ID the
+            // account already has ({existing_senderid}) is refused without
+            // side effects, and so is a body without "senderid". The created
+            // path feeds an ACMA compliance email, so it stays unrecorded.
+            ['name' => 'senderid.register-missing', 'method' => 'POST', 'path' => '/senderid',
+             'body' => []],
+            ['name' => 'senderid.register-existing', 'method' => 'POST', 'path' => '/senderid',
+             'body' => ['senderid' => '{existing_senderid}']],
             ['name' => 'optouts', 'method' => 'GET', 'path' => '/optouts'],
             ['name' => 'optouts.remove-unlisted', 'method' => 'DELETE', 'path' => '/optouts/{unlisted_number}'],
             // No `to`: rejected, so nothing is sent.
@@ -117,5 +131,10 @@ final class FiveCentSmsCases implements ProviderCases
     public function cancelRequest(string $messageId): array
     {
         return ['method' => 'DELETE', 'path' => '/sms/' . rawurlencode($messageId), 'body' => null];
+    }
+
+    public function unrecordable(): array
+    {
+        return []; // every served v5 route is recorded
     }
 }

@@ -9,6 +9,24 @@ final class FiveCentSms implements ProviderInterface
 {
     public function name(): string { return '5centsms'; }
 
+    /** The current (v5, bare-path) surface. The deprecated v4 family under
+     *  /api/v1/ is still dispatched by handle() but deliberately not listed:
+     *  it has no recorded cases and no current consumers. */
+    public static function routes(): array
+    {
+        return [
+            'POST /sms',
+            'GET /sms',
+            'GET /sms/{id}',
+            'DELETE /sms/{id}',
+            'POST /senderid',
+            'GET /senderid',
+            'GET /balance',
+            'GET /optouts',
+            'DELETE /optouts/{id}',
+        ];
+    }
+
     public function handle(Ctx $ctx): void
     {
         \SmsMockServer\Util::jsonHeader();
@@ -493,23 +511,18 @@ final class FiveCentSms implements ProviderInterface
 
     // ── v5 Sender ID Registration ──────────────────────────────────────
 
-    /** POST /senderid handler for FiveCentSmsV5Provider format. */
+    /** POST /senderid handler for FiveCentSmsV5Provider format. Recorded
+     *  live (2026-10): a body without "senderid" is a 400, and re-POSTing an
+     *  ID already on the account just creates it again — 200 "Sender ID
+     *  created" with a fresh id; the "already exists" refusal fires only for
+     *  IDs owned by other accounts, which the mock does not model. */
     private function handlePostSenderIdV5(Ctx $ctx): void
     {
         $body = $ctx->jsonBody();
         $senderId = $body['senderid'] ?? '';
 
         if ($senderId === '') {
-            \SmsMockServer\Util::json(200, ['error' => 'Missing senderid']);
-        }
-
-        // Idempotency check
-        $existing = $ctx->store->getRegistration('5centsms', $ctx->profileName, 'senderid', $senderId);
-        if ($existing !== null) {
-            $approval = $ctx->state->deriveApproval($existing, $ctx->now);
-            if ($approval === \SmsMockServer\State::APPROVAL_APPROVED) {
-                \SmsMockServer\Util::json(200, ['error' => 'Sender ID already registered']);
-            }
+            \SmsMockServer\Util::json(400, ['error' => 'Missing Sender ID']);
         }
 
         $pending = new \SmsMockServer\PendingRegistration();
@@ -534,14 +547,22 @@ final class FiveCentSms implements ProviderInterface
                     rawRequest: json_encode($body),
                     createdAt: $ctx->now,
                 );
-                \SmsMockServer\Util::json(200, ['senderid' => $senderId, 'status' => 'approved']);
+                \SmsMockServer\Util::json(200, [
+                    'error' => '',
+                    'id' => bin2hex(random_bytes(12)),
+                    'message' => 'Sender ID created',
+                ]);
             default:
                 $ctx->store->upsertRegistration(
                     $ctx->profileName, '5centsms', 'senderid', $senderId, $senderId,
                     rawRequest: json_encode($body),
                     createdAt: $ctx->now,
                 );
-                \SmsMockServer\Util::json(200, ['senderid' => $senderId, 'status' => 'approved']);
+                \SmsMockServer\Util::json(200, [
+                    'error' => '',
+                    'id' => bin2hex(random_bytes(12)),
+                    'message' => 'Sender ID created',
+                ]);
         }
     }
 

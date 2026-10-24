@@ -17,6 +17,23 @@ final class Cellcast implements ProviderInterface
 {
     public function name(): string { return 'cellcast'; }
 
+    public static function routes(): array
+    {
+        return [
+            'POST /api/v1/gateway',
+            'POST /api/v1/gateway/cancelScheduleQuickMessage',
+            'GET /api/v1/apiClient/account',
+            'GET /api/v1/apiClient/getOptout',
+            'GET /api/v1/customNumber',
+            'POST /api/v1/customNumber/add',
+            'POST /api/v1/customNumber/verifyCustomNumber',
+            'POST /api/v1/business/add',
+            'GET /api/v1/business',
+            'GET /api/v2/report/message',
+            'GET /api/v2/report/message/{id}',
+        ];
+    }
+
     public function handle(Ctx $ctx): void
     {
         \SmsMockServer\Util::jsonHeader();

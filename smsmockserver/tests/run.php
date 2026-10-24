@@ -138,6 +138,56 @@ test('state: scheduled → sent → delivered, cancelled and forced win', functi
     same(State::MSG_FAILED, $state->deriveMessage($row(['forced_status' => State::MSG_FAILED]), $now), 'forced status');
 });
 
+// ── Route coverage: every route the mock serves needs a recorded case ──
+
+/** "METHOD /path" with {placeholder} segments collapsed, so '/sms/{scheduled_id}'
+ *  matches the route 'GET /sms/{id}'. */
+$routeShape = function (string $method, string $path): string {
+    $segments = [];
+    foreach (explode('/', $path) as $segment) {
+        $segments[] = $segment !== '' && $segment[0] === '{' ? '{}' : $segment;
+    }
+    return $method . ' ' . implode('/', $segments);
+};
+
+foreach (Providers::all() as $name => $config) {
+    test("$name: every mock route has a recorded case (or is marked unrecordable)", function () use ($name, $config, $routeShape) {
+        foreach ($config['mock_env'] as $key => $value) {
+            putenv("$key=$value");
+        }
+        $providerClass = $config['provider'];
+        $casesClass = $config['cases'];
+        $cases = $casesClass::fromEnv();
+
+        $routes = [];
+        foreach ($providerClass::routes() as $route) {
+            [$method, $path] = explode(' ', $route, 2);
+            $routes[$routeShape($method, $path)] = $route;
+        }
+        $unrecordable = [];
+        foreach ($cases->unrecordable() as $route => $reason) {
+            [$method, $path] = explode(' ', $route, 2);
+            $unrecordable[$routeShape($method, $path)] = $reason;
+        }
+        $covered = [];
+        foreach ($cases->cases() as $case) {
+            $covered[$routeShape($case['method'], $case['path'])] = $case['name'];
+        }
+
+        $problems = [];
+        foreach ($routes as $shape => $route) {
+            if (isset($covered[$shape]) || isset($unrecordable[$shape])) continue;
+            $problems[] = "$route: the mock serves it, but no case records it and it is not marked unrecordable()";
+        }
+        foreach ($covered as $shape => $caseName) {
+            if (!isset($routes[$shape])) {
+                $problems[] = "$caseName: records $shape, which routes() does not list — a case for a route the mock no longer serves, or a stale route list";
+            }
+        }
+        check($problems === [], implode("\n", $problems));
+    });
+}
+
 // ── The mock's replies vs the live recordings ─────────────────────────
 
 Profile::loadProfiles(__DIR__ . '/../profiles');
