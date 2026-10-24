@@ -207,14 +207,16 @@ class Call_Admin_Statuspanel_Sms extends Call_Admin_Statuspanel
      * The parent escapes every value (see the getStatus() plain-text
      * contract), so markup can't ride inside a detail value.  This override
      * keeps the escaping and, for the sender-number rows, renders each
-     * entry from the structured $senderNumberRows: every matching person's
-     * name (each linked to their record, number on hover), slash-joined
-     * when several persons share the mobile, otherwise the raw number; unregistered entries carry their
-     * attempted date; and a red delete cross (the chooser's
-     * delete-chosen-person icon, re-scoped inline) when the provider can
-     * delete — the cross Datastar-@gets the deleteSenderNumber confirmation
-     * form into the operations container, which morphs by container ID from
-     * anywhere on the page.
+     * entry from the structured $senderNumberRows as a list item: every
+     * matching person's name (each linked to their record, number on
+     * hover), slash-joined when several persons share the mobile,
+     * otherwise the raw number; unregistered entries carry their attempted
+     * date; and, when the provider can delete, a red delete cross using the
+     * chooser's `delete-chosen-person` icon.  That CSS is scoped to
+     * `li div.delete-chosen-person`, hence the <ul>/<li> markup — a bare
+     * div gets no icon at all.  The cross Datastar-@gets the
+     * deleteSenderNumber confirmation form into the operations container,
+     * which morphs by container ID from anywhere on the page.
      */
     protected function detailsTable(array $details): string
     {
@@ -226,7 +228,7 @@ class Call_Admin_Statuspanel_Sms extends Call_Admin_Statuspanel
         foreach ($details as $label => $value) {
             $controls = ents($value);
             if (isset($this->senderNumberRows[$label]) && $this->senderNumberRows[$label] !== []) {
-                $rendered = [];
+                $items = '';
                 foreach ($this->senderNumberRows[$label] as $entry) {
                     $persons = $this->findPersonsByMobile($entry['number']);
                     if ($persons !== []) {
@@ -243,14 +245,20 @@ class Call_Admin_Statuspanel_Sms extends Call_Admin_Statuspanel
                     if ($label === 'Unregistered Sender Numbers' && $entry['registeredAt'] !== null) {
                         $piece .= ' ' . ents('(attempted ' . date('Y-m-d', $entry['registeredAt']) . ')');
                     }
+
+                    // The cross comes first so the chooser CSS's float:right
+                    // puts it at the end of the line.  The rule is scoped to
+                    // `li div.delete-chosen-person`, so the entry must be an
+                    // <li> for the icon (and its pointer cursor) to render.
+                    $cross = '';
                     if ($deleteCapable) {
                         $url = ents('?call=admin_statuspanel_operation_sms&operation=deleteSenderNumber&number=' . $entry['number']);
-                        // The chooser red cross, re-scoped from <li> to inline.
-                        $piece .= ' <div class="delete-chosen-person" title="Delete sender number" style="display:inline-block;float:none;position:static;margin:0 0 -2px 4px" data-on:click="@get(\'' . $url . '\')"></div>';
+                        $cross = '<div class="delete-chosen-person" title="Delete sender number"'
+                            . ' data-on:click="@get(\'' . $url . '\')"></div>';
                     }
-                    $rendered[] = $piece;
+                    $items .= '<li>' . $cross . $piece . '</li>';
                 }
-                $controls = implode(', ', $rendered);
+                $controls = '<ul class="unstyled sms-sender-numbers">' . $items . '</ul>';
                 if ($label === 'Unregistered Sender Numbers') {
                     $controls .= '<p class="help-block">'
                         . ents('A registration was attempted for these numbers, but the number was never verified, so it cannot currently be used as a sender. Re-registering only re-sends the verification link; deleting a stale entry clears it from the account.')
