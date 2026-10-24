@@ -92,4 +92,9 @@ require_once __DIR__ . '/factory.php';
 
 // CLI
 require_once __DIR__ . '/Cli/CliEnvironment.php';
+require_once __DIR__ . '/Cli/CliOutcome.php';
+require_once __DIR__ . '/Cli/CliError.php';
+require_once __DIR__ . '/Cli/Presenter.php';
+require_once __DIR__ . '/Cli/TextPresenter.php';
+require_once __DIR__ . '/Cli/JsonPresenter.php';
 require_once __DIR__ . '/cli.php';

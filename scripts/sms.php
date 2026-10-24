@@ -109,8 +109,6 @@ function handleExportSmslog(): void
             $body,
         ]) . "\n";
     }
-
-    exit(0);
 }
 
 
@@ -127,7 +125,6 @@ function handleListDiff(array $args): void
 	$since = $sinceRaw !== null ? (int) $sinceRaw : null;
 
 	echo \Jethro\Sms\checkSynchronized($since);
-	exit(0);
 }
 
 /**
@@ -145,11 +142,9 @@ function handleSyncHistory(array $args): void
 	try {
 		$result = \Jethro\Sms\synchronizeHistory($since);
 	} catch (\RuntimeException $e) {
-		fwrite(STDERR, 'Error: ' . $e->getMessage() . "\n");
-		exit(1);
+		throw new \Sms\Cli\CliError($e->getMessage());
 	}
 	echo "Imported {$result['imported']} deliveries in {$result['batches']} new batches ({$result['skipped']} batches already existed).\n";
-	exit(0);
 }
 
 
@@ -178,9 +173,9 @@ $env = new \Sms\Cli\CliEnvironment(
 	// DB-aware cancel: updates sms/smsdelivery rows as well as the gateway.
 	cancel: fn (\Sms\SmsDeliveryBatch $batch): \Result => \Jethro\Sms\cancelSms($batch),
 	extraActions: [
-		'export-smslog' => fn (array $args) => handleExportSmslog(),
-		'list-diff'     => fn (array $args) => handleListDiff($args),
-		'sync-history'  => fn (array $args) => handleSyncHistory($args),
+		'export-smslog' => fn (array $args, \Sms\Cli\Presenter $ui) => handleExportSmslog(),
+		'list-diff'     => fn (array $args, \Sms\Cli\Presenter $ui) => handleListDiff($args),
+		'sync-history'  => fn (array $args, \Sms\Cli\Presenter $ui) => handleSyncHistory($args),
 	],
 	extraActionHelp: [
 		'export-smslog' => "Print database send history in the legacy sms.log JSON-lines format",

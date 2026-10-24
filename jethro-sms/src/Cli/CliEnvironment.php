@@ -22,7 +22,7 @@ final class CliEnvironment
 	 *                                     When absent, recipients must be phone numbers.
 	 * @param ?\Closure $cancel            fn(\Sms\SmsDeliveryBatch): \Result; when absent the
 	 *                                     provider's own cancel() is used.
-	 * @param array<string, \Closure>  $extraActions   action name => fn(array $args): void
+	 * @param array<string, \Closure>  $extraActions   action name => fn(array $args, Presenter $ui): void
 	 * @param array<string, string>    $extraActionHelp action name => usage text shown under
 	 *                                     it in printUsage() (lines after the first are
 	 *                                     indented to the action-description column)

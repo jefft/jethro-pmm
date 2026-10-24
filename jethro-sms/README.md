@@ -60,6 +60,28 @@ bin/jethro-sms optouts
 Recipients are phone numbers. (Inside Jethro, `scripts/sms.php` wraps this
 CLI and additionally accepts person IDs and logs sends to the database.)
 
+### Machine-readable output
+
+`--json` (before the action) prints exactly one JSON document on stdout;
+progress lines go to stderr, so the output pipes cleanly:
+
+```bash
+bin/jethro-sms --json balance | jq .data.balance
+bin/jethro-sms --json sendernums | jq -r '.data[].number'
+```
+
+```json
+{"ok":true,"action":"balance","data":{"balance":1372}}
+{"ok":false,"action":"balance","error":"Unable to connect to SMS Server: …"}
+```
+
+`data` is the provider-independent value from the API (deliveries, sender
+IDs/numbers, opt-outs, registration steps, …) — never the upstream
+provider's own JSON, so the schema is stable across providers. Exit codes
+are unchanged (1 on `"ok": false`). Credential constants are masked in
+`info` output. Implementations: `jethro-sms/src/Cli/{Text,Json}Presenter.php`.
+
+
 ## History
 
 Extracted from Jethro's `include/sms*.php` in July 2026. The entanglements

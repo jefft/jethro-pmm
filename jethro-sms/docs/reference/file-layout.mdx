@@ -14,6 +14,7 @@ monoliths (`jethro-sms/src/sms.php`, `sms_cellcast.php`,
 |---|---|
 | `jethro-sms/src/` | Pure layer: `SmsProvider`, `SmsCapability`, `SmsStatus`, decorators, value objects, HTTP, Result monad, statusline maths |
 | `jethro-sms/src/Providers/` | Concrete providers: `FiveCentSmsV5Provider`, `MobileMessageSmsProvider`, `CellcastSmsProvider`, `FiveCentSmsV4Provider`, `TemplateSmsProvider` |
+| `jethro-sms/src/Cli/` | CLI core: `CliEnvironment` (host wiring), `CliOutcome` + `CliError` (handler results), `Presenter` with `TextPresenter` / `JsonPresenter` (`--json`) — handlers execute, presenters print |
 | `include/Jethro/Sms/` | Bridge value objects: `JethroSmsRecipient`, `JethroSmsDelivery`, `JethroSmsDeliveryBatch`, `SmsRequestRecipients`, `SessionSmsCache`, `SmsStatusIcon` |
 | `include/Jethro/Sms/Providers/` | Bridge decorators: `DbLoggingSmsProvider` |
 | `include/jethro_sms.php` | Bridge functions: `getSmsProvider()` factory, send pipeline, request parsing, UI rendering |

@@ -3,7 +3,7 @@
 /**
  * CLI core for the jethro-sms engine — the package's end product.
  *
- * All argument parsing, action dispatch and output rendering lives here,
+ * All argument parsing, action dispatch and execution live here,
  * parameterised by a {@see CliEnvironment} so different hosts can supply
  * their own provider chain and recipient semantics:
  *
@@ -11,6 +11,11 @@
  *    phone-number recipients only, no DB logging.
  *  - Jethro's scripts/sms.php (wrapper): full bridge chain (DB logging,
  *    token expansion), person-ID recipients, export-smslog extra action.
+ *
+ * Execution and presentation are separate: handlers return a
+ * {@see CliOutcome} and never print; main() picks a {@see TextPresenter}
+ * (default) or {@see JsonPresenter} (`--json`) and renders once. Handlers
+ * narrate long steps through Presenter::progress().
  *
  * Extracted from Jethro's scripts/sms.php — see docs/extraction.md §5.
  */
@@ -21,22 +26,32 @@ use Sms\SenderID;
 
 
 /**
- * CLI entry point: dispatch $argv[1] to a handler and exit.
+ * CLI entry point: parse global flags, dispatch $argv[1] to a handler, render
+ * its outcome and exit.
  */
 function main(array $argv, CliEnvironment $env): never
 {
 	$args = $argv;
 	array_shift($args); // Remove script path
 
+	// --json: one JSON document on stdout, progress on stderr.  Stripped
+	// before dispatch so handlers only see their own action's arguments.
+	$json = false;
+	$args = array_values(array_filter($args, static function (string $arg) use (&$json): bool {
+		if ($arg === '--json') {
+			$json = true;
+			return false;
+		}
+		return true;
+	}));
+
 	if (count($args) < 1) {
 		printUsage($env);
 		exit(1);
 	}
 
-	if (isset($env->extraActions[$args[0]])) {
-		($env->extraActions[$args[0]])($args);
-		exit(0);
-	}
+	$ui = $json ? new JsonPresenter() : new TextPresenter();
+	$action = $args[0];
 
 	$known = array_merge(
 		['sms', 'senderids', 'sendernums', 'balance', 'smsinfo', 'cancel',
@@ -45,24 +60,45 @@ function main(array $argv, CliEnvironment $env): never
 		array_keys($env->extraActions),
 	);
 
-	match ($args[0]) {
-		'sms'                    => handleSms($env, $args),
-		'senderids'              => handleSenderIds($env),
-		'sendernums'             => handleSenderNums($env),
-		'balance'                => handleBalance($env),
-		'smsinfo'                => handleSmsInfo($env, $args),
-		'cancel'                 => handleCancel($env, $args),
-		'register-sender-number' => handleRegisterSenderNumber($env, $args),
-		'validate-sender-number' => handleValidateSenderNumber($env, $args),
-		'delete-sender-number'   => handleDeleteSenderNumber($env, $args),
-		'register-sender-id'     => handleRegisterSenderId($env, $args),
-		'optouts'                => handleOptOuts($env),
-		'remove-optout'          => handleRemoveOptOut($env, $args),
-		'info'                   => handleInfo($env),
-		'list'                   => handleList($env, $args),
-		default                  => exitWithError("Unknown action '{$args[0]}'. Must be one of: " . implode(', ', $known) . ".\n"),
-	};
-	exit(0);
+	// Host extra actions print for themselves; in JSON mode their text is
+	// captured and returned as data.text so stdout stays one document.
+	if (isset($env->extraActions[$action])) {
+		if ($json) {
+			ob_start();
+			($env->extraActions[$action])($args, $ui);
+			$outcome = CliOutcome::success($action, ['text' => (string) ob_get_clean()]);
+		} else {
+			($env->extraActions[$action])($args, $ui);
+			$outcome = CliOutcome::success($action);
+		}
+		$ui->render($outcome);
+		exit($outcome->exitCode);
+	}
+
+	try {
+		$outcome = match ($action) {
+			'sms'                    => handleSms($env, $args, $ui),
+			'senderids'              => handleSenderIds($env, $ui),
+			'sendernums'             => handleSenderNums($env, $ui),
+			'balance'                => handleBalance($env, $ui),
+			'smsinfo'                => handleSmsInfo($env, $args, $ui),
+			'cancel'                 => handleCancel($env, $args, $ui),
+			'register-sender-number' => handleRegisterSenderNumber($env, $args, $ui),
+			'validate-sender-number' => handleValidateSenderNumber($env, $args, $ui),
+			'delete-sender-number'   => handleDeleteSenderNumber($env, $args, $ui),
+			'register-sender-id'     => handleRegisterSenderId($env, $args, $ui),
+			'optouts'                => handleOptOuts($env, $ui),
+			'remove-optout'          => handleRemoveOptOut($env, $args, $ui),
+			'info'                   => handleInfo($env, $ui),
+			'list'                   => handleList($env, $args, $ui),
+			default                  => throw new CliError("Unknown action '{$action}'. Must be one of: " . implode(', ', $known) . ".\n"),
+		};
+	} catch (CliError $e) {
+		$outcome = CliOutcome::failure($action, $e->getMessage(), $e->exitCode());
+	}
+
+	$ui->render($outcome);
+	exit($outcome->exitCode);
 }
 
 // ===========================================================================
@@ -94,7 +130,7 @@ function parseArgs(array $args, array &$opts, array &$positional): void
 }
 
 /**
- * Get the configured SMS provider from the host factory or exit with an error.
+ * Get the configured SMS provider from the host factory or abort the action.
  *
  * When the failure is "not configured" (see \Sms\resolveRawProviderClass()),
  * append plain-text per-provider constant help.
@@ -105,9 +141,9 @@ function requireProvider(CliEnvironment $env, bool $logToDb = true): \Sms\SmsPro
 	if ($providerResult->isFailure()) {
 		$error = $providerResult->getError();
 		if (\is_array($error) && !empty($error['notConfigured'])) {
-			exitWithError(($error['message'] ?? 'SMS not configured.') . "\n" . renderCandidateHelpText());
+			throw new CliError(($error['message'] ?? 'SMS not configured.') . "\n" . renderCandidateHelpText());
 		}
-		exitWithError(\is_array($error) ? ($error['message'] ?? 'SMS not configured.') : $error);
+		throw new CliError(\is_array($error) ? ($error['message'] ?? 'SMS not configured.') : $error);
 	}
 	return $providerResult->getValue();
 }
@@ -133,15 +169,6 @@ function renderCandidateHelpText(): string
 }
 
 /**
- * Print error to stderr and exit.
- */
-function exitWithError(string $msg): never
-{
-	fwrite(STDERR, "Error: $msg\n");
-	exit(1);
-}
-
-/**
  * Resolve one --to argument to a recipient, or null to skip it (a warning
  * has already been printed). Delegates to the host resolver when present;
  * standalone accepts phone numbers only.
@@ -152,16 +179,19 @@ function resolveRecipient(CliEnvironment $env, string $toArg): ?\Sms\SmsRecipien
 		return ($env->recipientResolver)($toArg);
 	}
 	if (ctype_digit($toArg) && strlen($toArg) <= 6) {
-		exitWithError("Recipient '$toArg' looks like a Jethro person ID — person-ID recipients require the Jethro wrapper (scripts/sms.php); pass a full mobile number instead.");
+		throw new CliError("Recipient '$toArg' looks like a Jethro person ID — person-ID recipients require the Jethro wrapper (scripts/sms.php); pass a full mobile number instead.");
 	}
 	return new PhoneNumber($toArg);
 }
 
 // ===========================================================================
 // Handlers
+//
+// Each returns a CliOutcome and prints nothing: text/JSON rendering happens
+// in the presenter, so --json cannot drift from the text output.
 // ===========================================================================
 
-function handleSms(CliEnvironment $env, array $args): void
+function handleSms(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	// Skip action, parse remaining
 	$opts = $pos = [];
@@ -174,16 +204,16 @@ function handleSms(CliEnvironment $env, array $args): void
 	$messageText = implode(' ', $pos);
 
 	if ($from === null) {
-		exitWithError("--from=<sender> is required for 'sms' action.\n");
+		throw new CliError("--from=<sender> is required for 'sms' action.\n");
 	}
 	if ($to === []) {
-		exitWithError("--to=<recipient> is required for 'sms' action.\n");
+		throw new CliError("--to=<recipient> is required for 'sms' action.\n");
 	}
 	if ($messageText === '') {
-		exitWithError("<message> is required for 'sms' action.\n");
+		throw new CliError("<message> is required for 'sms' action.\n");
 	}
 
-	$sender = \Sms\senderFromString($from) ?? exitWithError("--from=<sender> must not be blank.");
+	$sender = \Sms\senderFromString($from) ?? throw new CliError("--from=<sender> must not be blank.");
 
 	$recipients = [];
 	foreach ($to as $toArg) {
@@ -194,10 +224,10 @@ function handleSms(CliEnvironment $env, array $args): void
 	}
 
 	if ($recipients === []) {
-		exitWithError('No valid recipients.');
+		throw new CliError('No valid recipients.');
 	}
 
-	echo 'Sending SMS to ' . count($recipients) . " recipient(s)...\n";
+	$ui->progress('Sending SMS to ' . count($recipients) . " recipient(s)...\n");
 
 	// Host-resolved (person) recipients get DB logging; raw phone numbers don't.
 	$hasPersonIds = false;
@@ -216,95 +246,56 @@ function handleSms(CliEnvironment $env, array $args): void
 	);
 
 	if ($result->isFailure()) {
-		exitWithError($result->getError());
+		throw new CliError($result->getError());
 	}
 
 	/** @var \Sms\SmsDelivery[] $results */
 	$results = $result->getValue()->deliveries;
 	$summary = \Sms\sendSummary($results, $recipients);
 	if ($summary instanceof \Sms\Failed) {
-		exitWithError($summary->error);
+		throw new CliError($summary->error);
 	}
 
-	match (true) {
-		$summary instanceof \Sms\AllSent => printf(
-			"Sent successfully to %d recipient(s).\n",
-			count($summary->recipients),
-		),
-		$summary instanceof \Sms\PartialSuccess => printf(
-			"Sent to %d recipient(s), failed for %d.\n",
-			count($summary->successes),
-			count($summary->failures),
-		),
-		default => printf("Unexpected send result type: %s\n", $summary::class),
-	};
-
-	exit(0);
+	return CliOutcome::success('sms', ['summary' => $summary, 'deliveries' => $results]);
 }
 
-function handleSenderIds(CliEnvironment $env): void
+function handleSenderIds(CliEnvironment $env, Presenter $ui): CliOutcome
 {
 	$provider = requireProvider($env);
 
 	$result = $provider->getSenderIds(getAll: true);
 	if ($result->isFailure()) {
-		exitWithError('Failed to fetch sender IDs: ' . $result->getError());
+		throw new CliError('Failed to fetch sender IDs: ' . $result->getError());
 	}
 
-	$senderIds = $result->getValue();
-
-	if ($senderIds === []) {
-		echo "No registered sender IDs found.\n";
-	} else {
-		echo "Sender IDs:\n";
-		foreach ($senderIds as $senderId) {
-			$status = match ($senderId->acmaApproved) {
-				true  => ' (approved)',
-				false => ' (not approved — hidden from senders)',
-				null  => '',
-			};
-			echo '  ' . $senderId->value . $status . "\n";
-		}
-	}
-	exit(0);
+	return CliOutcome::success('senderids', $result->getValue());
 }
 
-function handleSenderNums(CliEnvironment $env): void
+function handleSenderNums(CliEnvironment $env, Presenter $ui): CliOutcome
 {
 	$provider = requireProvider($env);
 
 	$result = $provider->getSenderNumbers();
 	if ($result->isFailure()) {
-		exitWithError('Failed to fetch sender numbers: ' . $result->getError());
+		throw new CliError('Failed to fetch sender numbers: ' . $result->getError());
 	}
 
-	$numbers = $result->getValue();
-
-	if ($numbers === []) {
-		echo "No registered sender numbers found.\n";
-	} else {
-		echo "Registered sender numbers:\n";
-		foreach ($numbers as $number) {
-			echo '  ' . $number->value . "\n";
-		}
-	}
-	exit(0);
+	return CliOutcome::success('sendernums', $result->getValue());
 }
 
-function handleBalance(CliEnvironment $env): void
+function handleBalance(CliEnvironment $env, Presenter $ui): CliOutcome
 {
 	$provider = requireProvider($env);
 
 	$result = $provider->getBalance();
 	if ($result->isFailure()) {
-		exitWithError('Could not retrieve account balance: ' . $result->getError());
+		throw new CliError('Could not retrieve account balance: ' . $result->getError());
 	}
 
-	echo 'Account balance: ' . $result->getValue() . "\n";
-	exit(0);
+	return CliOutcome::success('balance', $result->getValue());
 }
 
-function handleInfo(CliEnvironment $env): void
+function handleInfo(CliEnvironment $env, Presenter $ui): CliOutcome
 {
 	$provider = requireProvider($env);
 
@@ -314,35 +305,33 @@ function handleInfo(CliEnvironment $env): void
 		$inner = $inner->getInner();
 	}
 
-	echo 'Provider: ' . $provider->getDescription() . "\n";
-	if ($env->extraInfoLines !== null) {
-		foreach (($env->extraInfoLines)() as $label => $value) {
-			echo "$label: $value\n";
-		}
-	}
-	echo "\n";
+	$extra = $env->extraInfoLines !== null ? ($env->extraInfoLines)() : [];
 
-	$constants = $inner::getConstants();
-	if ($constants === []) {
-		echo "No constants defined by this provider.\n";
-	} else {
-		$maxLen = max(array_map('strlen', array_column($constants, 0)));
-		foreach ($constants as [$key, $required]) {
-			$value = defined($key) ? var_export(constant($key), true) : '<not defined>';
-			printf("  %-{$maxLen}s  %-10s  %s\n", $key, $required, $value);
-		}
+	$constants = [];
+	foreach ($inner::getConstants() as [$key, $required]) {
+		$constants[] = [
+			'key'      => $key,
+			'required' => $required,
+			'defined'  => defined($key),
+			'value'    => defined($key) ? constant($key) : null,
+		];
 	}
-	exit(0);
+
+	return CliOutcome::success('info', [
+		'provider'  => $provider->getDescription(),
+		'extra'     => $extra,
+		'constants' => $constants,
+	]);
 }
 
-function handleSmsInfo(CliEnvironment $env, array $args): void
+function handleSmsInfo(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	$opts = $pos = [];
 	parseArgs(array_slice($args, 1), $opts, $pos);
 
 	$id = $opts['id'][0] ?? null;
 	if ($id === null) {
-		exitWithError("--id=<remote_ref> is required for 'smsinfo' action.\n");
+		throw new CliError("--id=<remote_ref> is required for 'smsinfo' action.\n");
 	}
 
 	$provider = requireProvider($env);
@@ -356,33 +345,23 @@ function handleSmsInfo(CliEnvironment $env, array $args): void
 
 	$result = $provider->updateDelivery($delivery);
 	if ($result->isFailure()) {
-		exitWithError('Could not retrieve SMS info: ' . $result->getError());
+		throw new CliError('Could not retrieve SMS info: ' . $result->getError());
 	}
 
-	/** @var \Sms\SmsDelivery $updated */
-	$updated = $result->getValue();
-
-	echo "Status:     " . $updated->statusText() . " (#" . $updated->status()->value . ")\n";
-	if ($updated->sendTimestamp() !== null) {
-		echo "Sent:       " . date('Y-m-d H:i:s', $updated->sendTimestamp()) . "\n";
-	}
-	if ($updated->deliveryTimestamp() !== null) {
-		echo "Delivered:  " . date('Y-m-d H:i:s', $updated->deliveryTimestamp()) . "\n";
-	}
-	exit(0);
+	return CliOutcome::success('smsinfo', $result->getValue());
 }
 
-function handleCancel(CliEnvironment $env, array $args): void
+function handleCancel(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	$opts = $pos = [];
 	parseArgs(array_slice($args, 1), $opts, $pos);
 
 	$id = $opts['id'][0] ?? null;
 	if ($id === null) {
-		exitWithError("--id=<remote_ref> is required for 'cancel' action.\n");
+		throw new CliError("--id=<remote_ref> is required for 'cancel' action.\n");
 	}
 
-	echo "Cancelling SMS $id...\n";
+	$ui->progress("Cancelling SMS $id...\n");
 
 	// Wrap the single synthetic delivery (fake recipient — DB-less debug tool)
 	// in a batch so the cancel hook can accept it.
@@ -397,18 +376,16 @@ function handleCancel(CliEnvironment $env, array $args): void
 		? ($env->cancel)($batch)
 		: requireProvider($env, logToDb: false)->cancel($batch);
 	if ($result->isFailure()) {
-		exitWithError('Could not cancel SMS: ' . $result->getError());
+		throw new CliError('Could not cancel SMS: ' . $result->getError());
 	}
 
 	/** @var \Sms\SmsDeliveryBatch $cancelledBatch */
 	$cancelledBatch = $result->getValue();
-	$cancelled = $cancelledBatch->deliveries[0];
 
-	echo "Status:     " . $cancelled->statusText() . " (#" . $cancelled->status()->value . ")\n";
-	exit(0);
+	return CliOutcome::success('cancel', $cancelledBatch->deliveries[0]);
 }
 
-function handleRegisterSenderNumber(CliEnvironment $env, array $args): void
+function handleRegisterSenderNumber(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	$opts = $pos = [];
 	parseArgs(array_slice($args, 1), $opts, $pos);
@@ -419,38 +396,24 @@ function handleRegisterSenderNumber(CliEnvironment $env, array $args): void
 	$provider = requireProvider($env, logToDb: true);
 
 	if (!$provider->hasCapability(\Sms\SmsCapability::REGISTER_SENDER_NUMBER)) {
-		echo "This API provider lacks the ability to register Sender Numbers.\n";
-		exit(0);
+		return CliOutcome::success('register-sender-number', null, 'This API provider lacks the ability to register Sender Numbers.');
 	}
 
 	if ($phoneNumber === null) {
-		exitWithError("--phonenumber=<number> is required for 'register-sender-number' action.\n");
+		throw new CliError("--phonenumber=<number> is required for 'register-sender-number' action.\n");
 	}
 
 	$contact = new \Sms\ContactPhoneNumber(new \Sms\PhoneNumber($phoneNumber), $label ?? 'CLI registration');
 
-	echo "Registering phone number {$contact->phoneNumber->value} as a sender...\n";
+	$ui->progress("Registering phone number {$contact->phoneNumber->value} as a sender...\n");
 
 	$result = $provider->registerSenderNumber($contact, null);
 
 	if ($result->isFailure()) {
-		exitWithError('Registration failed: ' . $result->getError());
+		throw new CliError('Registration failed: ' . $result->getError());
 	}
 
-	$step = $result->getValue();
-	echo renderRegistrationStepText($step);
-
-	// Show validation fields if needed
-	if ($step->fields !== []) {
-		echo "\nComplete verification with 'validate-sender-number' providing these fields:\n";
-		foreach ($step->fields as $f) {
-			if ($f->type !== 'hidden') {
-				echo '  --' . $f->name . '=<value>  ' . $f->label . ($f->required ? ' (required)' : '') . "\n";
-			}
-		}
-	}
-
-	exit(0);
+	return CliOutcome::success('register-sender-number', ['step' => $result->getValue()]);
 }
 
 /**
@@ -459,21 +422,20 @@ function handleRegisterSenderNumber(CliEnvironment $env, array $args): void
  * Submits the provider-specific validation fields (e.g. OTP code for
  * Cellcast) to complete the sender number registration.
  */
-function handleValidateSenderNumber(CliEnvironment $env, array $args): void
+function handleValidateSenderNumber(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	$opts = $pos = [];
 	parseArgs(array_slice($args, 1), $opts, $pos);
 
 	$phoneNumber = $opts['phonenumber'][0] ?? null;
 	if ($phoneNumber === null) {
-		exitWithError("--phonenumber=<number> is required for 'validate-sender-number' action.\n");
+		throw new CliError("--phonenumber=<number> is required for 'validate-sender-number' action.\n");
 	}
 
 	$provider = requireProvider($env, logToDb: true);
 
 	if (!$provider->hasCapability(\Sms\SmsCapability::REGISTER_SENDER_NUMBER)) {
-		echo "This API provider lacks the ability to register Sender Numbers.\n";
-		exit(0);
+		return CliOutcome::success('validate-sender-number', null, 'This API provider lacks the ability to register Sender Numbers.');
 	}
 
 	$contact = new \Sms\ContactPhoneNumber(new \Sms\PhoneNumber($phoneNumber), $opts['label'][0] ?? 'CLI registration');
@@ -490,38 +452,25 @@ function handleValidateSenderNumber(CliEnvironment $env, array $args): void
 		// No params — show the schema
 		$result = $provider->registerSenderNumber($contact, null);
 		if ($result->isFailure()) {
-			exitWithError($result->getError());
+			throw new CliError($result->getError());
 		}
-		$step = $result->getValue();
-
-		if ($step->fields !== []) {
-			echo "\nRequired fields:\n";
-			foreach ($step->fields as $f) {
-				if ($f->type !== 'hidden') {
-					echo '  --' . $f->name . '=<value>  ' . $f->label . ($f->required ? ' (required)' : '') . "\n";
-				}
-			}
-		} elseif ($step->message !== '' || $step->instructions !== '') {
-			// Steps that need no fields usually carry the reason — e.g. an
-			// already-active sender number, or a link sent to the handset.
-			echo renderRegistrationStepText($step);
-		} else {
-			echo "\nNo validation fields required.\n";
-		}
-		exit(0);
+		return CliOutcome::success('validate-sender-number', [
+			'step' => $result->getValue(),
+			'mode' => 'schema',
+		]);
 	}
 
 	// Submit validation
 	$result = $provider->registerSenderNumber($contact, $params);
 
 	if ($result->isFailure()) {
-		exitWithError('Validation failed: ' . $result->getError());
+		throw new CliError('Validation failed: ' . $result->getError());
 	}
 
-	$step = $result->getValue();
-	echo renderRegistrationStepText($step);
-
-	exit(0);
+	return CliOutcome::success('validate-sender-number', [
+		'step' => $result->getValue(),
+		'mode' => 'submitted',
+	]);
 }
 
 /**
@@ -534,39 +483,36 @@ function handleValidateSenderNumber(CliEnvironment $env, array $args): void
  * by number), so the CLI only needs the number.  Irreversible upstream —
  * the number must re-verify before it can be used again.
  */
-function handleDeleteSenderNumber(CliEnvironment $env, array $args): void
+function handleDeleteSenderNumber(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	$opts = $pos = [];
 	parseArgs(array_slice($args, 1), $opts, $pos);
 
 	$phoneNumber = $opts['phonenumber'][0] ?? null;
 	if ($phoneNumber === null) {
-		exitWithError("--phonenumber=<number> is required for 'delete-sender-number' action.\n");
+		throw new CliError("--phonenumber=<number> is required for 'delete-sender-number' action.\n");
 	}
 
 	$provider = requireProvider($env, logToDb: true);
 
 	if (!$provider->hasCapability(\Sms\SmsCapability::DELETE_SENDER_NUMBER)) {
-		echo "This API provider lacks the ability to delete Sender Numbers.\n";
-		exit(0);
+		return CliOutcome::success('delete-sender-number', null, 'This API provider lacks the ability to delete Sender Numbers.');
 	}
 
 	$number = new \Sms\PhoneNumber($phoneNumber);
 
-	echo "Deleting sender number {$number->value}...\n";
+	$ui->progress("Deleting sender number {$number->value}...\n");
 
 	$result = $provider->deleteSenderNumber($number);
 
 	if ($result->isFailure()) {
-		exitWithError('Deletion failed: ' . $result->getError());
+		throw new CliError('Deletion failed: ' . $result->getError());
 	}
 
-	echo "Done. The number is no longer registered with the provider.\n";
-
-	exit(0);
+	return CliOutcome::success('delete-sender-number', ['number' => $number->value]);
 }
 
-function handleRegisterSenderId(CliEnvironment $env, array $args): void
+function handleRegisterSenderId(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	$opts = $pos = [];
 	parseArgs(array_slice($args, 1), $opts, $pos);
@@ -574,20 +520,19 @@ function handleRegisterSenderId(CliEnvironment $env, array $args): void
 	$provider = requireProvider($env, logToDb: true);
 
 	if (!$provider->hasCapability(\Sms\SmsCapability::REGISTER_SENDER_ID)) {
-		echo "This API provider lacks the ability to register Sender IDs.\n";
-		exit(0);
+		return CliOutcome::success('register-sender-id', null, 'This API provider lacks the ability to register Sender IDs.');
 	}
 
 	$senderIdStr = $opts['senderid'][0] ?? '';
 	if ($senderIdStr === '') {
-		exitWithError('--senderid is required');
+		throw new CliError('--senderid is required');
 	}
-	$senderId = new \Sms\SenderID($senderIdStr);
+	$senderId = new SenderID($senderIdStr);
 
 	// Phase 1: Get the field schema (may create the sender ID upstream)
 	$schemaResult = $provider->registerSenderId($senderId, null);
 	if ($schemaResult->isFailure()) {
-		exitWithError($schemaResult->getError());
+		throw new CliError($schemaResult->getError());
 	}
 	$schema = $schemaResult->getValue();
 	$fields = $schema->fields;
@@ -602,146 +547,69 @@ function handleRegisterSenderId(CliEnvironment $env, array $args): void
 		}
 	}
 
-	// No validation params → print help with required fields
+	// No validation params → the caller gets the field schema back
 	if ($params === []) {
-		echo "Sender ID registration requires the following fields:\n\n";
-		foreach ($fields as $f) {
-			$req = $f->required ? ' (required)' : ' (optional)';
-			$val = $f->value !== null ? ' [default: ' . $f->value . ']' : '';
-			echo "  --{$f->name}={$f->label}{$req}{$val}\n";
-			if ($f->description !== null && $f->description !== '') {
-				echo '    ' . $f->description . "\n";
-			}
-			if ($f->type === 'select' && $f->options !== null) {
-				echo '    Options: ' . implode(', ', $f->options) . "\n";
-			}
-			if ($f->type === 'checkbox') {
-				echo "    Pass --{$f->name}=1 to enable\n";
-			}
-		}
-		exit(0);
+		return CliOutcome::success('register-sender-id', ['step' => $schema, 'mode' => 'schema']);
 	}
 
-	echo "Registering sender ID...\n";
+	$ui->progress("Registering sender ID...\n");
 	$result = $provider->registerSenderId($senderId, $params);
 
 	if ($result->isFailure()) {
-		exitWithError($result->getError());
+		throw new CliError($result->getError());
 	}
 
-	$step = $result->getValue();
-	echo renderRegistrationStepText($step);
-	exit(0);
-}
-
-/**
- * Render a sender registration result (registerSenderId()/registerSenderNumber()
- * phase 2) as plain text for the CLI.
- *
- * Mirrors the web renderer Jethro\Sms\renderRegistrationStepHtml(): the
- * providers return structured data (message, instructions, contact, form) and
- * each presentation layer renders it.
- */
-function renderRegistrationStepText(\Sms\RegistrationStep $step): string
-{
-	$out = '';
-
-	if ($step->message !== '') {
-		$out .= $step->message . "\n";
-	}
-
-	if ($step->instructions !== '') {
-		$out .= "\n" . $step->instructions . "\n";
-	}
-
-	if ($step->contact !== '') {
-		$out .= '  ' . $step->contact . "\n";
-	}
-
-	if ($step->form !== []) {
-		$width = 0;
-		foreach ($step->form as $row) {
-			$width = max($width, strlen((string) ($row['label'] ?? '')));
-		}
-		$out .= "\n";
-		foreach ($step->form as $row) {
-			$out .= '  ' . str_pad((string) ($row['label'] ?? '') . ':', $width + 2)
-				. (string) ($row['value'] ?? '') . "\n";
-		}
-	}
-
-	return $out !== '' ? $out : "Done.\n";
+	return CliOutcome::success('register-sender-id', ['step' => $result->getValue(), 'mode' => 'confirmed']);
 }
 
 // ===========================================================================
 // Opt-out handlers
 // ===========================================================================
 
-function handleOptOuts(CliEnvironment $env): void
+function handleOptOuts(CliEnvironment $env, Presenter $ui): CliOutcome
 {
 	$provider = requireProvider($env, logToDb: false);
 
 	if (!$provider->hasCapability(\Sms\SmsCapability::LIST_OPT_OUTS)) {
-		echo "This API provider does not support listing opt-outs.\n";
-		exit(0);
+		return CliOutcome::success('optouts', null, 'This API provider does not support listing opt-outs.');
 	}
 
 	$result = $provider->listOptOuts();
 	if ($result->isFailure()) {
-		exitWithError('Failed to list opt-outs: ' . $result->getError());
+		throw new CliError('Failed to list opt-outs: ' . $result->getError());
 	}
 
-	$entries = $result->getValue();
-
-	if ($entries === []) {
-		echo "No opted-out numbers found.\n";
-	} else {
-		echo "Opted-out numbers (" . count($entries) . "):\n";
-		foreach ($entries as $entry) {
-			$line = '  ' . $entry->number->value;
-			if ($entry->name !== null) {
-				$line .= '  (' . $entry->name . ')';
-			}
-			if ($entry->optedOutAt !== null) {
-				$line .= '  opted out ' . date('Y-m-d H:i:s', $entry->optedOutAt);
-			}
-			echo $line . "\n";
-		}
-	}
-	exit(0);
+	return CliOutcome::success('optouts', $result->getValue());
 }
 
-function handleRemoveOptOut(CliEnvironment $env, array $args): void
+function handleRemoveOptOut(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	$opts = $pos = [];
 	parseArgs(array_slice($args, 1), $opts, $pos);
 
 	$number = $opts['number'][0] ?? null;
 	if ($number === null) {
-		exitWithError("--number=<phone_number> is required for 'remove-optout' action.\n");
+		throw new CliError("--number=<phone_number> is required for 'remove-optout' action.\n");
 	}
 
 	$provider = requireProvider($env, logToDb: false);
 
 	if (!$provider->hasCapability(\Sms\SmsCapability::REMOVE_OPT_OUT)) {
-		echo "This API provider does not support removing opt-outs.\n";
-		exit(0);
+		return CliOutcome::success('remove-optout', null, 'This API provider does not support removing opt-outs.');
 	}
 
 	$phoneNumber = new \Sms\PhoneNumber($number);
-	echo "Removing {$phoneNumber->value} from opt-out list...\n";
+	$ui->progress("Removing {$phoneNumber->value} from opt-out list...\n");
 
 	$result = $provider->removeOptOut($phoneNumber);
 	if ($result->isFailure()) {
-		exitWithError('Failed to remove opt-out: ' . $result->getError());
+		throw new CliError('Failed to remove opt-out: ' . $result->getError());
 	}
 
-	echo "Done.\n";
-	exit(0);
+	return CliOutcome::success('remove-optout', ['number' => $phoneNumber->value]);
 }
 
-
-function handleList(CliEnvironment $env, array $args): void
+function handleList(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	$opts = $pos = [];
 	parseArgs(array_slice($args, 1), $opts, $pos);
@@ -753,23 +621,13 @@ function handleList(CliEnvironment $env, array $args): void
 
 	$result = $provider->listRecentDeliveries($since);
 	if ($result->isFailure()) {
-		exitWithError('Failed to list recent deliveries: ' . $result->getError());
+		throw new CliError('Failed to list recent deliveries: ' . $result->getError());
 	}
 
-	/** @var \Sms\SmsDelivery[] $deliveries */
-	$deliveries = $result->getValue();
-
-	if ($deliveries === []) {
-		$range = $since !== null ? ' since ' . date('Y-m-d H:i:s', $since) : ' in the last 24 hours';
-		echo "No deliveries found{$range}.\n";
-	} else {
-		$range = $since !== null ? ' since ' . date('Y-m-d H:i:s', $since) : ' (last 24 hours)';
-		echo "Recent deliveries{$range} — " . count($deliveries) . " result(s):\n\n";
-		foreach ($deliveries as $d) {
-			echo '  ' . \Sms\formatDeliveryLine($d) . "\n";
-		}
-	}
-	exit(0);
+	return CliOutcome::success('list', [
+		'deliveries' => $result->getValue(),
+		'since'      => $since,
+	]);
 }
 
 // ===========================================================================
@@ -848,7 +706,10 @@ function printUsage(CliEnvironment $env): void
 	}
 
 	echo <<<USAGE
-Usage: {$prog} <action> [options] [message]
+Usage: {$prog} [--json] <action> [options] [message]
+
+  --json      Print one JSON document instead of text (progress goes to
+              stderr). Payloads are provider-independent value objects.
 
 Actions:
   sms         Send an SMS message
@@ -896,6 +757,7 @@ Examples:
   {$prog} sms --from=Jethro --to=0491570159 --sendat=1717000000 "Deferred message"
   {$prog} senderids
   {$prog} sendernums
+  {$prog} --json balance | jq .data.balance
   {$prog} optouts
   {$prog} remove-optout --number=61414972051
   {$prog} delete-sender-number --phonenumber=0434199553
