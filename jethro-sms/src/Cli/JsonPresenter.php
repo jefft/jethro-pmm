@@ -65,6 +65,10 @@ final class JsonPresenter implements Presenter
             'sms'                    => $this->send($data),
             'senderids'              => $this->senderIds($data),
             'sendernums'             => array_map(static fn (PhoneNumber $n) => ['number' => $n->value], $data),
+            'sendernums-unregistered' => $data,
+            'verify-sender'          => $data,
+            'estimate'               => $data,
+            'status'                 => $data,
             'balance'                => ['balance' => $data],
             'info'                   => $this->info($data),
             'smsinfo', 'cancel'      => $this->delivery($data),
@@ -124,9 +128,13 @@ final class JsonPresenter implements Presenter
     private function info(array $data): array
     {
         return [
-            'provider'  => $data['provider'],
-            'extra'     => $data['extra'],
-            'constants' => array_map(fn (array $c) => [
+            'provider'     => $data['provider'],
+            'key'          => $data['key'] ?? null,
+            'extra'        => $data['extra'],
+            'capabilities' => $data['capabilities'] ?? [],
+            'segmentCostMillicents' => $data['segmentCostMillicents'] ?? null,
+            'deferredSendMaxDelaySeconds' => $data['deferredSendMaxDelaySeconds'] ?? null,
+            'constants'    => array_map(fn (array $c) => [
                 'key'      => $c['key'],
                 'required' => $c['required'],
                 'value'    => $c['defined'] ? $this->maskConstant($c['key'], $c['value']) : null,

@@ -54,7 +54,8 @@ function main(array $argv, CliEnvironment $env): never
 	$action = $args[0];
 
 	$known = array_merge(
-		['sms', 'senderids', 'sendernums', 'balance', 'smsinfo', 'cancel',
+		['sms', 'senderids', 'sendernums', 'sendernums-unregistered', 'verify-sender',
+		 'balance', 'estimate', 'status', 'smsinfo', 'cancel',
 		 'register-sender-number', 'validate-sender-number', 'delete-sender-number',
 		 'register-sender-id', 'optouts', 'remove-optout', 'info', 'list'],
 		array_keys($env->extraActions),
@@ -80,7 +81,11 @@ function main(array $argv, CliEnvironment $env): never
 			'sms'                    => handleSms($env, $args, $ui),
 			'senderids'              => handleSenderIds($env, $ui),
 			'sendernums'             => handleSenderNums($env, $ui),
+			'sendernums-unregistered' => handleUnregisteredSenderNums($env, $ui),
+			'verify-sender'          => handleVerifySender($env, $args, $ui),
 			'balance'                => handleBalance($env, $ui),
+			'estimate'               => handleEstimate($env, $args, $ui),
+			'status'                 => handleStatus($env, $ui),
 			'smsinfo'                => handleSmsInfo($env, $args, $ui),
 			'cancel'                 => handleCancel($env, $args, $ui),
 			'register-sender-number' => handleRegisterSenderNumber($env, $args, $ui),
@@ -227,8 +232,6 @@ function handleSms(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 		throw new CliError('No valid recipients.');
 	}
 
-	$ui->progress('Sending SMS to ' . count($recipients) . " recipient(s)...\n");
-
 	// Host-resolved (person) recipients get DB logging; raw phone numbers don't.
 	$hasPersonIds = false;
 	foreach ($recipients as $r) {
@@ -238,6 +241,21 @@ function handleSms(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 		}
 	}
 	$provider = requireProvider($env, logToDb: $hasPersonIds);
+
+	// Fail locally when the provider would reject the schedule anyway
+	// (5CentSMS: 365 days; MobileMessage: its own limit) instead of spending
+	// a round trip on it.
+	if ($sendAt !== null) {
+		$maxDelay = $provider->getDeferredSendMaxDelay();
+		if ($maxDelay !== null && $sendAt > time() + $maxDelay) {
+			throw new CliError(
+				'--sendat is too far ahead: this provider allows at most '
+				. formatDuration($maxDelay) . ' from now.'
+			);
+		}
+	}
+
+	$ui->progress('Sending SMS to ' . count($recipients) . " recipient(s)...\n");
 
 	$result = $provider->send(
 		entries: [['message' => $messageText, 'recipients' => $recipients]],
@@ -283,6 +301,42 @@ function handleSenderNums(CliEnvironment $env, Presenter $ui): CliOutcome
 	return CliOutcome::success('sendernums', $result->getValue());
 }
 
+/**
+ * List sender numbers whose registration was attempted but never verified.
+ *
+ * These are the entries that sit on the provider account unapproved — they
+ * cannot be used as senders, and a stale one can block a fresh registration
+ * attempt.  Each carries the date of the last attempt (the record's creation
+ * date; re-registering re-creates the record with a fresh date).
+ *
+ * Uses getSenderNumberRecords() — the same source as the System
+ * Configuration panel — because getSenderNumbers() only returns approved
+ * numbers.
+ */
+function handleUnregisteredSenderNums(CliEnvironment $env, Presenter $ui): CliOutcome
+{
+	$provider = requireProvider($env);
+
+	$result = $provider->getSenderNumberRecords();
+	if ($result->isFailure()) {
+		throw new CliError('Failed to fetch sender numbers: ' . $result->getError());
+	}
+
+	$rows = [];
+	foreach ($result->getValue() as $record) {
+		if (!$record->isPhoneNumber() || $record->isApproved()) {
+			continue;
+		}
+		$rows[] = [
+			'number'       => $record->value,
+			'status'       => $record->status,
+			'registeredAt' => $record->registeredAt,
+		];
+	}
+
+	return CliOutcome::success('sendernums-unregistered', $rows);
+}
+
 function handleBalance(CliEnvironment $env, Presenter $ui): CliOutcome
 {
 	$provider = requireProvider($env);
@@ -293,6 +347,140 @@ function handleBalance(CliEnvironment $env, Presenter $ui): CliOutcome
 	}
 
 	return CliOutcome::success('balance', $result->getValue());
+}
+
+/**
+ * Check whether a phone number is an approved sender on the account.
+ *
+ * Answers the question the sender dropdown answers in the web UI — useful in
+ * scripts deciding whether to send as a particular number.  A "no" is a
+ * valid answer, so the exit code stays 0; scripts read `data.approved`.
+ */
+function handleVerifySender(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
+{
+	$opts = $pos = [];
+	parseArgs(array_slice($args, 1), $opts, $pos);
+
+	$phoneNumber = $opts['phonenumber'][0] ?? null;
+	if ($phoneNumber === null) {
+		throw new CliError("--phonenumber=<number> is required for 'verify-sender' action.\n");
+	}
+
+	$provider = requireProvider($env, logToDb: false);
+	$number = new \Sms\PhoneNumber($phoneNumber);
+
+	$result = $provider->verifySenderNumber($number);
+	if ($result->isFailure()) {
+		throw new CliError('Could not verify sender number: ' . $result->getError());
+	}
+
+	return CliOutcome::success('verify-sender', [
+		'number'   => $number->value,
+		'approved' => $result->getValue() === true,
+	]);
+}
+
+/**
+ * Estimate segments and cost for a message without sending it.
+ *
+ * Mirrors the compose statusline's maths (sms_statusline.php): GSM 03.38
+ * messages pack 160/153 characters per segment, UCS-2 (anything containing a
+ * non-GSM character, e.g. an emoji or a curly quote) only 70/67.  Cost uses
+ * the provider's per-segment price.
+ */
+function handleEstimate(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
+{
+	$opts = $pos = [];
+	parseArgs(array_slice($args, 1), $opts, $pos);
+
+	$text = implode(' ', $pos);
+	if ($text === '') {
+		throw new CliError("<message> is required for 'estimate' action.\n");
+	}
+
+	$provider = requireProvider($env, logToDb: false);
+
+	return CliOutcome::success('estimate', estimateMessage($text, $provider->getSegmentCost()));
+}
+
+/**
+ * Segments, encoding and cost for one message.
+ *
+ * Pure function (no provider calls) so the maths is unit-testable; the
+ * provider only supplies the per-segment price.
+ *
+ * @return array{
+ *     message: string,
+ *     encoding: string,
+ *     segments: int,
+ *     segmentCostMillicents: int,
+ *     costPerRecipientMillicents: int,
+ *     nonGsmChars: list<string>
+ * }
+ */
+function estimateMessage(string $text, int $segmentCostMillicents): array
+{
+	$nonGsm = \Sms\getNonGsmChars($text);
+	$isUcs2 = $nonGsm !== [];
+	$segments = $isUcs2
+		? \Sms\ucs2SegmentCount(\Sms\utf16Length($text))
+		: \Sms\gsmSegmentCount(\Sms\gsmLength($text));
+
+	return [
+		'message'                    => $text,
+		'encoding'                   => $isUcs2 ? 'UCS-2' : 'GSM',
+		'segments'                   => $segments,
+		'segmentCostMillicents'      => $segmentCostMillicents,
+		'costPerRecipientMillicents' => $segments * $segmentCostMillicents,
+		'nonGsmChars'                => array_values(\Sms\getNonGsmDisplayChars($text)),
+	];
+}
+
+/**
+ * Live operational check: are the gateway and the credentials working now?
+ *
+ * Unlike `info` (static configuration) and `balance` (which needs the
+ * GET_BALANCE capability), this uses the provider's own isOperational()
+ * probe — works for every provider.  Exits non-zero when it fails, so it
+ * can drive a monitoring check.
+ */
+function handleStatus(CliEnvironment $env, Presenter $ui): CliOutcome
+{
+	$provider = requireProvider($env);
+
+	$result = $provider->isOperational();
+	$operational = $result->isSuccess() && $result->getValue() === true;
+
+	if (!$operational) {
+		$reason = $result->isFailure() ? $result->getError() : 'Provider did not respond';
+		throw new CliError($provider->getDescription() . ' is not operational — ' . $reason);
+	}
+
+	return CliOutcome::success('status', [
+		'key'         => $provider->getKey(),
+		'description' => $provider->getDescription(),
+		'operational' => true,
+	]);
+}
+
+/**
+ * Human duration for the deferred-send window, e.g. 365 days.
+ */
+function formatDuration(int $seconds): string
+{
+	if ($seconds % 86400 === 0) {
+		$n = intdiv($seconds, 86400);
+		return $n . ' ' . ($n === 1 ? 'day' : 'days');
+	}
+	if ($seconds % 3600 === 0) {
+		$n = intdiv($seconds, 3600);
+		return $n . ' ' . ($n === 1 ? 'hour' : 'hours');
+	}
+	if ($seconds % 60 === 0) {
+		$n = intdiv($seconds, 60);
+		return $n . ' ' . ($n === 1 ? 'minute' : 'minutes');
+	}
+	return $seconds . ' seconds';
 }
 
 function handleInfo(CliEnvironment $env, Presenter $ui): CliOutcome
@@ -317,10 +505,21 @@ function handleInfo(CliEnvironment $env, Presenter $ui): CliOutcome
 		];
 	}
 
+	$capabilities = [];
+	foreach (\Sms\SmsCapability::cases() as $cap) {
+		if ($provider->hasCapability($cap)) {
+			$capabilities[] = $cap->name;
+		}
+	}
+
 	return CliOutcome::success('info', [
-		'provider'  => $provider->getDescription(),
-		'extra'     => $extra,
-		'constants' => $constants,
+		'provider'                    => $provider->getDescription(),
+		'key'                         => $provider->getKey(),
+		'extra'                       => $extra,
+		'capabilities'                => $capabilities,
+		'segmentCostMillicents'       => $provider->getSegmentCost(),
+		'deferredSendMaxDelaySeconds' => $provider->getDeferredSendMaxDelay(),
+		'constants'                   => $constants,
 	]);
 }
 
@@ -722,6 +921,19 @@ Actions:
 
   sendernums  List registered sender numbers (phone numbers)
 
+  sendernums-unregistered
+              List sender numbers whose registration was attempted but never
+              verified, with the date of the last attempt
+
+  verify-sender  Check whether a phone number is an approved sender
+                 Required: --phonenumber=<number>
+
+  estimate    Segments, encoding and cost for a message, without sending it
+              Usage: estimate <message>
+
+  status      Live check that the provider is reachable and the credentials work
+              (exits non-zero when it is not)
+
   balance     Check the current account balance
 
   info        Show provider description and current constant values
@@ -757,6 +969,10 @@ Examples:
   {$prog} sms --from=Jethro --to=0491570159 --sendat=1717000000 "Deferred message"
   {$prog} senderids
   {$prog} sendernums
+  {$prog} sendernums-unregistered
+  {$prog} verify-sender --phonenumber=61402511927
+  {$prog} estimate "Meeting at 7pm — bring a friend 😊"
+  {$prog} status
   {$prog} --json balance | jq .data.balance
   {$prog} optouts
   {$prog} remove-optout --number=61414972051

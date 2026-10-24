@@ -205,9 +205,128 @@ test('text: info table', function () {
 	assert_contains($out, sprintf("  %-15s  %-10s  %s\n", 'SMS_LONGER_NAME', 'optional', '<not defined>'));
 });
 
+test('text: unregistered sender numbers with attempt dates', function () {
+	assert_eq(
+		renderText(CliOutcome::success('sendernums-unregistered', [])),
+		"No unregistered sender numbers found.\n",
+	);
+
+	$rows = [
+		['number' => '61434199553', 'status' => 'pending', 'registeredAt' => 1744784026],
+		['number' => '61433703337', 'status' => 'unverified', 'registeredAt' => null],
+		['number' => '61499999999', 'status' => null, 'registeredAt' => 1792108731],
+	];
+	assert_eq(
+		renderText(CliOutcome::success('sendernums-unregistered', $rows)),
+		"Unregistered sender numbers (3):\n"
+		. "  61434199553  (pending, attempted 2025-04-16)\n"
+		. "  61433703337  (unverified)\n"
+		. "  61499999999  (attempted 2026-10-15)\n",
+	);
+});
+
+test('json: unregistered sender numbers', function () {
+	$data = renderJson(CliOutcome::success('sendernums-unregistered', [
+		['number' => '61434199553', 'status' => 'pending', 'registeredAt' => 1744784026],
+	]))['data'];
+	assert_eq($data, [['number' => '61434199553', 'status' => 'pending', 'registeredAt' => 1744784026]]);
+});
+
+test('text: verify-sender, estimate and status', function () {
+	assert_eq(
+		renderText(CliOutcome::success('verify-sender', ['number' => '61402511927', 'approved' => true])),
+		"61402511927 is an approved sender number.\n",
+	);
+	assert_eq(
+		renderText(CliOutcome::success('verify-sender', ['number' => '61400000000', 'approved' => false])),
+		"61400000000 is not an approved sender number.\n",
+	);
+
+	$gsm = \Sms\Cli\estimateMessage('Hello world', 5000);
+	assert_eq(
+		renderText(CliOutcome::success('estimate', $gsm)),
+		"Encoding:  GSM\nSegments:  1\nCost:      5.00c per recipient\n",
+	);
+
+	$ucs2 = \Sms\Cli\estimateMessage(str_repeat('a', 70) . '😊', 5000);
+	assert_contains(renderText(CliOutcome::success('estimate', $ucs2)), "Encoding:  UCS-2\n");
+	assert_contains(renderText(CliOutcome::success('estimate', $ucs2)), 'Non-GSM:   😊 (forces UCS-2 encoding)' . "\n");
+
+	assert_eq(
+		renderText(CliOutcome::success('status', ['key' => '5centsmsv5', 'description' => '5CentSMS (v5)', 'operational' => true])),
+		"Provider:     5CentSMS (v5)\nKey:          5centsmsv5\nOperational:  Yes\n",
+	);
+});
+
+test('text: info shows key, capabilities, cost and deferred window', function () {
+	$out = renderText(CliOutcome::success('info', [
+		'provider' => 'Test (v1)',
+		'key' => 'testv1',
+		'extra' => [],
+		'capabilities' => ['GET_BALANCE', 'DEFERRED_SEND'],
+		'segmentCostMillicents' => 4300,
+		'deferredSendMaxDelaySeconds' => 86400,
+		'constants' => [],
+	]));
+	assert_contains($out, "Provider: Test (v1)\nKey: testv1\n");
+	assert_contains($out, "Capabilities: GET_BALANCE, DEFERRED_SEND\n");
+	assert_contains($out, "Segment cost: 4.30c per segment\n");
+	assert_contains($out, "Max deferred send: 1 day\n");
+
+	$unlimited = renderText(CliOutcome::success('info', [
+		'provider' => 'Test (v1)', 'key' => 'k', 'extra' => [], 'capabilities' => [],
+		'segmentCostMillicents' => 1000, 'deferredSendMaxDelaySeconds' => null, 'constants' => [],
+	]));
+	assert_contains($unlimited, "Capabilities: none\n");
+	assert_contains($unlimited, "Max deferred send: unlimited\n");
+});
+
+test('estimateMessage(): segment boundaries match the statusline maths', function () {
+	assert_eq(\Sms\Cli\estimateMessage(str_repeat('a', 160), 5000)['segments'], 1);
+	assert_eq(\Sms\Cli\estimateMessage(str_repeat('a', 161), 5000)['segments'], 2);
+	assert_eq(\Sms\Cli\estimateMessage(str_repeat('a', 306), 5000)['segments'], 2);
+	assert_eq(\Sms\Cli\estimateMessage(str_repeat('a', 307), 5000)['segments'], 3);
+
+	// UCS-2: 70 chars per segment, 67 when concatenated
+	assert_eq(\Sms\Cli\estimateMessage(str_repeat('a', 70) . '😊', 5000)['segments'], 2);
+	assert_eq(\Sms\Cli\estimateMessage(str_repeat('😊', 35), 5000)['segments'], 1);
+	assert_eq(\Sms\Cli\estimateMessage(str_repeat('😊', 36), 5000)['segments'], 2);
+	assert_eq(\Sms\Cli\estimateMessage(str_repeat('😊', 36), 5000)['encoding'], 'UCS-2');
+
+	// GSM extended characters count double but stay GSM
+	$euro = \Sms\Cli\estimateMessage(str_repeat('€', 80), 5000);
+	assert_eq($euro['encoding'], 'GSM');
+	assert_eq($euro['segments'], 1, '80 × 2 = 160 effective chars');
+	assert_eq(\Sms\Cli\estimateMessage(str_repeat('€', 81), 5000)['segments'], 2);
+
+	// Cost = segments × per-segment price, in millicents
+	$cost = \Sms\Cli\estimateMessage(str_repeat('a', 161), 4300);
+	assert_eq($cost['costPerRecipientMillicents'], 8600);
+
+	// Non-GSM characters are reported for display
+	assert_eq($cost['nonGsmChars'], []);
+	assert_eq(\Sms\Cli\estimateMessage('Hi 😊', 5000)['nonGsmChars'], ['😊']);
+});
+
 // ===========================================================================
 // JsonPresenter
 // ===========================================================================
+
+test('json: verify-sender, estimate and status payloads', function () {
+	assert_eq(
+		renderJson(CliOutcome::success('verify-sender', ['number' => '61402511927', 'approved' => true]))['data'],
+		['number' => '61402511927', 'approved' => true],
+	);
+
+	$estimate = renderJson(CliOutcome::success('estimate', \Sms\Cli\estimateMessage('Hello', 5000)))['data'];
+	assert_eq($estimate['encoding'], 'GSM');
+	assert_eq($estimate['segments'], 1);
+	assert_eq($estimate['costPerRecipientMillicents'], 5000);
+	assert_eq($estimate['nonGsmChars'], []);
+
+	$status = renderJson(CliOutcome::success('status', ['key' => 'k', 'description' => 'd', 'operational' => true]));
+	assert_eq($status['data'], ['key' => 'k', 'description' => 'd', 'operational' => true]);
+});
 
 test('json: envelope for success, failure and note', function () {
 	assert_eq(

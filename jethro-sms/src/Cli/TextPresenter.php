@@ -46,6 +46,10 @@ final class TextPresenter implements Presenter
             'sms'                    => $this->sendSummary($outcome->data),
             'senderids'              => $this->senderIds($outcome->data),
             'sendernums'             => $this->senderNumbers($outcome->data),
+            'sendernums-unregistered' => $this->unregisteredSenderNumbers($outcome->data),
+            'verify-sender'          => $this->verifySender($outcome->data),
+            'estimate'               => $this->estimate($outcome->data),
+            'status'                 => $this->status($outcome->data),
             'balance'                => $this->balance($outcome->data),
             'info'                   => $this->info($outcome->data),
             'smsinfo', 'cancel'      => $this->deliveryStatus($outcome->data),
@@ -114,12 +118,79 @@ final class TextPresenter implements Presenter
         echo 'Account balance: ' . $balance . "\n";
     }
 
+    /** @param list<array{number: string, status: ?string, registeredAt: ?int}> $rows */
+    private function unregisteredSenderNumbers(array $rows): void
+    {
+        if ($rows === []) {
+            echo "No unregistered sender numbers found.\n";
+            return;
+        }
+        echo "Unregistered sender numbers (" . count($rows) . "):\n";
+        foreach ($rows as $row) {
+            $line = '  ' . $row['number'];
+            if ($row['status'] !== null) {
+                $line .= '  (' . $row['status'];
+                if ($row['registeredAt'] !== null) {
+                    $line .= ', attempted ' . date('Y-m-d', $row['registeredAt']);
+                }
+                $line .= ')';
+            } elseif ($row['registeredAt'] !== null) {
+                $line .= '  (attempted ' . date('Y-m-d', $row['registeredAt']) . ')';
+            }
+            echo $line . "\n";
+        }
+    }
+
+    /** @param array{number: string, approved: bool} $data */
+    private function verifySender(array $data): void
+    {
+        echo $data['number'] . ($data['approved']
+            ? " is an approved sender number.\n"
+            : " is not an approved sender number.\n");
+    }
+
+    /**
+     * @param array{encoding: string, segments: int, segmentCostMillicents: int,
+     *              costPerRecipientMillicents: int, nonGsmChars: list<string>} $data
+     */
+    private function estimate(array $data): void
+    {
+        echo 'Encoding:  ' . $data['encoding'] . "\n";
+        echo 'Segments:  ' . $data['segments'] . "\n";
+        echo 'Cost:      ' . number_format($data['costPerRecipientMillicents'] / 1000, 2) . "c per recipient\n";
+        if ($data['nonGsmChars'] !== []) {
+            echo 'Non-GSM:   ' . implode('', $data['nonGsmChars']) . " (forces UCS-2 encoding)\n";
+        }
+    }
+
+    /** @param array{key: string, description: string, operational: bool} $data */
+    private function status(array $data): void
+    {
+        echo 'Provider:     ' . $data['description'] . "\n";
+        echo 'Key:          ' . $data['key'] . "\n";
+        echo "Operational:  Yes\n";
+    }
+
     /** @param array{provider: string, extra: array<string,string>, constants: list<array{key:string, required:string, defined:bool, value:mixed}>} $data */
     private function info(array $data): void
     {
         echo 'Provider: ' . $data['provider'] . "\n";
         foreach ($data['extra'] as $label => $value) {
             echo "$label: $value\n";
+        }
+        if (isset($data['key'])) {
+            echo 'Key: ' . $data['key'] . "\n";
+        }
+        if (isset($data['capabilities'])) {
+            echo 'Capabilities: ' . ($data['capabilities'] === [] ? 'none' : implode(', ', $data['capabilities'])) . "\n";
+        }
+        if (isset($data['segmentCostMillicents'])) {
+            echo 'Segment cost: ' . number_format($data['segmentCostMillicents'] / 1000, 2) . "c per segment\n";
+        }
+        if (array_key_exists('deferredSendMaxDelaySeconds', $data)) {
+            echo 'Max deferred send: '
+                . ($data['deferredSendMaxDelaySeconds'] === null ? 'unlimited' : formatDuration($data['deferredSendMaxDelaySeconds']))
+                . "\n";
         }
         echo "\n";
 

@@ -54,6 +54,10 @@ bin/jethro-sms balance
 bin/jethro-sms sms --from=MyChurch --to=0491570159 'Hello %firstname%'
 bin/jethro-sms smsinfo --id=<remote_ref>
 bin/jethro-sms cancel --id=<remote_ref>
+bin/jethro-sms sendernums-unregistered    # attempted but never verified, with dates
+bin/jethro-sms verify-sender --phonenumber=61402511927
+bin/jethro-sms estimate 'Hello 👋'        # segments, encoding and cost, no send
+bin/jethro-sms status                     # live reachability/credentials check
 bin/jethro-sms optouts
 ```
 
