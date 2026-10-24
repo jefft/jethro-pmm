@@ -55,7 +55,9 @@ bin/jethro-sms sms --from=MyChurch --to=0491570159 'Hello %firstname%'
 bin/jethro-sms smsinfo --id=<remote_ref>
 bin/jethro-sms cancel --id=<remote_ref>
 bin/jethro-sms sendernums-unregistered    # attempted but never verified, with dates
-bin/jethro-sms check-sender --phonenumber=61402511927
+bin/jethro-sms is-sendernum-registered --phonenumber=61411264069
+bin/jethro-sms validate-sendernum --phonenumber=0491570159          # send the link/OTP
+bin/jethro-sms complete-sendernum-validation --phonenumber=0491570159 --otp=123456
 bin/jethro-sms estimate 'Hello 👋'        # segments, encoding and cost, no send
 bin/jethro-sms status                     # live reachability/credentials check
 bin/jethro-sms optouts

@@ -54,9 +54,9 @@ function main(array $argv, CliEnvironment $env): never
 	$action = $args[0];
 
 	$known = array_merge(
-		['sms', 'senderids', 'sendernums', 'sendernums-unregistered', 'check-sender',
+		['sms', 'senderids', 'sendernums', 'sendernums-unregistered', 'is-sendernum-registered',
 		 'balance', 'estimate', 'status', 'smsinfo', 'cancel',
-		 'register-sender-number', 'validate-sender-number', 'delete-sender-number',
+		 'validate-sendernum', 'complete-sendernum-validation', 'delete-sender-number',
 		 'register-sender-id', 'optouts', 'remove-optout', 'info', 'list'],
 		array_keys($env->extraActions),
 	);
@@ -82,14 +82,14 @@ function main(array $argv, CliEnvironment $env): never
 			'senderids'              => handleSenderIds($env, $ui),
 			'sendernums'             => handleSenderNums($env, $ui),
 			'sendernums-unregistered' => handleUnregisteredSenderNums($env, $ui),
-			'check-sender'          => handleCheckSender($env, $args, $ui),
+			'is-sendernum-registered'          => handleIsSendernumRegistered($env, $args, $ui),
 			'balance'                => handleBalance($env, $ui),
 			'estimate'               => handleEstimate($env, $args, $ui),
 			'status'                 => handleStatus($env, $ui),
 			'smsinfo'                => handleSmsInfo($env, $args, $ui),
 			'cancel'                 => handleCancel($env, $args, $ui),
-			'register-sender-number' => handleRegisterSenderNumber($env, $args, $ui),
-			'validate-sender-number' => handleValidateSenderNumber($env, $args, $ui),
+			'validate-sendernum' => handleValidateSendernum($env, $args, $ui),
+			'complete-sendernum-validation' => handleCompleteSendernumValidation($env, $args, $ui),
 			'delete-sender-number'   => handleDeleteSenderNumber($env, $args, $ui),
 			'register-sender-id'     => handleRegisterSenderId($env, $args, $ui),
 			'optouts'                => handleOptOuts($env, $ui),
@@ -378,14 +378,14 @@ function handleBalance(CliEnvironment $env, Presenter $ui): CliOutcome
  * scripts deciding whether to send as a particular number.  A "no" is a
  * valid answer, so the exit code stays 0; scripts read `data.approved`.
  */
-function handleCheckSender(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
+function handleIsSendernumRegistered(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	$opts = $pos = [];
 	parseArgs(array_slice($args, 1), $opts, $pos);
 
 	$phoneNumber = $opts['phonenumber'][0] ?? null;
 	if ($phoneNumber === null) {
-		throw new CliError("--phonenumber=<number> is required for 'check-sender' action.\n");
+		throw new CliError("--phonenumber=<number> is required for 'is-sendernum-registered' action.\n");
 	}
 
 	$provider = requireProvider($env, logToDb: false);
@@ -396,7 +396,7 @@ function handleCheckSender(CliEnvironment $env, array $args, Presenter $ui): Cli
 		throw new CliError('Could not verify sender number: ' . $result->getError());
 	}
 
-	return CliOutcome::success('check-sender', [
+	return CliOutcome::success('is-sendernum-registered', [
 		'number'   => $number->value,
 		'approved' => $result->getValue() === true,
 	]);
@@ -606,7 +606,17 @@ function handleCancel(CliEnvironment $env, array $args, Presenter $ui): CliOutco
 	return CliOutcome::success('cancel', $cancelledBatch->deliveries[0]);
 }
 
-function handleRegisterSenderNumber(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
+/**
+ * Ask the provider to verify a phone number for use as a sender — the
+ * initial "I would like to validate this number" step.
+ *
+ * Phase 1 of the sender-number state machine: 5CentSMS texts a verification
+ * link to the handset (and only reports "pending" until it is clicked);
+ * Cellcast texts an OTP, which the caller submits with
+ * `complete-sendernum-validation`.  The result's fields say what (if
+ * anything) the provider needs next.
+ */
+function handleValidateSendernum(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	$opts = $pos = [];
 	parseArgs(array_slice($args, 1), $opts, $pos);
@@ -617,11 +627,11 @@ function handleRegisterSenderNumber(CliEnvironment $env, array $args, Presenter 
 	$provider = requireProvider($env, logToDb: true);
 
 	if (!$provider->hasCapability(\Sms\SmsCapability::REGISTER_SENDER_NUMBER)) {
-		return CliOutcome::success('register-sender-number', null, 'This API provider lacks the ability to register Sender Numbers.');
+		return CliOutcome::success('validate-sendernum', null, 'This API provider does not support sender-number validation.');
 	}
 
 	if ($phoneNumber === null) {
-		throw new CliError("--phonenumber=<number> is required for 'register-sender-number' action.\n");
+		throw new CliError("--phonenumber=<number> is required for 'validate-sendernum' action.\n");
 	}
 
 	$contact = new \Sms\ContactPhoneNumber(new \Sms\PhoneNumber($phoneNumber), $label ?? 'CLI registration');
@@ -634,29 +644,30 @@ function handleRegisterSenderNumber(CliEnvironment $env, array $args, Presenter 
 		throw new CliError('Registration failed: ' . $result->getError());
 	}
 
-	return CliOutcome::success('register-sender-number', ['step' => $result->getValue()]);
+	return CliOutcome::success('validate-sendernum', ['step' => $result->getValue()]);
 }
 
 /**
- * Validate (complete verification of) a registered sender phone number.
+ * Complete verification of a sender phone number — phase 2.
  *
- * Submits the provider-specific validation fields (e.g. OTP code for
- * Cellcast) to complete the sender number registration.
+ * Submits the provider-specific validation fields (e.g. the OTP for
+ * Cellcast) to finish the registration started by `validate-sendernum`.
+ * With no fields supplied it shows the schema the provider expects.
  */
-function handleValidateSenderNumber(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
+function handleCompleteSendernumValidation(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	$opts = $pos = [];
 	parseArgs(array_slice($args, 1), $opts, $pos);
 
 	$phoneNumber = $opts['phonenumber'][0] ?? null;
 	if ($phoneNumber === null) {
-		throw new CliError("--phonenumber=<number> is required for 'validate-sender-number' action.\n");
+		throw new CliError("--phonenumber=<number> is required for 'complete-sendernum-validation' action.\n");
 	}
 
 	$provider = requireProvider($env, logToDb: true);
 
 	if (!$provider->hasCapability(\Sms\SmsCapability::REGISTER_SENDER_NUMBER)) {
-		return CliOutcome::success('validate-sender-number', null, 'This API provider lacks the ability to register Sender Numbers.');
+		return CliOutcome::success('complete-sendernum-validation', null, 'This API provider does not support sender-number validation.');
 	}
 
 	$contact = new \Sms\ContactPhoneNumber(new \Sms\PhoneNumber($phoneNumber), $opts['label'][0] ?? 'CLI registration');
@@ -675,7 +686,7 @@ function handleValidateSenderNumber(CliEnvironment $env, array $args, Presenter 
 		if ($result->isFailure()) {
 			throw new CliError($result->getError());
 		}
-		return CliOutcome::success('validate-sender-number', [
+		return CliOutcome::success('complete-sendernum-validation', [
 			'step' => $result->getValue(),
 			'mode' => 'schema',
 		]);
@@ -688,7 +699,7 @@ function handleValidateSenderNumber(CliEnvironment $env, array $args, Presenter 
 		throw new CliError('Validation failed: ' . $result->getError());
 	}
 
-	return CliOutcome::success('validate-sender-number', [
+	return CliOutcome::success('complete-sendernum-validation', [
 		'step' => $result->getValue(),
 		'mode' => 'submitted',
 	]);
@@ -884,7 +895,7 @@ function printUsage(CliEnvironment $env): void
 			}
 
 			if (!$provider->hasCapability(\Sms\SmsCapability::REGISTER_SENDER_NUMBER)) {
-				$senderNumberNote = "\n                           This API provider lacks the ability to register Sender Numbers.";
+				$senderNumberNote = "\n                           This API provider does not support sender-number validation.";
 			}
 		}
 	} catch (\Throwable) {
@@ -916,7 +927,7 @@ function printUsage(CliEnvironment $env): void
 			$validateNumberNote .= "\n                           Required fields:\n" . implode("\n", $lines);
 		}
 	} elseif ($senderNumberNote !== '') {
-		$validateNumberNote = "\n                           This API provider lacks the ability to register Sender Numbers.";
+		$validateNumberNote = "\n                           This API provider does not support sender-number validation.";
 	}
 
 	$extraActionLines = '';
@@ -947,8 +958,9 @@ Actions:
               List sender numbers whose registration was attempted but never
               verified, with the date of the last attempt
 
-  check-sender  Check whether a phone number is an approved sender
-                 Required: --phonenumber=<number>
+  is-sendernum-registered
+              Check whether a phone number is an approved sender
+              Required: --phonenumber=<number>
 
   estimate    Segments, encoding and cost for a message, without sending it
               Usage: estimate <message>
@@ -976,9 +988,12 @@ Actions:
   remove-optout  Remove a phone number from the opt-out list
                  Required: --number=<phone_number>
 
-  register-sender-number   Register a phone number for use as a sender{$senderNumberNote}{$senderNumberArgs}
+  validate-sendernum       Ask the provider to verify a phone number for use as a
+                           sender (sends the verification link / OTP){$senderNumberNote}{$senderNumberArgs}
 
-  validate-sender-number   Complete verification of a registered sender number{$validateNumberNote}
+  complete-sendernum-validation
+                           Submit the verification code to complete sender-number
+                           registration{$validateNumberNote}
 
   delete-sender-number     Remove a registered sender number from the account
                            Required: --phonenumber=<number>  (irreversible)
@@ -992,7 +1007,9 @@ Examples:
   {$prog} senderids
   {$prog} sendernums
   {$prog} sendernums-unregistered
-  {$prog} check-sender --phonenumber=61402511927
+  {$prog} is-sendernum-registered --phonenumber=61411264069
+  {$prog} validate-sendernum --phonenumber=0491570159
+  {$prog} complete-sendernum-validation --phonenumber=0491570159 --otp=123456
   {$prog} estimate "Meeting at 7pm — bring a friend 😊"
   {$prog} status
   {$prog} --json balance | jq .data.balance

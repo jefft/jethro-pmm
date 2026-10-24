@@ -46,14 +46,14 @@ final class TextPresenter implements Presenter
             'senderids'              => $this->senderIds($outcome->data),
             'sendernums'             => $this->senderNumbers($outcome->data),
             'sendernums-unregistered' => $this->unregisteredSenderNumbers($outcome->data),
-            'check-sender'          => $this->checkSender($outcome->data),
+            'is-sendernum-registered'          => $this->isSendernumRegistered($outcome->data),
             'estimate'               => $this->estimate($outcome->data),
             'status'                 => $this->status($outcome->data),
             'balance'                => $this->balance($outcome->data),
             'info'                   => $this->info($outcome->data),
             'smsinfo', 'cancel'      => $this->deliveryStatus($outcome->data),
-            'register-sender-number' => $this->registerSenderNumber($outcome->data),
-            'validate-sender-number' => $this->validateSenderNumber($outcome->data),
+            'validate-sendernum' => $this->validateSendernum($outcome->data),
+            'complete-sendernum-validation' => $this->completeSendernumValidation($outcome->data),
             'delete-sender-number'   => $this->deleted($outcome->data),
             'register-sender-id'     => $this->registerSenderId($outcome->data),
             'optouts'                => $this->optOuts($outcome->data),
@@ -145,7 +145,7 @@ final class TextPresenter implements Presenter
     }
 
     /** @param array{number: string, approved: bool} $data */
-    private function checkSender(array $data): void
+    private function isSendernumRegistered(array $data): void
     {
         echo $data['number'] . ($data['approved']
             ? " is an approved sender number.\n"
@@ -221,13 +221,13 @@ final class TextPresenter implements Presenter
     }
 
     /** @param array{step: RegistrationStep} $data */
-    private function registerSenderNumber(array $data): void
+    private function validateSendernum(array $data): void
     {
         $step = $data['step'];
         echo $this->registrationStepText($step);
 
         if ($step->fields !== []) {
-            echo "\nComplete verification with 'validate-sender-number' providing these fields:\n";
+            echo "\nComplete verification with 'complete-sendernum-validation' providing these fields:\n";
             foreach ($step->fields as $f) {
                 if ($f->type !== 'hidden') {
                     echo '  --' . $f->name . '=<value>  ' . $f->label . ($f->required ? ' (required)' : '') . "\n";
@@ -237,7 +237,7 @@ final class TextPresenter implements Presenter
     }
 
     /** @param array{step: RegistrationStep, mode: string} $data */
-    private function validateSenderNumber(array $data): void
+    private function completeSendernumValidation(array $data): void
     {
         $step = $data['step'];
         if ($step->fields !== []) {

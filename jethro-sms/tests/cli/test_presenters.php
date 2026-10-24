@@ -152,7 +152,7 @@ test('text: delivery status block', function () {
 test('text: registration step and field schema', function () {
 	$step = new RegistrationStep(message: 'Verification link sent.', instructions: 'Click it.');
 	assert_eq(
-		renderText(CliOutcome::success('register-sender-number', ['step' => $step])),
+		renderText(CliOutcome::success('validate-sendernum', ['step' => $step])),
 		"Verification link sent.\n\nClick it.\n",
 	);
 
@@ -160,15 +160,15 @@ test('text: registration step and field schema', function () {
 		new FormField('otp', 'One-time code', 'text', required: true),
 		new FormField('hidden_thing', 'Hidden', 'hidden'),
 	]);
-	$out = renderText(CliOutcome::success('register-sender-number', ['step' => $withFields]));
-	assert_contains($out, "\nComplete verification with 'validate-sender-number' providing these fields:\n");
+	$out = renderText(CliOutcome::success('validate-sendernum', ['step' => $withFields]));
+	assert_contains($out, "\nComplete verification with 'complete-sendernum-validation' providing these fields:\n");
 	assert_contains($out, "  --otp=<value>  One-time code (required)\n");
 	assert_true(!str_contains($out, 'hidden_thing'), 'hidden fields are not listed');
 
-	$validate = renderText(CliOutcome::success('validate-sender-number', ['step' => $withFields, 'mode' => 'schema']));
+	$validate = renderText(CliOutcome::success('complete-sendernum-validation', ['step' => $withFields, 'mode' => 'schema']));
 	assert_contains($validate, "\nRequired fields:\n  --otp=<value>  One-time code (required)\n");
 
-	$validateEmpty = renderText(CliOutcome::success('validate-sender-number', [
+	$validateEmpty = renderText(CliOutcome::success('complete-sendernum-validation', [
 		'step' => new RegistrationStep(),
 		'mode' => 'submitted',
 	]));
@@ -186,7 +186,7 @@ test('text: delete/remove confirmations and notes', function () {
 	);
 	assert_eq(renderText(CliOutcome::success('remove-optout', ['number' => '61400000001'])), "Done.\n");
 	assert_eq(
-		renderText(CliOutcome::success('register-sender-number', null, 'This API provider lacks the ability to register Sender Numbers.')),
+		renderText(CliOutcome::success('validate-sendernum', null, 'This API provider lacks the ability to register Sender Numbers.')),
 		"This API provider lacks the ability to register Sender Numbers.\n",
 	);
 });
@@ -232,13 +232,13 @@ test('json: unregistered sender numbers', function () {
 	assert_eq($data, [['number' => '61434199553', 'status' => 'pending', 'registeredAt' => 1744784026]]);
 });
 
-test('text: check-sender, estimate and status', function () {
+test('text: is-sendernum-registered, estimate and status', function () {
 	assert_eq(
-		renderText(CliOutcome::success('check-sender', ['number' => '61402511927', 'approved' => true])),
-		"61402511927 is an approved sender number.\n",
+		renderText(CliOutcome::success('is-sendernum-registered', ['number' => '61491570157', 'approved' => true])),
+		"61491570157 is an approved sender number.\n",
 	);
 	assert_eq(
-		renderText(CliOutcome::success('check-sender', ['number' => '61400000000', 'approved' => false])),
+		renderText(CliOutcome::success('is-sendernum-registered', ['number' => '61400000000', 'approved' => false])),
 		"61400000000 is not an approved sender number.\n",
 	);
 
@@ -312,10 +312,10 @@ test('estimateMessage(): segment boundaries match the statusline maths', functio
 // JsonPresenter
 // ===========================================================================
 
-test('json: check-sender, estimate and status payloads', function () {
+test('json: is-sendernum-registered, estimate and status payloads', function () {
 	assert_eq(
-		renderJson(CliOutcome::success('check-sender', ['number' => '61402511927', 'approved' => true]))['data'],
-		['number' => '61402511927', 'approved' => true],
+		renderJson(CliOutcome::success('is-sendernum-registered', ['number' => '61491570157', 'approved' => true]))['data'],
+		['number' => '61491570157', 'approved' => true],
 	);
 
 	$estimate = renderJson(CliOutcome::success('estimate', \Sms\Cli\estimateMessage('Hello', 5000)))['data'];
@@ -394,7 +394,7 @@ test('json: send summary and registration step', function () {
 	assert_eq($partial['summary']['sent'], 1);
 	assert_eq($partial['summary']['failed'], 1);
 
-	$step = renderJson(CliOutcome::success('register-sender-number', [
+	$step = renderJson(CliOutcome::success('validate-sendernum', [
 		'step' => new RegistrationStep(
 			message: 'Verification link sent.',
 			number: '61400000001',
