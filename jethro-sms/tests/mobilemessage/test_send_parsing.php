@@ -689,6 +689,33 @@ test('registerSenderNumber(): discovery returns number-entry schema', function (
     assert_eq(count($result->getValue()->fields), 2);
 });
 
+test('registerSenderNumber(): POSTs the number under "number", the key the API requires', function () {
+    // Recorded live: POSTing it as "sender" fails with '"number" is required.'
+    $cache = new ArrayCache();
+    $cache->set('sms_senders', [['sender' => '61400000001', 'type' => 'own']]);
+    $spy = new SpyHttpClient(successResponse(json_encode(['status' => 'complete', 'results' => []])));
+    $p = makeProvider($spy, $cache);
+    $result = $p->registerSenderNumber(new \Sms\ContactPhoneNumber(new PhoneNumber('0400000001'), 'Office'));
+    assert_true($result->isSuccess());
+    $body = json_decode($spy->lastRequest->body, true);
+    assert_eq('0400000001', $body['number']);
+    assert_eq('Office', $body['label']);
+    assert_false(isset($body['sender']));
+    assert_true(isset($cache->deleted['sms_senders']) || in_array('sms_senders', $cache->deleted, true));
+});
+
+test('registerSenderNumber(): an already-active number is a completed registration, not a failure', function () {
+    // Recorded live: POSTing a number already on the account returns this error.
+    $p = makeProvider(new FakeHttpClient(successResponse(json_encode(
+        ['error' => 'This number is already an active sender on your account.']))));
+    $result = $p->registerSenderNumber(new \Sms\ContactPhoneNumber(new PhoneNumber('0400000001'), 'Office'));
+    assert_true($result->isSuccess());
+    $step = $result->getValue();
+    assert_true($step->registered);
+    assert_eq('0400000001', $step->number);
+    assert_true($step->isComplete());
+});
+
 test('fromSettings(): throws without credentials; 2FA variants win per field', function () {
     assert_throws(
         \RuntimeException::class,

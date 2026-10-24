@@ -437,7 +437,7 @@ function handleRegisterSenderNumber(CliEnvironment $env, array $args): void
 	}
 
 	$step = $result->getValue();
-	echo $step->message . "\n";
+	echo renderRegistrationStepText($step);
 
 	// Show validation fields if needed
 	if ($step->fields !== []) {
@@ -500,6 +500,10 @@ function handleValidateSenderNumber(CliEnvironment $env, array $args): void
 					echo '  --' . $f->name . '=<value>  ' . $f->label . ($f->required ? ' (required)' : '') . "\n";
 				}
 			}
+		} elseif ($step->message !== '' || $step->instructions !== '') {
+			// Steps that need no fields usually carry the reason — e.g. an
+			// already-active sender number, or a link sent to the handset.
+			echo renderRegistrationStepText($step);
 		} else {
 			echo "\nNo validation fields required.\n";
 		}

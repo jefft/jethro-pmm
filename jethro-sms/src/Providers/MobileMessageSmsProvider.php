@@ -465,13 +465,26 @@ class MobileMessageSmsProvider implements SmsProvider
 		}
 
 		$number = $contact->phoneNumber;
-		$body = ['sender' => $number->value];
+		// The API requires the number under "number" (a "sender" key fails
+		// with '"number" is required.'); GET /v1/senders items do use
+		// "sender", but that shape doesn't apply here.
+		$body = ['number' => $number->value];
 		if ($contact->name !== '') {
 			$body['label'] = $contact->name;
 		}
 
 		$result = $this->request('POST', '/v1/senders', $body);
 		if ($result->isFailure()) {
+			// Already on the account is the verification-already-done state,
+			// not a failure — report it as done instead of an error.
+			if (stripos($result->getError(), 'already an active sender') !== false) {
+				return \Result::success(new RegistrationStep(
+					registered: true,
+					message: $number->value . ' is already an active sender on the account — no verification needed.',
+					number: $number->value,
+					fields: [],
+				));
+			}
 			return $result;
 		}
 
