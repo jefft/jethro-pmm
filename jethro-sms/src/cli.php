@@ -56,7 +56,7 @@ function main(array $argv, CliEnvironment $env): never
 	$known = array_merge(
 		['sms', 'senderids', 'sendernums', 'sendernums-unregistered', 'is-sendernum-registered',
 		 'balance', 'estimate', 'status', 'smsinfo', 'cancel',
-		 'validate-sendernum', 'complete-sendernum-validation', 'delete-sender-number',
+		 'validate-sendernum', 'complete-sendernum-validation', 'delete-sendernum',
 		 'register-sender-id', 'optouts', 'remove-optout', 'info', 'list'],
 		array_keys($env->extraActions),
 	);
@@ -90,7 +90,7 @@ function main(array $argv, CliEnvironment $env): never
 			'cancel'                 => handleCancel($env, $args, $ui),
 			'validate-sendernum' => handleValidateSendernum($env, $args, $ui),
 			'complete-sendernum-validation' => handleCompleteSendernumValidation($env, $args, $ui),
-			'delete-sender-number'   => handleDeleteSenderNumber($env, $args, $ui),
+			'delete-sendernum'       => handleDeleteSendernum($env, $args, $ui),
 			'register-sender-id'     => handleRegisterSenderId($env, $args, $ui),
 			'optouts'                => handleOptOuts($env, $ui),
 			'remove-optout'          => handleRemoveOptOut($env, $args, $ui),
@@ -708,27 +708,27 @@ function handleCompleteSendernumValidation(CliEnvironment $env, array $args, Pre
 /**
  * Remove a registered sender phone number from the provider account.
  *
- * Usage: delete-sender-number --phonenumber=<number>
+ * Usage: delete-sendernum --phonenumber=<number>
  *
  * Gated on the DELETE_SENDER_NUMBER capability.  The provider resolves the
  * number to its own record id (5CentSMS deletes by gateway record id, not
  * by number), so the CLI only needs the number.  Irreversible upstream —
  * the number must re-verify before it can be used again.
  */
-function handleDeleteSenderNumber(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
+function handleDeleteSendernum(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	$opts = $pos = [];
 	parseArgs(array_slice($args, 1), $opts, $pos);
 
 	$phoneNumber = $opts['phonenumber'][0] ?? null;
 	if ($phoneNumber === null) {
-		throw new CliError("--phonenumber=<number> is required for 'delete-sender-number' action.\n");
+		throw new CliError("--phonenumber=<number> is required for 'delete-sendernum' action.\n");
 	}
 
 	$provider = requireProvider($env, logToDb: true);
 
 	if (!$provider->hasCapability(\Sms\SmsCapability::DELETE_SENDER_NUMBER)) {
-		return CliOutcome::success('delete-sender-number', null, 'This API provider lacks the ability to delete Sender Numbers.');
+		return CliOutcome::success('delete-sendernum', null, 'This API provider lacks the ability to delete Sender Numbers.');
 	}
 
 	$number = new \Sms\PhoneNumber($phoneNumber);
@@ -741,7 +741,7 @@ function handleDeleteSenderNumber(CliEnvironment $env, array $args, Presenter $u
 		throw new CliError('Deletion failed: ' . $result->getError());
 	}
 
-	return CliOutcome::success('delete-sender-number', ['number' => $number->value]);
+	return CliOutcome::success('delete-sendernum', ['number' => $number->value]);
 }
 
 function handleRegisterSenderId(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
@@ -995,7 +995,7 @@ Actions:
                            Submit the verification code to complete sender-number
                            registration{$validateNumberNote}
 
-  delete-sender-number     Remove a registered sender number from the account
+  delete-sendernum         Remove a registered sender number from the account
                            Required: --phonenumber=<number>  (irreversible)
 
   register-sender-id       Register a sender ID (business identity){$senderIdBlock}
@@ -1015,7 +1015,7 @@ Examples:
   {$prog} --json balance | jq .data.balance
   {$prog} optouts
   {$prog} remove-optout --number=61414972051
-  {$prog} delete-sender-number --phonenumber=0434199553
+  {$prog} delete-sendernum --phonenumber=0491570159
   {$prog} info
   {$prog} smsinfo --id=6a1439267bbc1d12b20627ea
   {$prog} list

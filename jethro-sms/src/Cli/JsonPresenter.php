@@ -73,7 +73,7 @@ final class JsonPresenter implements Presenter
             'smsinfo', 'cancel'      => $this->delivery($data),
             'validate-sendernum' => $this->registrationStep($data['step']),
             'complete-sendernum-validation' => $this->registrationStep($data['step']),
-            'delete-sender-number'   => ['number' => $data['number'], 'deleted' => true],
+            'delete-sendernum'       => ['number' => $data['number'], 'deleted' => true],
             'register-sender-id'     => $this->registrationStep($data['step']),
             'optouts'                => $this->optOuts($data),
             'remove-optout'          => ['number' => $data['number'], 'removed' => true],

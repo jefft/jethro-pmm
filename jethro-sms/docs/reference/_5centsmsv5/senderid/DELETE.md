@@ -6,7 +6,7 @@ Remove a registered Sender ID from the account. The `{id}` path parameter is the
 
 > **Implemented** — `FiveCentSmsV5Provider::deleteSenderNumber()` (jethro-sms) resolves the
 > record id via `GET /senderid` and deletes by it; callers pass the phone number. Exposed as
-> `sms.php delete-sender-number --phonenumber=<number>` and by the System Configuration page's
+> `sms.php delete-sendernum --phonenumber=<number>` and by the System Configuration page's
 > SMS Gateway panel ("(delete)" links / Delete Sender Number operation). The mock server
 > simulates this endpoint (see `smsmockserver`).
 

@@ -145,7 +145,7 @@ class Call_Admin_Statuspanel_Operation_Sms extends Call_Admin_Statuspanel_Operat
     }
 
     /**
-     * GET  — show the delete-sender-number confirmation form.
+     * GET  — show the delete-sendernum confirmation form.
      * POST — delete the number from the provider account.
      *
      * Reached from the "(delete)" links beside each sender number in the

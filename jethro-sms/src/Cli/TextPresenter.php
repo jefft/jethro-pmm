@@ -54,7 +54,7 @@ final class TextPresenter implements Presenter
             'smsinfo', 'cancel'      => $this->deliveryStatus($outcome->data),
             'validate-sendernum' => $this->validateSendernum($outcome->data),
             'complete-sendernum-validation' => $this->completeSendernumValidation($outcome->data),
-            'delete-sender-number'   => $this->deleted($outcome->data),
+            'delete-sendernum'       => $this->deleted($outcome->data),
             'register-sender-id'     => $this->registerSenderId($outcome->data),
             'optouts'                => $this->optOuts($outcome->data),
             'remove-optout'          => $this->removed($outcome->data),

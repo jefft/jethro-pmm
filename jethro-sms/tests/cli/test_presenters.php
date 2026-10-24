@@ -181,7 +181,7 @@ test('text: registration step and field schema', function () {
 
 test('text: delete/remove confirmations and notes', function () {
 	assert_eq(
-		renderText(CliOutcome::success('delete-sender-number', ['number' => '61400000001'])),
+		renderText(CliOutcome::success('delete-sendernum', ['number' => '61400000001'])),
 		"Done. The number is no longer registered with the provider.\n",
 	);
 	assert_eq(renderText(CliOutcome::success('remove-optout', ['number' => '61400000001'])), "Done.\n");
@@ -427,7 +427,7 @@ test('json: info masks credential constants only', function () {
 
 test('json: delete and remove confirmations', function () {
 	assert_eq(
-		renderJson(CliOutcome::success('delete-sender-number', ['number' => '61400000001']))['data'],
+		renderJson(CliOutcome::success('delete-sendernum', ['number' => '61400000001']))['data'],
 		['number' => '61400000001', 'deleted' => true],
 	);
 	assert_eq(
