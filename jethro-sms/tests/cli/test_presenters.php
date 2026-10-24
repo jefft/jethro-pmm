@@ -232,13 +232,13 @@ test('json: unregistered sender numbers', function () {
 	assert_eq($data, [['number' => '61434199553', 'status' => 'pending', 'registeredAt' => 1744784026]]);
 });
 
-test('text: verify-sender, estimate and status', function () {
+test('text: check-sender, estimate and status', function () {
 	assert_eq(
-		renderText(CliOutcome::success('verify-sender', ['number' => '61402511927', 'approved' => true])),
+		renderText(CliOutcome::success('check-sender', ['number' => '61402511927', 'approved' => true])),
 		"61402511927 is an approved sender number.\n",
 	);
 	assert_eq(
-		renderText(CliOutcome::success('verify-sender', ['number' => '61400000000', 'approved' => false])),
+		renderText(CliOutcome::success('check-sender', ['number' => '61400000000', 'approved' => false])),
 		"61400000000 is not an approved sender number.\n",
 	);
 
@@ -312,9 +312,9 @@ test('estimateMessage(): segment boundaries match the statusline maths', functio
 // JsonPresenter
 // ===========================================================================
 
-test('json: verify-sender, estimate and status payloads', function () {
+test('json: check-sender, estimate and status payloads', function () {
 	assert_eq(
-		renderJson(CliOutcome::success('verify-sender', ['number' => '61402511927', 'approved' => true]))['data'],
+		renderJson(CliOutcome::success('check-sender', ['number' => '61402511927', 'approved' => true]))['data'],
 		['number' => '61402511927', 'approved' => true],
 	);
 

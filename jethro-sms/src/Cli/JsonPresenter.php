@@ -65,7 +65,7 @@ final class JsonPresenter implements Presenter
             'senderids'              => $data,
             'sendernums'             => array_map(static fn (PhoneNumber $n) => ['number' => $n->value], $data),
             'sendernums-unregistered' => $data,
-            'verify-sender'          => $data,
+            'check-sender'          => $data,
             'estimate'               => $data,
             'status'                 => $data,
             'balance'                => ['balance' => $data],

@@ -46,7 +46,7 @@ final class TextPresenter implements Presenter
             'senderids'              => $this->senderIds($outcome->data),
             'sendernums'             => $this->senderNumbers($outcome->data),
             'sendernums-unregistered' => $this->unregisteredSenderNumbers($outcome->data),
-            'verify-sender'          => $this->verifySender($outcome->data),
+            'check-sender'          => $this->checkSender($outcome->data),
             'estimate'               => $this->estimate($outcome->data),
             'status'                 => $this->status($outcome->data),
             'balance'                => $this->balance($outcome->data),
@@ -145,7 +145,7 @@ final class TextPresenter implements Presenter
     }
 
     /** @param array{number: string, approved: bool} $data */
-    private function verifySender(array $data): void
+    private function checkSender(array $data): void
     {
         echo $data['number'] . ($data['approved']
             ? " is an approved sender number.\n"

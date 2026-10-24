@@ -54,7 +54,7 @@ function main(array $argv, CliEnvironment $env): never
 	$action = $args[0];
 
 	$known = array_merge(
-		['sms', 'senderids', 'sendernums', 'sendernums-unregistered', 'verify-sender',
+		['sms', 'senderids', 'sendernums', 'sendernums-unregistered', 'check-sender',
 		 'balance', 'estimate', 'status', 'smsinfo', 'cancel',
 		 'register-sender-number', 'validate-sender-number', 'delete-sender-number',
 		 'register-sender-id', 'optouts', 'remove-optout', 'info', 'list'],
@@ -82,7 +82,7 @@ function main(array $argv, CliEnvironment $env): never
 			'senderids'              => handleSenderIds($env, $ui),
 			'sendernums'             => handleSenderNums($env, $ui),
 			'sendernums-unregistered' => handleUnregisteredSenderNums($env, $ui),
-			'verify-sender'          => handleVerifySender($env, $args, $ui),
+			'check-sender'          => handleCheckSender($env, $args, $ui),
 			'balance'                => handleBalance($env, $ui),
 			'estimate'               => handleEstimate($env, $args, $ui),
 			'status'                 => handleStatus($env, $ui),
@@ -378,14 +378,14 @@ function handleBalance(CliEnvironment $env, Presenter $ui): CliOutcome
  * scripts deciding whether to send as a particular number.  A "no" is a
  * valid answer, so the exit code stays 0; scripts read `data.approved`.
  */
-function handleVerifySender(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
+function handleCheckSender(CliEnvironment $env, array $args, Presenter $ui): CliOutcome
 {
 	$opts = $pos = [];
 	parseArgs(array_slice($args, 1), $opts, $pos);
 
 	$phoneNumber = $opts['phonenumber'][0] ?? null;
 	if ($phoneNumber === null) {
-		throw new CliError("--phonenumber=<number> is required for 'verify-sender' action.\n");
+		throw new CliError("--phonenumber=<number> is required for 'check-sender' action.\n");
 	}
 
 	$provider = requireProvider($env, logToDb: false);
@@ -396,7 +396,7 @@ function handleVerifySender(CliEnvironment $env, array $args, Presenter $ui): Cl
 		throw new CliError('Could not verify sender number: ' . $result->getError());
 	}
 
-	return CliOutcome::success('verify-sender', [
+	return CliOutcome::success('check-sender', [
 		'number'   => $number->value,
 		'approved' => $result->getValue() === true,
 	]);
@@ -947,7 +947,7 @@ Actions:
               List sender numbers whose registration was attempted but never
               verified, with the date of the last attempt
 
-  verify-sender  Check whether a phone number is an approved sender
+  check-sender  Check whether a phone number is an approved sender
                  Required: --phonenumber=<number>
 
   estimate    Segments, encoding and cost for a message, without sending it
@@ -992,7 +992,7 @@ Examples:
   {$prog} senderids
   {$prog} sendernums
   {$prog} sendernums-unregistered
-  {$prog} verify-sender --phonenumber=61402511927
+  {$prog} check-sender --phonenumber=61402511927
   {$prog} estimate "Meeting at 7pm — bring a friend 😊"
   {$prog} status
   {$prog} --json balance | jq .data.balance
