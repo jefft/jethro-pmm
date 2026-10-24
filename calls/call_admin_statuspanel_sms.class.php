@@ -246,17 +246,20 @@ class Call_Admin_Statuspanel_Sms extends Call_Admin_Statuspanel
                         $piece .= ' ' . ents('(attempted ' . date('Y-m-d', $entry['registeredAt']) . ')');
                     }
 
-                    // The cross comes first so the chooser CSS's float:right
-                    // puts it at the end of the line.  The rule is scoped to
-                    // `li div.delete-chosen-person`, so the entry must be an
-                    // <li> for the icon (and its pointer cursor) to render.
+                    // The cross follows the text with a single space.  The
+                    // chooser CSS floats it right (`float:right`), which is
+                    // right for its own list but wrong here, so float/position
+                    // are neutralised inline; the icon, size and pointer
+                    // cursor still come from the `delete-chosen-person` rule
+                    // (which requires an <li> ancestor — hence the list).
                     $cross = '';
                     if ($deleteCapable) {
                         $url = ents('?call=admin_statuspanel_operation_sms&operation=deleteSenderNumber&number=' . $entry['number']);
                         $cross = '<div class="delete-chosen-person" title="Delete sender number"'
+                            . ' style="float:none;display:inline-block;position:static;margin:0"'
                             . ' data-on:click="@get(\'' . $url . '\')"></div>';
                     }
-                    $items .= '<li>' . $cross . $piece . '</li>';
+                    $items .= '<li>' . $piece . ' ' . $cross . '</li>';
                 }
                 $controls = '<ul class="unstyled sms-sender-numbers">' . $items . '</ul>';
                 if ($label === 'Unregistered Sender Numbers') {
