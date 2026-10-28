@@ -4,7 +4,7 @@ import type {Config} from '@docusaurus/types';
 // Single source of truth: the rehype root-relative path fixer below MUST use
 // the same prefix as the deployed site, or it will rewrite already-resolved
 // internal doc links into nonexistent paths (broken-link build failure).
-const BASE_URL = '/docs/';
+const BASE_URL = '/jethro-pmm/';
 
 const config: Config = {
   title: 'Jethro ChMS',
@@ -13,7 +13,7 @@ const config: Config = {
 
   future: { v4: true },
 
-  url: 'https://jethro-chms.github.io',
+  url: 'https://jefft.github.io',
   baseUrl: BASE_URL,
 
   organizationName: 'jethro-chms',
