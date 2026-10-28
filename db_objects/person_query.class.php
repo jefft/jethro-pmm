@@ -337,9 +337,26 @@ class Person_Query extends DB_Object
 												'options' => Array(
 													'any' => 'has an attachment',
 													'empty' => 'has no attachment',
+													'filename' => 'with filename matching',
+												),
+												'attrs' => Array(
+													'data-toggle' => 'visible',
+													'data-target' => 'row input[data-select-rule-type]',
+													'data-match-attr' => 'data-select-rule-type'
 												),
 											);
 									print_widget('params_custom_field_'.$fieldid.'_criteria', $cparams, array_get($value, 'criteria'));
+									print_widget(
+										'params_custom_field_'.$fieldid.'_val',
+										Array(
+											'type' => 'text',
+											'attrs' => Array(
+												'data-select-rule-type' => 'filename',
+												'placeholder' => 'e.g. %baptism%'
+											)
+										),
+										array_get($value, 'val')
+									);
 									break;
 								case 'text':
 								case 'link':
@@ -909,7 +926,8 @@ class Person_Query extends DB_Object
 				switch ($this->_custom_fields[$fieldid]['type']) {
 					case 'attachment':
 						$params['custom_fields'][$fieldid] = Array(
-							'criteria' => array_get($_REQUEST, 'params_custom_field_'.$fieldid.'_criteria', 'any')
+							'criteria' => array_get($_REQUEST, 'params_custom_field_'.$fieldid.'_criteria', 'any'),
+							'val' => array_get($_REQUEST, 'params_custom_field_'.$fieldid.'_val', '')
 						);
 						break;
 					case 'date':
@@ -1563,9 +1581,21 @@ class Person_Query extends DB_Object
 			$query['from'] .= ' LEFT JOIN custom_field_value pd'.$fieldid.' ON pd'.$fieldid.'.personid = p.id AND pd'.$fieldid.'.fieldid = '.(int)$fieldid."\n";
 			switch ($this->_custom_fields[$fieldid]['type']) {
 				case 'attachment':
-					$customFieldWheres[] = (array_get($values, 'criteria', 'any') == 'empty')
-						? '(pd'.$fieldid.'.personid IS NULL)'
-						: '(pd'.$fieldid.'.personid IS NOT NULL)';
+					$criteria = array_get($values, 'criteria', 'any');
+					if ($criteria == 'filename') {
+						$query['from'] .= ' LEFT JOIN custom_field_attachment cfa'.$fieldid.'
+								ON cfa'.$fieldid.'.id = pd'.$fieldid.'.value_text
+								AND cfa'.$fieldid.'.personid = p.id
+								AND cfa'.$fieldid.'.fieldid = '.(int)$fieldid."\n";
+						$term = (string)array_get($values, 'val', '');
+						$customFieldWheres[] = strlen($term)
+							? 'LOWER(cfa'.$fieldid.'.filename) LIKE LOWER('.$db->quote($term).')'
+							: '(pd'.$fieldid.'.personid IS NOT NULL)';
+					} else {
+						$customFieldWheres[] = ($criteria == 'empty')
+							? '(pd'.$fieldid.'.personid IS NULL)'
+							: '(pd'.$fieldid.'.personid IS NOT NULL)';
+					}
 					break;
 				case 'date':
 					if ($values['criteria'] == 'between') {

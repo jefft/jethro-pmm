@@ -62,4 +62,5 @@ link title. The download endpoint also returns HTTP 409 on mismatch.
 
 Attachment fields are hidden from CSV imports, note templates, bulk updates,
 action plans, and system-wide search. Reports can display the filename and
-filter on presence/absence.
+filter on presence/absence or on filename. Filename matching is an ILIKE-style
+case-insensitive `LIKE`, so `%` and `_` are wildcards.
