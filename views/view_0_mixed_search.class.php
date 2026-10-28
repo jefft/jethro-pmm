@@ -24,6 +24,16 @@ class View__Mixed_Search extends View
 	private string $_search_in = '*';
 	/** @var array{p: array<int, list<array{0: string, 1: string}>>, f: array<int, list<array{0: string, 1: string}>>} type => id => [field label, snippet HTML] for non-name fields that matched */
 	private array $_matches = Array('p' => Array(), 'f' => Array());
+	/** @var array<int, array{body: string, created: string, personid: int|null, first_name: string|null, last_name: string|null}> sms.id => single-recipient message matching the search */
+	private $_message_data = Array();
+
+	/**
+	 * Whether the current user may search SMS message bodies.
+	 */
+	private static function canSearchMessages(): bool
+	{
+		return $GLOBALS['system']->featureEnabled('SMS') && $GLOBALS['user_system']->havePerm(PERM_VIEWSMS);
+	}
 
 	function processView()
 	{
@@ -190,14 +200,15 @@ class View__Mixed_Search extends View
 	private function loadResults(): void
 	{
 		$GLOBALS['system']->includeDBClass('person');
+		$GLOBALS['system']->includeDBClass('sms');
 		$search = trim(array_get($_REQUEST, 'search', array_get($_REQUEST, 'tel', '')));
 		$this->_search = $search;
 		$tel = preg_replace('/[^0-9]/', '', $search);
-		$types = Array('p' => TRUE, 'f' => TRUE, 'g' => TRUE, 'r' => TRUE);
+		$types = Array('p' => TRUE, 'f' => TRUE, 'g' => TRUE, 'r' => TRUE, 'm' => self::canSearchMessages());
 		$st = array_get($_REQUEST, 'searchtype');
 		if ($st && $st !== '*') {
 			foreach ($types as $k => $v) {
-				$types[$k] = ($st == $k);
+				$types[$k] = $v && ($st == $k);
 			}
 		}
 		$in = (string)array_get($_REQUEST, 'searchin', '*');
@@ -236,10 +247,10 @@ class View__Mixed_Search extends View
 
 	/**
 	 * "Search in: everything". Phone numbers match exactly; when none match (or the term has no
-	 * digits), names, address, contact remarks, searchable custom fields, email, groups and reports
-	 * are searched.
+	 * digits), names, address, contact remarks, searchable custom fields, email, groups, reports
+	 * and (when the user may see them) message bodies are searched.
 	 *
-	 * @param array<string, bool> $types Enabled result types (p, f, g, r)
+	 * @param array<string, bool> $types Enabled result types (p, f, g, r, m)
 	 */
 	private function loadEverything(string $search, string $tel, array $types): void
 	{
@@ -273,6 +284,9 @@ class View__Mixed_Search extends View
 			if ($types['r']) {
 				$this->_report_data = $this->findReports($search);
 			}
+			if ($types['m']) {
+				$this->_message_data = Sms::getSingleRecipientMessagesContaining($search);
+			}
 		}
 	}
 
@@ -283,7 +297,7 @@ class View__Mixed_Search extends View
 	{
 		if ($prefix = preg_replace('[^0-9]', '', ifdef('SMS_INTERNATIONAL_PREFIX'))) {
 			if (str_starts_with($tel, $prefix)) {
-				$tel = SMS_LOCAL_PREFIX.substr($tel, strlen($prefix));
+				$tel = ifdef('SMS_LOCAL_PREFIX', '0').substr($tel, strlen($prefix));
 			}
 		}
 		return $tel;
@@ -321,9 +335,12 @@ class View__Mixed_Search extends View
 	 */
 	private function redirectToSingleResult(): void
 	{
+		// Message hits don't count here: personalised bodies often contain a
+		// person's name, and they must not stop a single-person search from
+		// jumping straight to that person.
 		$numResults = count($this->_family_data) + count($this->_group_data) + count($this->_person_data) + count($this->_report_data);
 
-		if ($numResults == 1) {
+		if ($numResults == 1 || ($numResults == 0 && count($this->_message_data) == 1)) {
 			// For a single result, just redirect to its detail view, don't show a list
 			if (!empty($this->_person_data)) {
 				add_message("One matching person found");
@@ -337,6 +354,12 @@ class View__Mixed_Search extends View
 			} else if (!empty($this->_report_data)) {
 				add_message("One matching report found");
 				redirect('persons__reports', Array('queryid' => key($this->_report_data)));
+			} else if (!empty($this->_message_data)) {
+				$m = reset($this->_message_data);
+				if ($m['personid']) {
+					add_message("One matching message found");
+					redirect('persons', Array('search' => NULL, 'personid' => $m['personid']), 'message_'.key($this->_message_data));
+				}
 			}
 		}
 	}
@@ -386,7 +409,7 @@ class View__Mixed_Search extends View
 		echo '<div id="'.self::RESULTS_ID.'">';
 		if ($this->_search === '') {
 			// Nothing searched yet.
-		} else if (empty($this->_person_data) && empty($this->_family_data) && empty($this->_group_data) && empty($this->_report_data)) {
+		} else if (empty($this->_person_data) && empty($this->_family_data) && empty($this->_group_data) && empty($this->_report_data) && empty($this->_message_data)) {
 			echo '<p><i>No results were found.</i></p>';
 		} else {
 			?>
@@ -394,6 +417,7 @@ class View__Mixed_Search extends View
 			<?php
 			$this->printResultRows(FALSE);
 			$this->printResultRows(TRUE);
+			$this->printMessageRows();
 			?>
 			</table>
 			<?php
@@ -522,6 +546,31 @@ class View__Mixed_Search extends View
 		<?php
 	}
 
+	private function printMessageRows()
+	{
+		foreach ($this->_message_data as $smsId => $m) {
+			$name = trim(($m['first_name'] ?? '').' '.($m['last_name'] ?? ''));
+			$body = (string)$m['body'];
+			$snippet = mb_strlen($body) > 80 ? mb_substr($body, 0, 77).'...' : $body;
+			?>
+			<tr>
+				<td>
+					<i class="icon-envelope"></i>
+					<?php echo format_datetime($m['created']); ?>
+					<?php if ($name !== '') echo 'to '.ents($name); ?>:
+					<?php echo ents($snippet); ?>
+				</td>
+				<td class="narrow">
+					<?php if ($m['personid']) { ?>
+						<a href="?view=persons&personid=<?php echo (int)$m['personid']; ?>#message_<?php echo (int)$smsId; ?>">View</a>
+					<?php } else { ?>
+						<a href="?view=persons__messages#message_<?php echo (int)$smsId; ?>">View</a>
+					<?php } ?>
+				</td>
+			</tr>
+			<?php
+		}
+	}
 	
 	private function _printFamilyRow($id, $values)
 	{
@@ -584,6 +633,9 @@ class View__Mixed_Search extends View
 						<label class="checkbox"><input type="radio" name="searchtype" <?php echo array_get($checked, 'p'); ?> value="p" /> persons</label>
 						<label class="checkbox"><input type="radio" name="searchtype" <?php echo array_get($checked, 'g'); ?> value="g" /> groups</label>
 						<label class="checkbox"><input type="radio" name="searchtype" <?php echo array_get($checked, 'r'); ?> value="r" /> reports</label>
+						<?php if (self::canSearchMessages()) { ?>
+						<label class="checkbox"><input type="radio" name="searchtype" <?php echo array_get($checked, 'm'); ?> value="m" /> messages</label>
+						<?php } ?>
 					</div>
 				</details>
 				<?php

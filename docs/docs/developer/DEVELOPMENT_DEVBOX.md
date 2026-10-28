@@ -29,7 +29,7 @@ This will:
 
  - download the full `devbox` binary if you don't already have it (`./devbox` is a stub [^devbox] ).
  - download binaries for php, nginx and mariadb. This will take a few minutes the first time.
- - install Jethro's PHP dependencies (the `vendor/` directory) with Composer. Composer is bundled in the devbox environment (via the php package), so no separate install is needed.
+ - install Jethro's PHP dependencies (the `vendor/` directory) with Composer. Composer is bundled in the devbox environment (via the php package), so no separate install is needed. This includes the dev-only SMS mock server (`jethro/smsmockserver`), linked into the tree as `smsmockserver/` → `vendor/jethro/smsmockserver`.
  - launch a MariaDB database and Nginx web server in the background (`-b`).
  - create a `jethro` database in the Devbox MariaDB
 
@@ -85,10 +85,11 @@ inherited shell values.
 Read the configured value with `./devbox run -- printenv NGINX_WEB_PORT`.
 
 Devbox (at least, our fork of it) exports `DEVBOX_RUNTIME_DIR`, `DEVBOX_LOG_DIR` and `DEVBOX_DATA_DIR`
-before expanding `env`. Log/data roots are `.devbox/logs` and `.devbox/data`.
-Keep MariaDB and PHP-FPM on their plugin-specific paths beneath those roots.
-Custom services must create private runtime subdirectories before using them.
-The hook locates utilities through `$DEVBOX_CONFIG_DIR`.
+before expanding `env`. Project configuration sets `MAILPIT_SOCKET_DIR` to
+`$DEVBOX_RUNTIME_DIR/mailpit`. The runtime namespace matches the plugin socket paths;
+log/data roots are `.devbox/logs` and `.devbox/data`. Keep MariaDB and PHP-FPM on their
+plugin-specific paths beneath those roots. Custom services must create private runtime
+subdirectories before using them. The hook locates utilities through `$DEVBOX_CONFIG_DIR`.
 
 Run `devbox info mariadb` / `devbox info php` / `devbox info nginx` to see what's available.
 
