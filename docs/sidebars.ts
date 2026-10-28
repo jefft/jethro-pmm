@@ -47,6 +47,7 @@ const sidebars: SidebarsConfig = {
       link: { type: 'doc', id: 'user-manual/getting-started' },
       items: [
         'user-manual/getting-started',
+        'user-manual/search',
         'user-manual/sms',
       ],
     },
