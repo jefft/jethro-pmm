@@ -10,6 +10,7 @@ Custom fields let you record extra information on person records. Configure them
 | Selection | One or more values from a configurable list. Supports an "Other" free-text option. |
 | Date | A date, optionally with a note or a blank year. |
 | Link | Text that is rendered as a link, with an optional URL template. |
+| Attachment | One or more uploaded files associated with the person. |
 
 ## Sensitive fields
 
@@ -25,7 +26,8 @@ the **Sensitive custom fields** permission. Sensitive fields are omitted from:
 - CSV and report exports;
 - document merge data and the merge-field help;
 - imports, bulk updates, action plans, and note templates;
-- system-wide search.
+- system-wide search;
+- attachment download links and the attachment download endpoint.
 
 Users with both **Custom fields** and **Sensitive custom fields**
 see and edit the field normally. System administrators have both permissions
@@ -34,3 +36,58 @@ automatically. Grant them to other roles under **Admin &rarr; User Accounts**.
 Sensitive fields are hidden by default; marking a field sensitive does not
 automatically grant **Sensitive custom fields** to existing
 non-administrator accounts.
+
+## Attachment fields
+
+Attachment fields store the file on the filesystem and keep metadata in the
+database. Files are stored in a tree under `ATTACHMENTS_ROOT_PATH`:
+
+```
+<ATTACHMENTS_ROOT_PATH>/person/<personid>/field/<fieldid>/<random-token>
+```
+
+If `ATTACHMENTS_ROOT_PATH` is not set in `conf.php`, the default is
+`<Jethro root>/attachments`. Keep the configured directory outside the web root,
+or protect it with equivalent server configuration. The bundled nginx config
+denies direct access to the default `/attachments/` path, and the directory
+contains an `.htaccess` deny rule for Apache.
+
+Attachments are downloaded through Jethro rather than linked directly. Access
+follows the person record and custom-field visibility: a user needs **Custom
+fields**, and for a sensitive attachment field also **Sensitive custom
+fields**, in addition to being able to see the person. Files are always
+served as downloads, never rendered inline.
+
+Each attachment records its uploader, upload time, and SHA-1 checksum. When the
+attachment link is rendered, Jethro re-computes the checksum and shows an error
+instead of the link if the file no longer matches. Hovering over the link shows
+who uploaded it and when. Older attachments without a stored checksum get one
+recorded on their first view; direct downloads are also rejected if the checksum
+does not match.
+
+### Settings
+
+- **Allowed extensions** — comma-separated list. Leave blank for the default:
+  `pdf, jpg, jpeg, png, gif, doc, docx, odt, rtf, xls, xlsx, ods, ppt, pptx, txt, csv`.
+- **Maximum size (MB)** — defaults to 10 MB, and is reduced automatically if
+  PHP's `upload_max_filesize` or `post_max_size` is lower.
+- **Allow Multiple** — permits more than one file per person.
+- **Show on add-family page** — allows an attachment to be uploaded while
+  creating a family.
+
+Attachment fields are intentionally not available as:
+
+- columns in CSV imports;
+- note-template value fields;
+- bulk-update targets;
+- action-plan fields;
+- system-wide search fields.
+
+They can be displayed in reports and filtered by "has an attachment" or "has no
+attachment".
+
+### Backup
+
+Back up both the database and the `ATTACHMENTS_ROOT_PATH` directory. Deleting a
+person or a custom field removes its attachment metadata and files; archiving
+and cleaning a person also removes their attachments.

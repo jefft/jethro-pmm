@@ -277,6 +277,17 @@ Refusals are written to the web server's PHP error log, as
   custom-field names or values into note text; those values remain on the person
   record.
 
+### Custom field attachments
+
+- **Attachment custom fields.** A new *Attachment* custom field type stores one
+  or more uploaded files against a person — useful for forms, consent scans and
+  similar documents. Files are stored under `ATTACHMENTS_ROOT_PATH` (default
+  `<Jethro root>/attachments`, denied by the bundled web-server config) and are
+  served through Jethro only to users who can see the person and the field. See
+  [Custom Fields](../administration/custom-fields.mdx#attachment-fields).
+
+## Version 2.39 (unreleased)
+>>>>>>>>>>> conflict 1 of 1 ends
 
 ### Search results page: live search
 

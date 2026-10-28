@@ -9,13 +9,14 @@ class Note_Template_Field extends DB_Object
 	}
 
 	/**
-	 * Hidden sensitive fields cannot be referenced by note templates.
+	 * Hidden sensitive fields and attachment fields cannot be referenced by
+	 * note templates.
 	 * @param Custom_Field $field
 	 * @return bool
 	 */
 	public static function isSelectableCustomField($field)
 	{
-		return $field->isVisibleToCurrentUser();
+		return $field->getValue('type') != 'attachment' && $field->isVisibleToCurrentUser();
 	}
 
 	protected static function _getFields()

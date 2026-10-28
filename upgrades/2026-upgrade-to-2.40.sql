@@ -467,6 +467,29 @@ UPDATE staff_member
 SET resetsmsrequired = 1, resetsmshash = NULL, resetsmssent = NULL
 WHERE resethash IS NOT NULL AND resetsmsrequired = 0 AND resetsmshash IS NOT NULL;
 
+-- Filesystem-backed attachments for custom fields.
+-- Metadata only; files live under ATTACHMENTS_ROOT_PATH (default <root>/attachments).
+-- Same definition and constraint names as the installer
+-- (Custom_Field_Attachment::getInitSQL() and getForeignKeys()). Idempotent.
+CREATE TABLE IF NOT EXISTS `custom_field_attachment` (
+	`id` int(11) NOT NULL AUTO_INCREMENT,
+	`personid` int(11) NOT NULL,
+	`fieldid` int(11) NOT NULL,
+	`token` varchar(255) NOT NULL,
+	`filename` varchar(255) NOT NULL,
+	`mime` varchar(255) NULL DEFAULT NULL,
+	`size` int(11) NOT NULL,
+	`created_by` int(11) NULL DEFAULT NULL,
+	`sha1` char(40) NULL DEFAULT NULL,
+	`created` datetime DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (`id`),
+	UNIQUE KEY `token` (`token`),
+	INDEX `person_field` (`personid`, `fieldid`),
+	CONSTRAINT `custom_field_attachmentpersonid` FOREIGN KEY (`personid`) REFERENCES `_person` (`id`) ON DELETE CASCADE,
+	CONSTRAINT `custom_field_attachmentfieldid` FOREIGN KEY (`fieldid`) REFERENCES `custom_field` (`id`) ON DELETE CASCADE,
+	CONSTRAINT `custom_field_attachmentcreated_by` FOREIGN KEY (`created_by`) REFERENCES `_person` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
 -- Sensitive custom fields: hidden from users without DATA_PERM_VIEWSENSITIVE.
 -- Idempotent; MySQL 8 lacks ADD COLUMN IF NOT EXISTS.
 SET @missing = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS

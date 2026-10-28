@@ -20,6 +20,7 @@ class View__Persons_Bulk_Update extends View
 		$customFields = $GLOBALS['system']->getDBObjectData('custom_field', Array(), 'OR', 'rank');
 		$dummyField = new Custom_Field();
 		foreach ($customFields as $fieldid => $fieldDetails) {
+			if ($fieldDetails['type'] == 'attachment') continue;
 			if (!Custom_Field::isFieldDataVisibleToCurrentUser($fieldDetails)) continue;
 			$dummyField->populate($fieldid, $fieldDetails);
 			if ($val = $dummyField->processWidget()) {

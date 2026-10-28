@@ -71,6 +71,7 @@ const sidebars: SidebarsConfig = {
         'developer/reference/contact-field-permissions',
         'developer/reference/sensitive-custom-fields',
         'developer/reference/import',
+        'developer/reference/custom-field-attachments',
         'contributing',
         'developer/DEVELOPMENT_FUNCTESTS',
         {

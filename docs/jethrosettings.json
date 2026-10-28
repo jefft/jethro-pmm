@@ -1158,6 +1158,15 @@
       "fileOnly": true,
       "note": "Document storage path. Defaults to files/ under Jethro root."
     },
+    "ATTACHMENTS_ROOT_PATH": {
+      "type": "text",
+      "label": "Attachments Root Path",
+      "description": "Directory where custom-field file attachments are stored.",
+      "explanation": "Defaults to <code>attachments/</code> under the Jethro root directory. Relative paths are relative to the Jethro root. Keep this outside the web root, or protect it with server configuration.",
+      "default": null,
+      "fileOnly": true,
+      "note": "Attachment storage path. Defaults to attachments/ under Jethro root."
+    },
     "CUSTOM_REPORTS_DIR": {
       "type": "text",
       "label": "Custom Reports Dir",
@@ -1550,6 +1559,7 @@
       "settings": [
         "ALLOW_SETTINGS_IN_FILE",
         "DOCUMENTS_ROOT_PATH",
+        "ATTACHMENTS_ROOT_PATH",
         "CUSTOM_REPORTS_DIR",
         "SERVICE_DOCS_TO_POPULATE_DIRS",
         "SERVICE_DOCS_TO_EXPAND_DIRS",

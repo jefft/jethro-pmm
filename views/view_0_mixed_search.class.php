@@ -219,6 +219,7 @@ class View__Mixed_Search extends View
 		}
 		foreach ($GLOBALS['system']->getDBObjectData('custom_field', Array('searchable' => 1), 'AND', 'rank') as $id => $f) {
 			if (!Custom_Field::isFieldDataVisibleToCurrentUser($f)) continue;
+			if ($f['type'] == 'attachment') continue;
 			$options['custom_'.$id] = $f['name'];
 		}
 		return $options;
@@ -461,6 +462,7 @@ class View__Mixed_Search extends View
 			$names = Array();
 			foreach ($custom_fields as $f) {
 				if (!Custom_Field::isFieldDataVisibleToCurrentUser($f)) continue;
+				if ($f['type'] == 'attachment') continue;
 				$names[] = '"'.$f['name'].'"';
 			}
 			if ($names) {
