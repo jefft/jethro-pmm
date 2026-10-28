@@ -326,6 +326,12 @@ define('2FA_ENABLED', true);
 // Defaults to [yourJethroRoot]/files
 // define('DOCUMENTS_ROOT_PATH', '');
 
+// The place where custom-field file attachments are stored.
+// Defaults to [yourJethroRoot]/attachments. Relative paths are relative to
+// [yourJethroRoot]. Keep this outside the web root, or protect it with server
+// configuration.
+// define('ATTACHMENTS_ROOT_PATH', '');
+
 // The place where custom report SQL files are stored
 // Defaults to [yourJethroRoot]/custom_reports
 // define('CUSTOM_REPORTS_DIR', '');

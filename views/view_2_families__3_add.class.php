@@ -4,6 +4,7 @@ class View_Families__Add extends View
 {
 	var $_family;
 	protected $_similar_families;
+	protected $_memberInputs = Array();
 
 	static function getMenuPermissionLevel()
 	{
@@ -37,35 +38,57 @@ class View_Families__Add extends View
 				}
 			}
 
+			// Process the forms (including staging attachment uploads) before
+			// creating anything, so a duplicate-family warning does not lose
+			// the uploads when it rolls back.
+			$this->_family->processForm();
+			$GLOBALS['system']->includeDBClass('person');
+			$i = 0;
+			$this->_memberInputs = Array();
+			while (isset($_POST['members_'.$i.'_first_name'])) {
+				if (!empty($_POST['members_'.$i.'_first_name'])) {
+					$member = new Person();
+					$member->processForm('members_'.$i.'_');
+					$this->_memberInputs[$i] = $member;
+				}
+				$i++;
+			}
+
+			// Before creating anything, check for duplicates. The confirmation
+			// form re-posts the staged attachment markers, which now survive
+			// across requests.
+			if (empty($_REQUEST['override_dup_check'])) {
+				$newMembers = Array();
+				foreach ($this->_memberInputs as $member) {
+					$newMembers[] = Array('first_name' => $member->getValue('first_name'), 'last_name' => $member->getValue('last_name'));
+				}
+				$this->_similar_families = $this->_family->findSimilarFamilies($newMembers);
+				if (!empty($this->_similar_families)) {
+					return;
+				}
+			}
+
 			$GLOBALS['system']->doTransaction('begin');
 
 			// Create the family record itself
-			$this->_family->processForm();
 			$success = $this->_family->create();
 
+			$members = Array();
 			if ($success) {
 				// Add members
-				$i = 0;
-				$members = Array();
-				$GLOBALS['system']->includeDBClass('person');
-				while (isset($_POST['members_'.$i.'_first_name'])) {
-					if (!empty($_POST['members_'.$i.'_first_name'])) {
-						$member = new Person();
-						$member->setValue('familyid', $this->_family->id);
-						$member->processForm('members_'.$i.'_');
-						if (!$member->create()) {
-							$success = FALSE;
-							break;
-						}
-						if (!empty($_POST['members_'.$i.'_groupid'])) {
-							$group = $GLOBALS['system']->getDBObject('person_group', (int)$_POST['members_'.$i.'_groupid']);
-							if ($group) {
-								$group->addMember($member->id, array_get($_POST, 'members_'.$i.'_membership_statusid'));
-							}
-						}
-						$members[] =& $member;
+				foreach ($this->_memberInputs as $inputIndex => $member) {
+					$member->setValue('familyid', $this->_family->id);
+					if (!$member->create()) {
+						$success = FALSE;
+						break;
 					}
-					$i++;
+					if (!empty($_POST['members_'.$inputIndex.'_groupid'])) {
+						$group = $GLOBALS['system']->getDBObject('person_group', (int)$_POST['members_'.$inputIndex.'_groupid']);
+						if ($group) {
+							$group->addMember($member->id, array_get($_POST, 'members_'.$inputIndex.'_membership_statusid'));
+						}
+					}
+					$members[] =& $member;
 				}
 			}
 
@@ -92,15 +115,6 @@ class View_Families__Add extends View
 						$plan = $GLOBALS['system']->getDBObject('action_plan', $planid);
 						$plan->execute('family', $this->_family->id, process_widget('plan_reference_date', Array('type' => 'date')));
 					}
-				}
-			}
-
-			// Before committing, check for duplicates
-			if (empty($_REQUEST['override_dup_check'])) {
-				$this->_similar_families = $this->_family->findSimilarFamilies();
-				if (!empty($this->_similar_families)) {
-					$GLOBALS['system']->doTransaction('rollback');
-					return;
 				}
 			}
 
@@ -152,7 +166,16 @@ class View_Families__Add extends View
 		?>
 
 		<form method="post" class="min">
-		<?php print_hidden_fields($_POST); ?>
+		<?php
+		print_hidden_fields($_POST);
+		foreach ($this->_memberInputs as $inputIndex => $member) {
+			foreach ($member->getStagedAttachmentMarkers() as $fieldid => $markers) {
+				foreach ($markers as $marker) {
+					print_hidden_field('members_'.$inputIndex.'_custom_'.$fieldid.'_existing[]', $marker);
+				}
+			}
+		}
+		?>
 		<input type="submit" class="btn" name="override_dup_check" value="<?php echo _('Create new family anyway');?>" />
 		</form>
 
@@ -261,7 +284,15 @@ class View_Families__Add extends View
 							if (!$field->isVisibleToCurrentUser()) continue;
 							?>
 							<label class="fullwidth"><?php $field->printFieldValue('name'); ?></label>
-							<div class="fullwidth"><?php $field->printWidget('', Array(), 'members_0_'); ?></div>
+							<div class="fullwidth">
+								<?php
+								if ($fDetails['type'] == 'attachment') {
+									$field->printAttachmentWidget(Array(), 'members_0_');
+								} else {
+									$field->printWidget('', Array(), 'members_0_');
+								}
+								?>
+							</div>
 							<?php
 						}
 						?>

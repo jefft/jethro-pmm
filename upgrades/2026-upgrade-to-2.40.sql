@@ -409,11 +409,11 @@ DELETE FROM setting WHERE symbol = 'SMS_SEND_LOGFILE';
 -- by raw SQL in User_System (kept out of the ORM like _person.resethash for member resets):
 --   resethash         bcrypt hash of the single-use emailed token (never the token itself)
 --   resetexpires      when the request stops being usable (24h after it was armed)
+--   resetsmsrequired  whether the armed request requires SMS, even before a code is sent
 --   resetsmshash      bcrypt hash of the current SMS code (never the code itself)
 --   resetsmssent      last reserved SMS send, used for the 60s cooldown and 10m code expiry
 --   resetsmsattempts  total SMS codes tried against the current request (2 allowed)
 --   usernamereminded  when a "forgot username" reminder last went out (1 per hour)
--- Every reset request requires an SMS code, so there is no separate requirement flag.
 -- Column definitions must match db_objects/staff_member.class.php getInitSQL().
 --
 -- Idempotent on both MariaDB and MySQL: MySQL has no "ADD COLUMN IF NOT EXISTS"
@@ -427,6 +427,9 @@ SET @staff_reset_missing = CONCAT_WS(', ',
 	IF((SELECT COUNT(*) FROM information_schema.columns
 		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetexpires') = 0,
 		'ADD COLUMN `resetexpires` DATETIME DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetsmsrequired') = 0,
+		'ADD COLUMN `resetsmsrequired` TINYINT UNSIGNED NOT NULL DEFAULT 0', NULL),
 	IF((SELECT COUNT(*) FROM information_schema.columns
 		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetsmshash') = 0,
 		'ADD COLUMN `resetsmshash` VARCHAR(255) DEFAULT NULL', NULL),
@@ -444,6 +447,29 @@ SET @staff_reset_sql = IF(@staff_reset_missing = '', 'DO 0', CONCAT('ALTER TABLE
 PREPARE staff_reset_stmt FROM @staff_reset_sql;
 EXECUTE staff_reset_stmt;
 DEALLOCATE PREPARE staff_reset_stmt;
+
+-- Filesystem-backed attachments for custom fields.
+-- Metadata only; files live under ATTACHMENTS_ROOT_PATH (default <root>/attachments).
+-- Same definition and constraint names as the installer
+-- (Custom_Field_Attachment::getInitSQL() and getForeignKeys()). Idempotent.
+CREATE TABLE IF NOT EXISTS `custom_field_attachment` (
+	`id` int(11) NOT NULL AUTO_INCREMENT,
+	`personid` int(11) NOT NULL,
+	`fieldid` int(11) NOT NULL,
+	`token` varchar(255) NOT NULL,
+	`filename` varchar(255) NOT NULL,
+	`mime` varchar(255) NULL DEFAULT NULL,
+	`size` int(11) NOT NULL,
+	`created_by` int(11) NULL DEFAULT NULL,
+	`sha1` char(40) NULL DEFAULT NULL,
+	`created` datetime DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (`id`),
+	UNIQUE KEY `token` (`token`),
+	INDEX `person_field` (`personid`, `fieldid`),
+	CONSTRAINT `custom_field_attachmentpersonid` FOREIGN KEY (`personid`) REFERENCES `_person` (`id`) ON DELETE CASCADE,
+	CONSTRAINT `custom_field_attachmentfieldid` FOREIGN KEY (`fieldid`) REFERENCES `custom_field` (`id`) ON DELETE CASCADE,
+	CONSTRAINT `custom_field_attachmentcreated_by` FOREIGN KEY (`created_by`) REFERENCES `_person` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB;
 
 -- Sensitive custom fields: hidden from users without DATA_PERM_VIEWSENSITIVE.
 -- Idempotent; MySQL 8 lacks ADD COLUMN IF NOT EXISTS.
