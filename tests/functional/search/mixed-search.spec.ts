@@ -12,7 +12,9 @@ import { login } from "../auth.js";
  * Runs against the standard demo database at the root URL, like the import
  * project, so no scenario `.conf` is needed. Every assertion works on data from
  * the demo dump (Calvin/Luther persons and families, the "Friend Of" searchable
- * custom field); tests are read-only and safe among parallel workers.
+ * custom field); tests are read-only and safe among parallel workers, but other
+ * projects (SMS scenarios, import) write to the same database, so assertions
+ * must tolerate extra matching rows.
  */
 
 const REGION = "#mixed-search-results";
@@ -120,6 +122,9 @@ test("name matches and other-field matches are split into sections", async ({ pa
   // "John" matches persons/group by name, and Idelette's remarks and two Lang
   // families' addresses on other fields. The name matches list first (persons,
   // then the group) under no heading; the Other matches heading follows.
+  // Other projects write to the same demo database (sms-send-single sends
+  // "Hello John …" to John Calvin; the import project adds persons), so the
+  // Other matches count is checked against its own rows, not a fixed number.
   await page.goto("?view=_mixed_search&search=John");
   const results = page.locator(REGION);
   const html = await results.innerHTML();
@@ -132,15 +137,18 @@ test("name matches and other-field matches are split into sections", async ({ pa
   const alissa = index("Alissa Johnston");
   const josie = index("Josie Johnston");
   const group = index("MIXED #2 John");
-  const other = index("Other matches (3)");
+  const other = index("Other matches (");
   const remarks = index("Idelette de Bure");
   expect(alissa).toBeGreaterThan(calvin);
   expect(josie).toBeGreaterThan(alissa);
   expect(group).toBeGreaterThan(josie);
   expect(other).toBeGreaterThan(group);
   expect(remarks).toBeGreaterThan(other);
+  const heading = results.locator("h4.search-section");
   await expect(results.locator("h3.search-section, h4.search-section")).toHaveCount(1);
-  await expect(results.locator("h4.search-section")).toContainText("Other matches (3)");
+  const count = Number((await heading.textContent())?.match(/Other matches \((\d+)\)/)?.[1]);
+  expect(count).toBeGreaterThanOrEqual(3);
+  await expect(heading.locator("xpath=following-sibling::table[1]//tr")).toHaveCount(count);
 });
 
 test("a search that matches only on other fields has no section headings", async ({ page }) => {
