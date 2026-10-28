@@ -17,8 +17,9 @@ existing accounts by the upgrade. `VIEWSENSITIVE` is not granted by default.
 `DATA_PERM_VIEWCUSTOMFIELDS`, then applies `DATA_PERM_VIEWSENSITIVE` when the field is
 marked sensitive. `Custom_Field::isVisibleToCurrentUser()` is the central check
 used by summaries, forms, form processing, search, merge data, reports, CSV
-exports, imports, bulk updates, action plans, note templates, and merge help.
-`Person::setCustomValue()` also ignores writes to hidden fields.
+exports, imports, bulk updates, action plans, note templates, merge help, and
+the attachment download endpoint. `Person::setCustomValue()` also ignores writes
+to hidden fields.
 
 A note template that sets any custom field writes only "Custom field values are
 recorded on the person record." into the note text. It never copies custom-field

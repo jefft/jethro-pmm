@@ -331,6 +331,16 @@ class Person_Query extends DB_Object
 										array_get($value, 'val')
 									);
 									break;
+								case 'attachment':
+									$cparams = Array(
+												'type' => 'select',
+												'options' => Array(
+													'any' => 'has an attachment',
+													'empty' => 'has no attachment',
+												),
+											);
+									print_widget('params_custom_field_'.$fieldid.'_criteria', $cparams, array_get($value, 'criteria'));
+									break;
 								case 'text':
 								case 'link':
 									$cparams = Array(
@@ -677,6 +687,7 @@ class Person_Query extends DB_Object
 			<option disabled="disabled">------</option>
 			<?php
 			foreach ($this->_custom_fields as $fieldid => $fielddetails) {
+				if ($fielddetails['type'] == 'attachment') continue;
 				if (!Custom_Field::isFieldDataVisibleToCurrentUser($fielddetails)) continue;
 				$selected = ($sb == self::CUSTOMFIELD_PREFIX.$fieldid) || ($sb == 'date---'.$fieldid)
 				?>
@@ -896,6 +907,11 @@ class Person_Query extends DB_Object
 			if (in_array($fieldid, array_get($_REQUEST, 'enable_custom_field', Array()))) {
 				if (!Custom_Field::isFieldDataVisibleToCurrentUser($fieldDetails)) continue;
 				switch ($this->_custom_fields[$fieldid]['type']) {
+					case 'attachment':
+						$params['custom_fields'][$fieldid] = Array(
+							'criteria' => array_get($_REQUEST, 'params_custom_field_'.$fieldid.'_criteria', 'any')
+						);
+						break;
 					case 'date':
 						$params['custom_fields'][$fieldid] = Array(
 							'criteria' => $_REQUEST['params_custom_field_'.$fieldid.'_criteria'],
@@ -1546,6 +1562,11 @@ class Person_Query extends DB_Object
 			}
 			$query['from'] .= ' LEFT JOIN custom_field_value pd'.$fieldid.' ON pd'.$fieldid.'.personid = p.id AND pd'.$fieldid.'.fieldid = '.(int)$fieldid."\n";
 			switch ($this->_custom_fields[$fieldid]['type']) {
+				case 'attachment':
+					$customFieldWheres[] = (array_get($values, 'criteria', 'any') == 'empty')
+						? '(pd'.$fieldid.'.personid IS NULL)'
+						: '(pd'.$fieldid.'.personid IS NOT NULL)';
+					break;
 				case 'date':
 					if ($values['criteria'] == 'between') {
 						$values['criteria'] = $values['anniversary'] ? 'anniversary' : 'exact';

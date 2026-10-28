@@ -10,6 +10,9 @@ define('DB_DSN', 'mysql:unix_socket=' . getenv('MYSQL_UNIX_PORT') . ';dbname=jet
 define('DB_DATABASE', 'jethro');
 define('DB_USERNAME', "jethro");
 define('DB_PASSWORD', 'jethro');
+// Keep the dev instance's attachments separate from functest and from the
+// shared checkout's legacy attachments/ tree.
+define('ATTACHMENTS_ROOT_PATH', JETHRO_ROOT.'/.devbox/attachments-web');
 define('PREFILL_USERNAME', 'demo');
 define('PREFILL_PASSWORD', 'qfntt7eYuwHs123');   # This qfntt7eYuwHs123 is not sensitive
 define('PREFILL_MEMBER_EMAIL', 'mluther@wittenberg.edu.de');

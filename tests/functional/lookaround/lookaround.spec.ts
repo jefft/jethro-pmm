@@ -1,3 +1,19 @@
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import type { Page } from "@playwright/test";
 import { test, expect } from "../fixtures.js";
 import { login } from "../auth.js";
 import { DEMO_NOUNS, validateNouns } from "../nouns.js";
@@ -199,6 +215,22 @@ test.describe("Role-based permission checks", () => {
   });
 });
 
+test.describe("Admin: Custom Fields", () => {
+  // Regression for jr-trh.4. The blank "new field" row renders a params block
+  // for every type, including Attachment. That hidden max_mb input carried
+  // value 0 with min=1, so the browser treated the form as invalid and refused
+  // to submit at all (Chrome: "An invalid form control ... is not focusable"),
+  // with no visible feedback. 0 is meaningful: Attachments_Manager treats
+  // max_mb <= 0 as DEFAULT_MAX_MB.
+  test("custom fields page saves", async ({ page }) => {
+    await login(page);
+    await page.goto("./?view=admin__custom_fields");
+    await expect(page.locator("#custom-fields-editor")).toBeVisible();
+    await page.click('input[value="Save"]');
+    await expect(page.getByText("Custom fields updated")).toBeVisible();
+  });
+});
+
 test.describe("Login", () => {
   const NOTE_TEMPLATE_NAME = "Private Field Regression";
   const NOTE_TEMPLATE_SUBJECT = "Private Field Regression Note";
@@ -327,5 +359,459 @@ test.describe("Login", () => {
     // submits a form. The same walk runs against the wizard-built instance in
     // walkthrough.spec.ts, with the records that instance's verbs tests add.
     await validateNouns(page, DEMO_NOUNS);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Unwritable attachment store (jr-trh.8).
+//
+// attachment-store-readonly.conf points ATTACHMENTS_ROOT_PATH at a per-checkout
+// temp directory; the two must compute the same path.
+// ---------------------------------------------------------------------------
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const SCENARIO_URL = "tests/functional/lookaround/attachment-store-readonly/";
+const STORE_ROOT = path.join(
+  tmpdir(),
+  `jethro-attachment-store-readonly-${createHash("md5").update(realpathSync(PROJECT_ROOT)).digest("hex")}`,
+);
+const ATTACHMENT_FIELD_ID = 30; // Free in the demo data (max id is 27).
+const ATTACHMENT_PERSON_ID = 2; // John Calvin.
+const EXISTING_TOKEN = `${"c".repeat(32)}.pdf`;
+const EXISTING_CONTENT = "existing attachment\n";
+
+/** Run a statement against the shared demo database for one scenario test. */
+function functestDb(sql: string): string {
+  return execFileSync("mariadb", ["jethro_functest", "-sNBe", sql], { encoding: "utf8" }).trim();
+}
+
+/** Give John Calvin a Docs (attachment) field, optionally holding c.pdf. */
+function seedAttachmentField(withExisting = true): void {
+  const sha1 = createHash("sha1").update(EXISTING_CONTENT).digest("hex");
+  const existing = withExisting
+    ? `
+    INSERT INTO \`custom_field_attachment\`
+      (\`personid\`, \`fieldid\`, \`token\`, \`filename\`, \`mime\`, \`size\`, \`created_by\`, \`sha1\`)
+      VALUES (${ATTACHMENT_PERSON_ID}, ${ATTACHMENT_FIELD_ID}, '${EXISTING_TOKEN}', 'c.pdf',
+              'application/pdf', ${EXISTING_CONTENT.length}, ${ATTACHMENT_PERSON_ID}, '${sha1}');
+    INSERT INTO \`_custom_field_value\` (\`personid\`, \`fieldid\`, \`value_text\`)
+      SELECT ${ATTACHMENT_PERSON_ID}, ${ATTACHMENT_FIELD_ID}, CAST(\`id\` AS CHAR)
+      FROM \`custom_field_attachment\` WHERE \`token\` = '${EXISTING_TOKEN}';`
+    : "";
+  functestDb(`
+    DELETE FROM \`_custom_field_value\` WHERE \`personid\`=${ATTACHMENT_PERSON_ID} AND \`fieldid\`=${ATTACHMENT_FIELD_ID};
+    DELETE FROM \`custom_field_attachment\` WHERE \`personid\`=${ATTACHMENT_PERSON_ID} AND \`fieldid\`=${ATTACHMENT_FIELD_ID};
+    DELETE FROM \`custom_field\` WHERE \`id\`=${ATTACHMENT_FIELD_ID};
+    INSERT INTO \`custom_field\`
+      (\`id\`, \`name\`, \`rank\`, \`type\`, \`allow_multiple\`, \`show_add_family\`, \`searchable\`,
+       \`heading_before\`, \`divider_before\`, \`params\`, \`tooltip\`, \`sensitive\`)
+      VALUES (${ATTACHMENT_FIELD_ID}, 'Docs', 0, 'attachment', '', '', '', '', '', 'a:0:{}', '', 0);
+    ${existing}
+  `);
+}
+
+const SECURITY_DOCS_FIELD_ID = 9901;
+const SECURITY_PHOTO_FIELD_ID = 9902;
+const SECURITY_PRIVATE_FIELD_ID = 9903;
+const SECURITY_FILENAME = "private-attachment-check-4f9d.pdf";
+const SECURITY_FOREIGN_TOKEN = `${"d".repeat(32)}.pdf`;
+const SECURITY_SCENARIO_URL = "tests/functional/lookaround/attachment-security/";
+const SECURITY_STORE_ROOT = path.join(
+  tmpdir(),
+  `jethro-attachment-security-${createHash("md5").update(realpathSync(PROJECT_ROOT)).digest("hex")}`,
+);
+
+function seedAttachmentSecurityFields(): { targetPersonId: string; foreignPersonId: string; foreignAttachmentId: string } {
+  const targetPersonId = functestDb(
+    "SELECT id FROM _person WHERE congregationid=3 ORDER BY id LIMIT 1",
+  );
+  const foreignPersonId = functestDb(
+    "SELECT id FROM _person WHERE congregationid<>3 ORDER BY id LIMIT 1",
+  );
+  if (!targetPersonId || !foreignPersonId) {
+    throw new Error("Attachment security test requires persons in both restricted and unrestricted congregations");
+  }
+
+  functestDb(`
+    DELETE FROM _custom_field_value
+      WHERE fieldid IN (${SECURITY_DOCS_FIELD_ID}, ${SECURITY_PHOTO_FIELD_ID}, ${SECURITY_PRIVATE_FIELD_ID});
+    DELETE FROM custom_field_attachment
+      WHERE fieldid IN (${SECURITY_DOCS_FIELD_ID}, ${SECURITY_PHOTO_FIELD_ID}, ${SECURITY_PRIVATE_FIELD_ID});
+    DELETE FROM custom_field
+      WHERE id IN (${SECURITY_DOCS_FIELD_ID}, ${SECURITY_PHOTO_FIELD_ID}, ${SECURITY_PRIVATE_FIELD_ID});
+    INSERT INTO \`custom_field\`
+      (\`id\`, \`name\`, \`rank\`, \`type\`, \`allow_multiple\`, \`show_add_family\`, \`searchable\`,
+       \`heading_before\`, \`divider_before\`, \`params\`, \`tooltip\`, \`sensitive\`)
+      VALUES
+      (${SECURITY_DOCS_FIELD_ID}, 'Docs', 0, 'attachment', 0, 0, 0, '', '', 'a:0:{}', '', 0),
+      (${SECURITY_PHOTO_FIELD_ID}, 'Photo', 1, 'attachment', 0, 0, 0, '', '',
+       'a:1:{s:18:"allowed_extensions";s:3:"jpg";}', '', 0),
+      (${SECURITY_PRIVATE_FIELD_ID}, 'Private files', 2, 'attachment', 0, 0, 0, '', '', 'a:0:{}', '', 1);
+    INSERT INTO custom_field_attachment
+      (personid, fieldid, token, filename, mime, size, created_by, sha1)
+      VALUES (${foreignPersonId}, ${SECURITY_PRIVATE_FIELD_ID},
+        '${SECURITY_FOREIGN_TOKEN}', '${SECURITY_FILENAME}', 'application/pdf', 1,
+        ${foreignPersonId}, SHA1('x'));
+    SET @attachment_security_id=LAST_INSERT_ID();
+    INSERT INTO _custom_field_value (personid, fieldid, value_text)
+      VALUES (${foreignPersonId}, ${SECURITY_PRIVATE_FIELD_ID}, CAST(@attachment_security_id AS CHAR));
+  `);
+  const foreignAttachmentId = functestDb(
+    `SELECT id FROM custom_field_attachment WHERE token='${SECURITY_FOREIGN_TOKEN}'`,
+  );
+  if (!foreignAttachmentId) {
+    throw new Error("Could not seed the foreign attachment");
+  }
+  return { targetPersonId, foreignPersonId, foreignAttachmentId };
+}
+
+function clearAttachmentSecurityFields(): void {
+  functestDb(`
+    DELETE FROM _custom_field_value
+      WHERE fieldid IN (${SECURITY_DOCS_FIELD_ID}, ${SECURITY_PHOTO_FIELD_ID}, ${SECURITY_PRIVATE_FIELD_ID});
+    DELETE FROM custom_field_attachment
+      WHERE fieldid IN (${SECURITY_DOCS_FIELD_ID}, ${SECURITY_PHOTO_FIELD_ID}, ${SECURITY_PRIVATE_FIELD_ID});
+    DELETE FROM custom_field
+      WHERE id IN (${SECURITY_DOCS_FIELD_ID}, ${SECURITY_PHOTO_FIELD_ID}, ${SECURITY_PRIVATE_FIELD_ID});
+  `);
+}
+
+/** Make a read-only tree deletable. */
+function makeWritable(dir: string): void {
+  chmodSync(dir, 0o755);
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) makeWritable(path.join(dir, entry.name));
+  }
+}
+
+/** Remove the scenario's store, clearing a read-only tree left by a failed run. */
+function removeStore(): void {
+  if (existsSync(STORE_ROOT)) makeWritable(STORE_ROOT);
+  rmSync(STORE_ROOT, { recursive: true, force: true });
+}
+
+function removeSecurityStore(): void {
+  if (existsSync(SECURITY_STORE_ROOT)) makeWritable(SECURITY_STORE_ROOT);
+  rmSync(SECURITY_STORE_ROOT, { recursive: true, force: true });
+}
+
+test.describe("Attachments: unwritable store", () => {
+  // Both tests own the same scenario store and demo field, so they must not
+  // run in parallel: one makes the root read-only, the other only a subdir.
+  test.describe.configure({ mode: "serial" });
+
+  // Regression for jr-trh.8. With .staging unavailable (the store root is
+  // read-only) an upload is never staged, so the save step used to call
+  // move_uploaded_file() on the raw HTTP upload unguarded. The warning
+  // ((Permission denied) reached the browser before the redirect header, so
+  // the save answered HTTP 500 with a SYSTEM ERROR banner instead of the
+  // "could not be stored" message. The existing attachment must survive.
+  test("attachment store read-only reports an error and keeps the existing file", async ({ page }) => {
+    test.slow();
+    seedAttachmentField();
+    removeStore();
+    const fieldDir = path.join(
+      STORE_ROOT,
+      "person",
+      String(ATTACHMENT_PERSON_ID),
+      "field",
+      String(ATTACHMENT_FIELD_ID),
+    );
+    mkdirSync(fieldDir, { recursive: true });
+    writeFileSync(path.join(fieldDir, EXISTING_TOKEN), EXISTING_CONTENT);
+    // Read-only store: .staging cannot be created at the root, and the
+    // person/field directory exists but cannot take the new file.
+    chmodSync(STORE_ROOT, 0o555);
+    chmodSync(fieldDir, 0o555);
+
+    try {
+      await login(page);
+      await page.goto(`${SCENARIO_URL}?view=_edit_person&personid=${ATTACHMENT_PERSON_ID}`);
+      const upload = page.locator(
+        `input[type="file"][name="custom_${ATTACHMENT_FIELD_ID}_upload[]"]`,
+      );
+      await expect(upload).toBeVisible();
+      await upload.setInputFiles({
+        name: "w.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from("replacement attachment\n"),
+      });
+
+      const postPromise = page.waitForResponse((response) => response.request().method() === "POST");
+      await page.click('button:has-text("Update Person")');
+      const post = await postPromise;
+
+      // Was HTTP 500 ("headers already sent") before the fix.
+      expect(post.status()).toBeLessThan(400);
+      await expect(page).toHaveURL(new RegExp(`personid=${ATTACHMENT_PERSON_ID}`));
+      await expect(page.getByText('The attachment "w.pdf" could not be stored.')).toBeVisible();
+      await expect(page.getByRole("link", { name: "c.pdf" })).toBeVisible();
+      await expect(page.locator("#body")).not.toContainText("SYSTEM ERROR");
+
+      // The failure genuinely came from an unavailable staging directory...
+      expect(existsSync(path.join(STORE_ROOT, ".staging"))).toBe(false);
+      // ...and the existing attachment is still the person's Docs value.
+      const oldAttachmentId = functestDb(
+        `SELECT id FROM custom_field_attachment WHERE token='${EXISTING_TOKEN}'`,
+      );
+      expect(
+        functestDb(
+          `SELECT value_text FROM _custom_field_value
+            WHERE personid=${ATTACHMENT_PERSON_ID} AND fieldid=${ATTACHMENT_FIELD_ID}`,
+        ),
+      ).toBe(oldAttachmentId);
+    } finally {
+      removeStore();
+      functestDb(`
+        DELETE FROM _custom_field_value WHERE personid=${ATTACHMENT_PERSON_ID} AND fieldid=${ATTACHMENT_FIELD_ID};
+        DELETE FROM custom_field_attachment WHERE personid=${ATTACHMENT_PERSON_ID} AND fieldid=${ATTACHMENT_FIELD_ID};
+        DELETE FROM custom_field WHERE id=${ATTACHMENT_FIELD_ID};
+      `);
+    }
+  });
+
+  // Regression for jr-trh.15. The store root stays writable, so stageUpload()
+  // moves the upload into .staging; only the person/field directory refuses it.
+  // Removing the staged sidecar used to leave the payload behind forever (no
+  // later upload reaches this instance to trigger the one-day sweep).
+  test("failed store leaves no staged upload", async ({ page }) => {
+    test.slow();
+    seedAttachmentField(false);
+    removeStore();
+    const fieldDir = path.join(
+      STORE_ROOT,
+      "person",
+      String(ATTACHMENT_PERSON_ID),
+      "field",
+      String(ATTACHMENT_FIELD_ID),
+    );
+    mkdirSync(fieldDir, { recursive: true });
+    chmodSync(fieldDir, 0o555);
+
+    try {
+      await login(page);
+      await page.goto(`${SCENARIO_URL}?view=_edit_person&personid=${ATTACHMENT_PERSON_ID}`);
+      const upload = page.locator(
+        `input[type="file"][name="custom_${ATTACHMENT_FIELD_ID}_upload[]"]`,
+      );
+      await expect(upload).toBeVisible();
+      await upload.setInputFiles({
+        name: "w.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from("replacement attachment\n"),
+      });
+
+      const postPromise = page.waitForResponse((response) => response.request().method() === "POST");
+      await page.click('button:has-text("Update Person")');
+      const post = await postPromise;
+
+      expect(post.status()).toBeLessThan(400);
+      await expect(page).toHaveURL(new RegExp(`personid=${ATTACHMENT_PERSON_ID}`));
+      await expect(page.getByText('The attachment "w.pdf" could not be stored.')).toBeVisible();
+      await expect(page.locator("#body")).not.toContainText("SYSTEM ERROR");
+
+      // The upload was staged because the store root is writable...
+      const stagingDir = path.join(STORE_ROOT, ".staging");
+      expect(existsSync(stagingDir)).toBe(true);
+      // ...the store failed, created no metadata row...
+      expect(
+        functestDb(
+          `SELECT COUNT(*) FROM custom_field_attachment
+            WHERE personid=${ATTACHMENT_PERSON_ID} AND fieldid=${ATTACHMENT_FIELD_ID}`,
+        ),
+      ).toBe("0");
+      // ...and the consumed payload is gone.
+      expect(readdirSync(stagingDir)).toEqual([]);
+    } finally {
+      if (existsSync(fieldDir)) chmodSync(fieldDir, 0o755);
+      removeStore();
+      functestDb(`
+        DELETE FROM _custom_field_value WHERE personid=${ATTACHMENT_PERSON_ID} AND fieldid=${ATTACHMENT_FIELD_ID};
+        DELETE FROM custom_field_attachment WHERE personid=${ATTACHMENT_PERSON_ID} AND fieldid=${ATTACHMENT_FIELD_ID};
+        DELETE FROM custom_field WHERE id=${ATTACHMENT_FIELD_ID};
+      `);
+    }
+  });
+
+  // The failure cleanup must not touch the success path: a writable
+  // person/field directory still receives the staged payload (rename into the
+  // store) and the staging directory is left empty.
+  test("successful upload moves the staged file into the store", async ({ page }) => {
+    test.slow();
+    seedAttachmentField(false);
+    removeStore();
+
+    try {
+      await login(page);
+      await page.goto(`${SCENARIO_URL}?view=_edit_person&personid=${ATTACHMENT_PERSON_ID}`);
+      const upload = page.locator(
+        `input[type="file"][name="custom_${ATTACHMENT_FIELD_ID}_upload[]"]`,
+      );
+      await expect(upload).toBeVisible();
+      await upload.setInputFiles({
+        name: "w.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from("replacement attachment\n"),
+      });
+
+      const postPromise = page.waitForResponse((response) => response.request().method() === "POST");
+      await page.click('button:has-text("Update Person")');
+      const post = await postPromise;
+
+      expect(post.status()).toBeLessThan(400);
+      await expect(page).toHaveURL(new RegExp(`personid=${ATTACHMENT_PERSON_ID}`));
+      await expect(page.locator("#body")).not.toContainText("could not be stored");
+
+      const token = functestDb(
+        `SELECT token FROM custom_field_attachment
+          WHERE personid=${ATTACHMENT_PERSON_ID} AND fieldid=${ATTACHMENT_FIELD_ID}`,
+      );
+      expect(token).toMatch(/^[0-9a-f]{32}\.pdf$/);
+      expect(
+        readFileSync(
+          path.join(
+            STORE_ROOT,
+            "person",
+            String(ATTACHMENT_PERSON_ID),
+            "field",
+            String(ATTACHMENT_FIELD_ID),
+            token,
+          ),
+          "utf8",
+        ),
+      ).toBe("replacement attachment\n");
+      expect(readdirSync(path.join(STORE_ROOT, ".staging"))).toEqual([]);
+    } finally {
+      removeStore();
+      functestDb(`
+        DELETE FROM _custom_field_value WHERE personid=${ATTACHMENT_PERSON_ID} AND fieldid=${ATTACHMENT_FIELD_ID};
+        DELETE FROM custom_field_attachment WHERE personid=${ATTACHMENT_PERSON_ID} AND fieldid=${ATTACHMENT_FIELD_ID};
+        DELETE FROM custom_field WHERE id=${ATTACHMENT_FIELD_ID};
+      `);
+    }
+  });
+});
+
+async function submitEditWithAttachment(
+  page: Page,
+  fieldId: number,
+  attachmentValue: string,
+  removeFieldId?: number,
+) {
+  const responsePromise = page.waitForResponse((response) => response.request().method() === "POST");
+  await page.locator("#edit-person").evaluate(
+    (form, values) => {
+      if (values.removeFieldId !== undefined) {
+        const previousName = `custom_${values.removeFieldId}_existing[]`;
+        for (const input of Array.from(form.querySelectorAll("input"))) {
+          if (input.name === previousName) input.remove();
+        }
+      }
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = `custom_${values.fieldId}_existing[]`;
+      input.value = values.attachmentValue;
+      form.appendChild(input);
+      (form as HTMLFormElement).submit();
+    },
+    { fieldId, attachmentValue, removeFieldId },
+  );
+  return responsePromise;
+}
+
+test.describe("Attachment ownership and field binding", () => {
+  test.describe.configure({ mode: "serial" });
+
+  test("foreign attachment id is absent from history and validation form", async ({ page }) => {
+    const { targetPersonId, foreignAttachmentId } = seedAttachmentSecurityFields();
+    removeSecurityStore();
+    try {
+      await login(page, "kidscare");
+      await page.goto(`${SECURITY_SCENARIO_URL}?view=_edit_person&personid=${targetPersonId}`);
+      const save = await submitEditWithAttachment(
+        page,
+        SECURITY_DOCS_FIELD_ID,
+        foreignAttachmentId,
+      );
+      expect(save.status()).toBeLessThan(400);
+      await expect(page).not.toHaveURL(/view=_edit_person/);
+
+      expect(
+        functestDb(
+          `SELECT COUNT(*) FROM _custom_field_value
+            WHERE personid=${targetPersonId} AND fieldid=${SECURITY_DOCS_FIELD_ID}`,
+        ),
+      ).toBe("0");
+      expect(
+        functestDb(`SELECT history FROM _person WHERE id=${targetPersonId}`),
+      ).not.toContain(SECURITY_FILENAME);
+
+      await page.goto(`${SECURITY_SCENARIO_URL}?view=_edit_person&personid=${targetPersonId}`);
+      await page.locator('input[name="first_name"]').fill("");
+      const invalidSave = await submitEditWithAttachment(
+        page,
+        SECURITY_DOCS_FIELD_ID,
+        foreignAttachmentId,
+      );
+      expect(invalidSave.status()).toBeLessThan(400);
+      await expect(page.locator("#edit-person")).toBeVisible();
+      await expect(page.locator("#body")).not.toContainText(SECURITY_FILENAME);
+      await expect(page.locator("#body")).not.toContainText("Uploaded by");
+    } finally {
+      removeSecurityStore();
+      clearAttachmentSecurityFields();
+    }
+  });
+
+  test("staged marker other field is not stored", async ({ page }) => {
+    const { targetPersonId } = seedAttachmentSecurityFields();
+    removeSecurityStore();
+    try {
+      await login(page, "kidscare");
+      await page.goto(`${SECURITY_SCENARIO_URL}?view=_edit_person&personid=${targetPersonId}`);
+      const firstName = await page.locator('input[name="first_name"]').inputValue();
+      await page.locator('input[name="first_name"]').fill("");
+      await page.locator(
+        `input[type="file"][name="custom_${SECURITY_DOCS_FIELD_ID}_upload[]"]`,
+      ).setInputFiles({
+        name: "smuggled.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from("staged attachment\n"),
+      });
+      const failedSave = page.waitForResponse(
+        (response) => response.request().method() === "POST",
+      );
+      await page.locator("#edit-person").evaluate((form) => (form as HTMLFormElement).submit());
+      await failedSave;
+      await expect(page.locator("#edit-person")).toBeVisible();
+      const marker = await page
+        .locator(`input[name="custom_${SECURITY_DOCS_FIELD_ID}_existing[]"]`)
+        .inputValue();
+      expect(marker).toMatch(/^new:[0-9a-f]{32}$/);
+
+      await page.locator('input[name="first_name"]').fill(firstName);
+      const saved = await submitEditWithAttachment(
+        page,
+        SECURITY_PHOTO_FIELD_ID,
+        marker,
+        SECURITY_DOCS_FIELD_ID,
+      );
+      expect(saved.status()).toBeLessThan(400);
+      await expect(page).not.toHaveURL(/view=_edit_person/);
+      expect(
+        functestDb(
+          `SELECT COUNT(*) FROM custom_field_attachment
+            WHERE personid=${targetPersonId} AND fieldid=${SECURITY_PHOTO_FIELD_ID}`,
+        ),
+      ).toBe("0");
+      expect(
+        functestDb(
+          `SELECT COUNT(*) FROM _custom_field_value
+            WHERE personid=${targetPersonId} AND fieldid=${SECURITY_PHOTO_FIELD_ID}`,
+        ),
+      ).toBe("0");
+    } finally {
+      removeSecurityStore();
+      clearAttachmentSecurityFields();
+    }
   });
 });
