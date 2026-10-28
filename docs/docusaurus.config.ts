@@ -4,7 +4,7 @@ import type {Config} from '@docusaurus/types';
 // Single source of truth: the rehype root-relative path fixer below MUST use
 // the same prefix as the deployed site, or it will rewrite already-resolved
 // internal doc links into nonexistent paths (broken-link build failure).
-const BASE_URL = '/docs/';
+const BASE_URL = '/jethro-pmm/';
 
 const config: Config = {
   title: 'Jethro ChMS',
@@ -13,7 +13,7 @@ const config: Config = {
 
   future: { v4: true },
 
-  url: 'https://jethro-chms.github.io',
+  url: 'https://jefft.github.io',
   baseUrl: BASE_URL,
 
   organizationName: 'jethro-chms',
@@ -34,7 +34,7 @@ const config: Config = {
   // cannot resolve `export *` re-export chains through d3's ESM source tree,
   // causing "curveBumpX/curveBumpY not exported from d3" and "blur2 not
   // exported from d3-array" at build time (mermaid 11.16 + d3 7.9).
-  // The single ER diagram in jethro-sms/docs/reference/database.mdx was
+  // The single ER diagram in docs/docs/developer/sms/database.mdx was
   // replaced with ASCII art. To re-enable mermaid in future, test that
   // `bun run build` succeeds after re-adding the theme, the `markdown.mermaid`
   // config, and `@docusaurus/theme-mermaid` to dependencies.
@@ -60,8 +60,8 @@ const config: Config = {
           ],
           versions: {
             current: {
-              label: '2.39.0-dev',
-              path: '2.39.0-dev',
+              label: '2.40.0-dev',
+              path: '2.40.0-dev',
               banner: 'unreleased',
             },
           },
