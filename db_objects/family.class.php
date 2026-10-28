@@ -566,17 +566,22 @@ class Family extends DB_Object
 		return $db->query($SQL);
 	}
 
-	/* Find a family that looks like a duplicate of this one - if it has the same family name and a member with the same name
-	*/
-	public function findSimilarFamilies()
+	/**
+	 * Find a family that looks like a duplicate of this one - same family name
+	 * and a member with the same name.
+	 * @param array|null $members Member rows to compare; defaults to this family's stored members
+	 * @return array<int, Family>
+	 */
+	public function findSimilarFamilies($members=NULL)
 	{
 		$res = Array();
+		if ($members === NULL) $members = $this->getMemberData();
 		$same_names = $GLOBALS['system']->getDBObjectData('family', Array('family_name' => $this->getValue('family_name'), '!id' => $this->id), 'AND');
 		if (!empty($same_names)) {
 			foreach ($same_names as $familyid => $fdata) {
 				$family = $GLOBALS['system']->getDBObject('family', $familyid);
 				foreach ($family->getMemberData() as $dup_member) {
-					foreach ($this->getMemberData() as $my_member) {
+					foreach ($members as $my_member) {
 						if (($my_member['first_name'] == $dup_member['first_name'])
 							&& ($my_member['last_name'] == $dup_member['last_name'])
 							) {

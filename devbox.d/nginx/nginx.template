@@ -42,6 +42,12 @@ http {
         index index.php;
         server_tokens off;
 
+        # Attachment/photo uploads (e.g. ?view=_edit_person&personid=…) can be
+        # large; nginx defaults to 1m and answers 413 Request Entity Too Large
+        # beyond that. Keep this >= PHP's post_max_size (devbox.d/php/php.ini)
+        # so real uploads of up to upload_max_filesize (100M) get through.
+        client_max_body_size 128m;
+
         # -- Request ID on every response --
         add_header X-Request-ID $request_id always;
 
@@ -83,6 +89,13 @@ http {
 
         # Deny direct access to uploaded files — must go through PHP handler
         location ^~ /files/ {
+            deny all;
+            return 404;
+        }
+
+        # Default ATTACHMENTS_ROOT_PATH; configured roots need equivalent
+        # protection if they sit inside the web root.
+        location ^~ /attachments/ {
             deny all;
             return 404;
         }

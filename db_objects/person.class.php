@@ -9,6 +9,7 @@ class Person extends DB_Object
 	private $_photo_data = NULL;
 	private $_custom_values = Array();
 	private $_old_custom_values = Array();
+	private $_attachment_rows_to_delete = Array();
 
 	function __construct($id=0)
 	{
@@ -653,6 +654,7 @@ class Person extends DB_Object
 				JOIN custom_field_value cfv ON cfv.personid = p.id
 				JOIN custom_field cf ON cfv.fieldid = cf.id
 				WHERE cf.searchable
+				AND cf.type <> \'attachment\'
 				'.(in_array('custom', $fields) ? '' : 'AND cf.id IN ('.implode(',', $customFieldIDs).')').'
 				'.$sensitiveSql.'
 				AND (
@@ -884,8 +886,10 @@ class Person extends DB_Object
 			$this->_savePhoto();
 			$this->_saveCustomValues();
 			$GLOBALS['system']->doTransaction('COMMIT');
+			$this->_deleteSavedAttachmentFiles();
 		} else {
 			$GLOBALS['system']->doTransaction('ROLLBACK');
+			$this->_attachment_rows_to_delete = Array();
 		}
 		if ($msg) add_message($msg);
 		return $res;
@@ -928,6 +932,7 @@ class Person extends DB_Object
 		// Only replace the fields this user can see. Hidden sensitive values
 		// must survive a save by a user who cannot see them.
 		$this->_clearCustomValues(array_keys($this->_custom_values));
+		$this->_attachment_rows_to_delete = Array();
 		$db =& $GLOBALS['db'];
 		$SQL = 'INSERT INTO `_custom_field_value`
 				(personid, fieldid, value_text, value_date, value_optionid)
@@ -936,6 +941,59 @@ class Person extends DB_Object
 		$sets = Array();
 		foreach ($this->_custom_values as $fieldid => $values) {
 			if (!is_array($values)) $values = empty($values) ? Array() : Array($values);
+
+			if ($customFields[$fieldid]['type'] == 'attachment') {
+				$oldIds = Array();
+				foreach ((array)array_get($this->_old_custom_values, $fieldid, Array()) as $oldValue) {
+					if ((int)$oldValue > 0) $oldIds[] = (int)$oldValue;
+				}
+
+				$resolved = Array();
+				$uploadFailed = FALSE;
+				foreach ($values as $value) {
+					if (!strlen($value)) continue;
+					if (0 === strpos($value, 'new:')) {
+						$upload = Custom_Field_Attachment::takeStagedUpload($value);
+						$attachment = $upload ? Custom_Field_Attachment::storeStagedUpload($this->id, $fieldid, $upload) : NULL;
+						if ($attachment) {
+							$resolved[] = (string)$attachment->id;
+						} else {
+							$uploadFailed = TRUE;
+						}
+					} else if ((int)$value > 0
+						&& Custom_Field_Attachment::isValidForPersonField((int)$value, $this->id, $fieldid)
+					) {
+						$resolved[] = (string)(int)$value;
+					}
+				}
+				if ($uploadFailed) {
+					$fieldName = $customFields[$fieldid]['name'];
+					if (empty($resolved) && $oldIds) {
+						// The replacement could not be stored: keep the current
+						// attachment rather than silently deleting it.
+						add_message('The attachment for '.$fieldName.' could not be found; the existing attachment was kept. Please re-select the file.', 'error');
+						$resolved = array_map('strval', $oldIds);
+					} else {
+						// Nothing was kept: on a new person there is no previous
+						// attachment, and on a multi-value field the old files
+						// are replaced by the uploads that did arrive.
+						add_message('The attachment for '.$fieldName.' could not be found and was not saved; please re-select it.', 'error');
+					}
+				}
+				$this->_custom_values[$fieldid] = $resolved;
+
+				$newIds = array_map('intval', $resolved);
+				foreach (array_unique($oldIds) as $oldId) {
+					if (!in_array($oldId, $newIds, TRUE)) {
+						Custom_Field_Attachment::deleteById($oldId, $this->id, $fieldid, $this->_attachment_rows_to_delete);
+					}
+				}
+				foreach ($resolved as $value) {
+					$sets[] = '('.(int)$this->id.','.(int)$fieldid.','.$db->quote($value).',NULL,NULL)';
+				}
+				continue;
+			}
+
 			foreach ($values as $value) {
 				$dateVal = $textVal = $optionVal = NULL;
 				if (strlen($value)) {
@@ -967,6 +1025,18 @@ class Person extends DB_Object
 		if ($sets) {
 			$SQL .= implode(",\n", $sets);
 			$res = $GLOBALS['db']->query($SQL);
+		}
+	}
+
+	/**
+	 * Remove files belonging to attachment rows deleted during a successful save.
+	 * @return void
+	 */
+	private function _deleteSavedAttachmentFiles()
+	{
+		if (!empty($this->_attachment_rows_to_delete)) {
+			Custom_Field_Attachment::deleteFiles($this->_attachment_rows_to_delete);
+			$this->_attachment_rows_to_delete = Array();
 		}
 	}
 
@@ -1022,24 +1092,49 @@ class Person extends DB_Object
 		return DATA_PERM_VIEWCUSTOMFIELDS | (empty($field['sensitive']) ? 0 : DATA_PERM_VIEWSENSITIVE);
 	}
 
+	/**
+	 * Staged attachment markers ("new:<token>") from the last form processing,
+	 * grouped by custom field ID. Used to carry uploads across a confirmation page.
+	 * @return array<int, array<int, string>>
+	 */
+	public function getStagedAttachmentMarkers()
+	{
+		$res = Array();
+		foreach ($this->_custom_values as $fieldid => $values) {
+			foreach ((array)$values as $value) {
+				if (0 === strpos((string)$value, 'new:')) $res[$fieldid][] = $value;
+			}
+		}
+		return $res;
+	}
+
 	public function reset()
 	{
 		parent::reset();
 		$this->_custom_values = Array();
 		$this->_old_custom_values = Array();
+		$this->_attachment_rows_to_delete = Array();
 		$this->_photo_data = NULL;
 	}
 
 	function create()
 	{
-		$GLOBALS['system']->doTransaction('BEGIN');
+		// Nested callers (add family, CSV import) own their transaction; rolling
+		// back theirs would make their later COMMIT/ROLLBACK throw.
+		$ownsTransaction = ($GLOBALS['system']->transactionDepth() == 0);
+		if ($ownsTransaction) $GLOBALS['system']->doTransaction('BEGIN');
 		Field_Access::filterWritableContactValues($this->values);
 		if (parent::create()) {
 			$this->_savePhoto();
 			$this->_saveCustomValues();
-			$GLOBALS['system']->doTransaction('COMMIT');
+			if ($ownsTransaction) $GLOBALS['system']->doTransaction('COMMIT');
+			$this->_deleteSavedAttachmentFiles();
 			return TRUE;
 		}
+		if ($ownsTransaction) {
+			$GLOBALS['system']->doTransaction('ROLLBACK');
+		}
+		$this->_attachment_rows_to_delete = Array();
 		return FALSE;
 	}
 
@@ -1134,7 +1229,7 @@ class Person extends DB_Object
 		$customFields = self::getCustomFields();
 		$resTemplate = Array();
 		foreach ($customFields as $fieldid => $fieldDetails) {
-			if (!Custom_Field::isFieldDataVisibleToCurrentUser($fieldDetails)) {
+			if (!Custom_Field::isFieldDataVisibleToCurrentUser($fieldDetails) || $fieldDetails['type'] == 'attachment') {
 				unset($customFields[$fieldid]);
 				continue;
 			}
@@ -1212,7 +1307,8 @@ class Person extends DB_Object
 				foreach ($customFields as $fieldid => $fieldDetails) {
 					$dummyField->populate($fieldid, $fieldDetails);
 					if (!$dummyField->isVisibleToCurrentUser()) continue;
-					$tableClass = $fieldDetails['allow_multiple'] ? 'expandable no-name-increment' : '';
+					$isAttachment = ($fieldDetails['type'] == 'attachment');
+					$tableClass = ($fieldDetails['allow_multiple'] && !$isAttachment) ? 'expandable no-name-increment' : '';
 					$values = isset($this->_custom_values[$fieldid]) ? $this->_custom_values[$fieldid] : Array('');
 
 					if ($fieldDetails['divider_before']) echo '<hr />';
@@ -1231,14 +1327,22 @@ class Person extends DB_Object
 						<div class="controls">
 							<table class="<?php echo $tableClass; ?>">
 							<?php
-							foreach ($values as $value) {
+							if ($isAttachment) {
 								?>
 								<tr><td>
-									<?php
-									$dummyField->printWidget($value);
-									?>
+									<?php $dummyField->printAttachmentWidget($values, $prefix); ?>
 								</td></tr>
 								<?php
+							} else {
+								foreach ($values as $value) {
+									?>
+									<tr><td>
+										<?php
+										$dummyField->printWidget($value);
+										?>
+									</td></tr>
+									<?php
+								}
 							}
 							?>
 							</table>
@@ -1263,7 +1367,7 @@ class Person extends DB_Object
 			foreach ($this->getCustomFields() as $fieldid => $fieldDetails) {
 				$field = $GLOBALS['system']->getDBObject('custom_field', $fieldid);
 				if (!$field->isVisibleToCurrentUser()) continue;
-				$this->setCustomValue($fieldid, $field->processWidget($prefix));
+				$this->setCustomValue($fieldid, $field->processWidget($prefix, (int)$this->id));
 			}
 		}
 		$this->_photo_data = Photo_Handler::getUploadedPhotoData($prefix.'photo');
@@ -1368,6 +1472,7 @@ class Person extends DB_Object
 		if ($customFields === NULL) {
 			$fields = $GLOBALS['system']->getDBObjectdata('custom_field');
 			foreach ($fields as $fieldID => $field) {
+				if ($field['type'] == 'attachment') continue;
 				if (!Custom_Field::isFieldDataVisibleToCurrentUser($field)) continue;
 				$field['id'] = $fieldID;
 				$customFields[str_replace(' ', '_', strtolower($field['name']))] = $GLOBALS['system']->getDBObject('custom_field', $fieldID);
@@ -1474,6 +1579,7 @@ class Person extends DB_Object
 		}
 
 		$GLOBALS['system']->doTransaction('COMMIT');
+		Custom_Field_Attachment::deleteForPerson($this->id);
 		return $res;
 	}
 
@@ -1483,7 +1589,10 @@ class Person extends DB_Object
 		$family = $this->getFamily();
 		$members = $family->getMemberData();
 		unset($members[$this->id]);
-		parent::delete();
+		$deleted = parent::delete();
+		if ($deleted) {
+			Attachments_Manager::deletePersonDir($this->id);
+		}
 		if (empty($members)) {
 			$family->delete();
 		}

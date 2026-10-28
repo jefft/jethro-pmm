@@ -106,6 +106,7 @@ $selected = Array(array_get($_REQUEST, 'bulk_action', '') => 'selected="selected
 							'options' => Array('Replacing existing values ', 'Adding to existing values')
 						);
 			foreach ($customFields as $fieldid => $fieldDetails) {
+				if ($fieldDetails['type'] == 'attachment') continue;
 				if (!Custom_Field::isFieldDataVisibleToCurrentUser($fieldDetails)) continue;
 				$dummy->populate($fieldid, $fieldDetails);
 				echo '<tr><td>Set '.ents($dummy->getValue('name')).' to: </td><td>';

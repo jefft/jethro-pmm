@@ -150,6 +150,7 @@ class Call_Sample_Import extends Call
 		);
 		$custom_fields = Person::getCustomFields();
 		foreach ($custom_fields as $field) {
+			if ($field['type'] == 'attachment') continue;
 			if (!Custom_Field::isFieldDataVisibleToCurrentUser($field)) continue;
 			switch ($field['type']) {
 				case 'select':

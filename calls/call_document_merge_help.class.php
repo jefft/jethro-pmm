@@ -105,6 +105,7 @@ class Call_document_merge_help extends Call
 					$fields = $GLOBALS['system']->getDBObjectData('custom_field', Array());
 					foreach ($fields as $id => $field) {
 						if (!Custom_Field::isFieldDataVisibleToCurrentUser($field)) continue;
+						if ($field['type'] == 'attachment') continue;
 						?>
 						<li><code>[person.<?php echo $fname = strtoupper(str_replace(' ', '_', $field['name'])); ?>]</code> -  custom field</li>
 						<?php

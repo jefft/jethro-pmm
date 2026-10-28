@@ -83,6 +83,11 @@ define('JETHRO_VERSION', getenv("JETHRO_VERSION"));
 # plugin and passed through by devbox.d/php/php-fpm.conf. DB_DATABASE is baked
 # into the DSN because JethroDB ignores it when DB_DSN is defined (jethrodb.php).
 if (!defined('DB_DATABASE')) define('DB_DATABASE', 'jethro_functest');
+// Keep functest attachment writes isolated from the dev web server and the
+// shared checkout attachment tree. Each checkout gets its own test store.
+if (!defined('ATTACHMENTS_ROOT_PATH')) {
+    define('ATTACHMENTS_ROOT_PATH', JETHRO_ROOT.'/.devbox/attachments-functest');
+}
 if (!defined('DB_HOST') && !defined('DB_DSN')) {
 	define('DB_DSN', 'mysql:unix_socket=' . getenv('MYSQL_UNIX_PORT') . ';dbname=' . DB_DATABASE);
 }

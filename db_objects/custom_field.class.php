@@ -1,6 +1,9 @@
 <?php
 include_once 'include/db_object.class.php';
 require_once __DIR__.'/../include/data_permissions.php';
+/**
+ * @see docs/docs/developer/reference/custom-field-attachments.md for the attachment type.
+ */
 class Custom_Field extends DB_Object
 {
 	protected $_save_permission_level = PERM_SYSADMIN;
@@ -31,7 +34,8 @@ class Custom_Field extends DB_Object
 											'text' => 'Text',
 											'select' => 'Selection',
 											'date' => 'Date',
-											'link' => 'Link'
+											'link' => 'Link',
+											'attachment' => 'Attachment'
 										  ),
 							'default'	=> 'text',
 							'attrs'		=> Array(
@@ -354,6 +358,42 @@ class Custom_Field extends DB_Object
 	}
 
 	/**
+	 * Print an interface to configure parameters for this field if its type is 'attachment'
+	 * @param string $prefix
+	 * @param array $params  Existing params of this field
+	 */
+	public static function printParamsAttachment($prefix, $params)
+	{
+		$allowed = array_get($params, 'allowed_extensions', '');
+		if (is_array($allowed)) $allowed = implode(', ', $allowed);
+		$maxMb = (int)array_get($params, 'max_mb', 0);
+		?>
+		<label>
+		Allowed extensions:
+		<?php
+		print_widget($prefix.'allowed_extensions',
+			Array('type' => 'text', 'attrs' => Array('placeholder' => Attachments_Manager::DEFAULT_EXTENSIONS, 'size' => 40)),
+			$allowed
+		);
+		?>
+		</label>
+		<label>
+		Maximum size (MB):
+		<?php
+		print_widget($prefix.'max_mb',
+			Array('type' => 'int', 'attrs' => Array('min' => 0, 'max' => 1024)),
+			$maxMb
+		);
+		?>
+		</label>
+		<div class="smallprint help-inline">
+			Comma-separated. Leave blank for the default list.
+			Files are stored under <code>ATTACHMENTS_ROOT_PATH</code>.
+		</div>
+		<?php
+	}
+
+	/**
 	 * Print an interface to configure parameters for this field if its type is 'select'
 	 * @param string $prefix
 	 * @param array $params  Existing params of this field
@@ -441,6 +481,10 @@ class Custom_Field extends DB_Object
 				$val['allow_blank_year'] = !empty($_REQUEST[$prefix.'allow_blank_year']);
 				$val['regex'] = array_get($_REQUEST, $prefix.'regex', '');
 				$val['template'] = array_get($_REQUEST, $prefix.'template', '');
+				if ($this->getValue('type') == 'attachment') {
+					$val['allowed_extensions'] = trim((string)array_get($_REQUEST, $prefix.'allowed_extensions', ''));
+					$val['max_mb'] = (int)array_get($_REQUEST, $prefix.'max_mb', 0);
+				}
 
 				// Also process the options for select fields:
 				if (!empty($_REQUEST[$prefix.'option_ids'])) {
@@ -589,6 +633,11 @@ class Custom_Field extends DB_Object
 		if (!$this->isVisibleToCurrentUser()) {
 			return;
 		}
+		if ($this->getValue('type') == 'attachment') {
+			$this->printAttachmentWidget($value, $prefix);
+			return;
+		}
+
 		$widgetParams = $this->getWidgetParams();
 		$otherValue = '';
 		if (($this->getValue('type') == 'select') && strlen($value) && !empty($this->values['params']['allow_other'])) {
@@ -615,14 +664,86 @@ class Custom_Field extends DB_Object
 	}
 
 	/**
+	 * Print the list of existing attachments plus an upload input.
+	 * @param mixed $values   Existing attachment IDs (scalar or array)
+	 * @param string $prefix  Form field prefix
+	 */
+	public function printAttachmentWidget($values, $prefix='')
+	{
+		if (!$this->isVisibleToCurrentUser()) {
+			return;
+		}
+		$params = (array)$this->getValue('params');
+		$allowMultiple = (bool)$this->getValue('allow_multiple');
+		$values = array_remove_empties(array_map('strval', (array)$values));
+		?>
+		<div class="attachment-field" id="custom_<?php echo (int)$this->id; ?>">
+			<?php
+			foreach ($values as $value) {
+				$staged = Custom_Field_Attachment::peekStagedUpload($value);
+				if ($staged) {
+					?>
+					<div class="attachment-item">
+						<span><?php echo ents($staged['filename']); ?> (not saved yet)</span>
+						<label class="checkbox">
+							<input type="checkbox" name="<?php echo ents($prefix.'custom_'.$this->id.'_delete[]'); ?>" value="<?php echo ents($value); ?>" aria-label="<?php echo ents('Remove '.$staged['filename']); ?>" />
+							Remove
+						</label>
+						<input type="hidden" name="<?php echo ents($prefix.'custom_'.$this->id.'_existing[]'); ?>" value="<?php echo ents($value); ?>" />
+					</div>
+					<?php
+					continue;
+				}
+				$id = (int)$value;
+				$row = $id ? Custom_Field_Attachment::getRow($id) : NULL;
+				if (!$row) continue;
+				$check = Custom_Field_Attachment::checkIntegrity($row);
+				?>
+				<div class="attachment-item">
+					<?php if ($check['ok']) { ?>
+						<a target="_blank" title="<?php echo ents(Custom_Field_Attachment::getUploadTitle($row)); ?>" href="<?php echo ents(build_url(Array('*' => NULL, 'call' => 'custom_field_attachment', 'id' => $id))); ?>"><?php echo ents($row['filename']); ?></a>
+					<?php } else { ?>
+						<span class="text-error"><?php echo ents('Attachment "'.$row['filename'].'": '.$check['message']); ?></span>
+					<?php } ?>
+					<label class="checkbox">
+						<input type="checkbox" name="<?php echo ents($prefix.'custom_'.$this->id.'_delete[]'); ?>" value="<?php echo $id; ?>" aria-label="<?php echo ents('Remove '.$row['filename']); ?>" />
+						Remove
+					</label>
+					<input type="hidden" name="<?php echo ents($prefix.'custom_'.$this->id.'_existing[]'); ?>" value="<?php echo $id; ?>" />
+				</div>
+				<?php
+			}
+			?>
+			<input type="file"
+				   id="custom_<?php echo (int)$this->id; ?>_upload"
+				   name="<?php echo ents($prefix.'custom_'.$this->id.'_upload[]'); ?>"
+				   aria-label="<?php echo ents('Upload '.$this->getValue('name')); ?>"
+				   accept="<?php echo ents(Attachments_Manager::getAcceptAttribute($params)); ?>"
+				   max-bytes="<?php echo (int)Attachments_Manager::getMaxBytes($params); ?>"
+				   <?php if ($allowMultiple) echo 'multiple="multiple"'; ?>
+			/>
+			<div class="help-inline smallprint">
+				<?php echo ents(implode(', ', Attachments_Manager::getAllowedExtensions($params))); ?>
+				&middot; maximum <?php echo ents(Attachments_Manager::getMaxSizeLabel($params)); ?>
+				<?php if ($allowMultiple) echo '&middot; multiple files allowed'; ?>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
 	 * Process an interface where an end user supplies a value for this custom field for a person record
 	 * @return mixed
 	 */
-	public function processWidget($prefix='')
+	public function processWidget($prefix='', $personid=0)
 	{
 		if (!$this->isVisibleToCurrentUser()) {
 			return NULL;
 		}
+		if ($this->getValue('type') == 'attachment') {
+			return $this->processAttachmentWidget($prefix, $personid);
+		}
+
 		$res = process_widget($prefix.'custom_'.$this->id, $this->getWidgetParams(), NULL, TRUE);
 		if (($this->getValue('type') == 'date') && !empty($this->values['params']['allow_note'])) {
 			$notes = process_widget($prefix.'custom_'.$this->id.'_note', Array('type' => 'text'), NULL, TRUE);
@@ -644,6 +765,108 @@ class Custom_Field extends DB_Object
 	}
 
 	/**
+	 * Process attachment selections/uploads, validating ownership before use.
+	 * @param string $prefix
+	 * @param int $personid
+	 * @return array
+	 */
+	private function processAttachmentWidget($prefix='', $personid=0)
+	{
+		$existing = array_get($_REQUEST, $prefix.'custom_'.$this->id.'_existing', Array());
+		$deleted = array_get($_REQUEST, $prefix.'custom_'.$this->id.'_delete', Array());
+		$submittedExisting = array_values(array_remove_empties(array_map('strval', (array)$existing)));
+		$deleted = array_map('strval', (array)$deleted);
+		$existing = Array();
+		foreach ($submittedExisting as $value) {
+			if (0 === strpos($value, 'new:')) {
+				if (Custom_Field_Attachment::isValidStagedUpload($value, $personid, (int)$this->id)) $existing[] = $value;
+			} else if ((int)$value > 0 && Custom_Field_Attachment::isValidForPersonField((int)$value, (int)$personid, (int)$this->id)) {
+				$existing[] = (string)(int)$value;
+			}
+		}
+		$validatedExisting = $existing;
+		$existing = array_values(array_diff($existing, array_remove_empties($deleted)));
+
+		$newValues = Array();
+		$uploadAttempted = FALSE;
+		$uploadSucceeded = FALSE;
+		$files = self::_normaliseUploadedFiles(array_get($_FILES, $prefix.'custom_'.$this->id.'_upload'));
+		foreach ($files as $file) {
+			if (($file['error'] ?? UPLOAD_ERR_NO_FILE) == UPLOAD_ERR_NO_FILE) continue;
+			$uploadAttempted = TRUE;
+			$token = Custom_Field_Attachment::stageUpload(
+				$file,
+				(array)$this->getValue('params'),
+				(string)$this->getValue('name'),
+				(int)$this->id,
+				(int)$personid
+			);
+			if ($token) {
+				$uploadSucceeded = TRUE;
+				$newValues[] = $token;
+				if (!$this->getValue('allow_multiple')) {
+					break;
+				}
+			}
+		}
+		if ($uploadAttempted && !$uploadSucceeded) {
+			// Rejected replacement: apply nothing, so the current attachment
+			// is not lost just because the user also ticked Remove.
+			$existing = $validatedExisting;
+		}
+
+		return self::mergeAttachmentValues($existing, $newValues, (bool)$this->getValue('allow_multiple'));
+	}
+
+	/**
+	 * Combine kept existing attachment IDs with newly staged uploads.
+	 * @param array<int,string> $existing
+	 * @param array<int,string> $newValues
+	 * @param bool $allowMultiple
+	 * @return array<int,string>
+	 */
+	public static function mergeAttachmentValues(array $existing, array $newValues, $allowMultiple)
+	{
+		if (!$allowMultiple && $newValues) {
+			// A new upload replaces the current value. With no upload, keep
+			// every existing value: they were uploaded while multiple files
+			// were allowed, and the user has not asked to remove them.
+			$existing = Array();
+		}
+		return array_values(array_merge($existing, $newValues));
+	}
+
+	/**
+	 * Normalise one or many entries from $_FILES into a list of single-file arrays.
+	 * @param array|null $files
+	 * @return array
+	 */
+	private static function _normaliseUploadedFiles($files)
+	{
+		if (empty($files) || !isset($files['name'])) {
+			return Array();
+		}
+		if (!is_array($files['name'])) {
+			return Array($files);
+		}
+		$res = Array();
+		$types = (array)array_get($files, 'type', Array());
+		$tmpNames = (array)array_get($files, 'tmp_name', Array());
+		$errors = (array)array_get($files, 'error', Array());
+		$sizes = (array)array_get($files, 'size', Array());
+		foreach ($files['name'] as $i => $name) {
+			$res[] = Array(
+				'name' => $name,
+				'type' => $types[$i] ?? '',
+				'tmp_name' => $tmpNames[$i] ?? '',
+				'error' => $errors[$i] ?? UPLOAD_ERR_NO_FILE,
+				'size' => $sizes[$i] ?? 0,
+			);
+		}
+		return $res;
+	}
+
+	/**
 	 * Format a value of this field into a human readable form
 	 * (ie. dates formatted, option IDs rendered as option labels, etc).
 	 * @param mixed $val	Raw value
@@ -656,6 +879,9 @@ class Custom_Field extends DB_Object
 		if (!strlen($val)) return '';
 
 		switch ($this->getValue('type')) {
+			case 'attachment':
+				$name = Custom_Field_Attachment::getDisplayName($val);
+				return strlen($name) ? $name : '[Missing attachment]';
 			case 'date':
 				if (!preg_match('/(([-0-9]{4})?-([0-9]{2}-[0-9]{2}))( (.*))?/', $val, $matches)) {
 					return "! Malformed value $val";
@@ -693,6 +919,26 @@ class Custom_Field extends DB_Object
 			echo '[Restricted]';
 			return;
 		}
+		if ($this->getValue('type') == 'attachment') {
+			if (0 === strpos((string)$val, 'new:')) {
+				echo ents(Custom_Field_Attachment::getStagedFileName($val));
+				return;
+			}
+			$row = Custom_Field_Attachment::getRow((int)$val);
+			if (!$row) {
+				echo '[Missing attachment]';
+				return;
+			}
+			$check = Custom_Field_Attachment::checkIntegrity($row);
+			if (!$check['ok']) {
+				echo '<span class="text-error">'.ents('Attachment "'.$row['filename'].'": '.$check['message']).'</span>';
+				return;
+			}
+			$url = build_url(Array('*' => NULL, 'call' => 'custom_field_attachment', 'id' => (int)$row['id']));
+			$title = Custom_Field_Attachment::getUploadTitle($row);
+			echo '<a target="_blank" title="'.ents($title).'" href="'.ents($url).'">'.ents($row['filename']).'</a>';
+			return;
+		}
 		if ($this->getValue('type') == 'link') {
 			$template = array_get($this->values['params'], 'template', '');
 			if (strlen($template)) {
@@ -718,6 +964,8 @@ class Custom_Field extends DB_Object
 	public function parseValue($val)
 	{
 		switch ($this->getValue('type')) {
+			case 'attachment':
+				return NULL;
 			case 'date':
 				if (preg_match('#([0-9]{4})/([0-9]{2})/([0-9]{2})#', $val, $matches)) {
 					if (($matches[2] < 12) && ($matches[3] < 31)) {
@@ -766,5 +1014,21 @@ class Custom_Field extends DB_Object
 	public static function getSortValueSQLExpr($dataTableAlias, $optionTableAlias)
 	{
 		return 'COALESCE('.$optionTableAlias.'.`rank`, '.$dataTableAlias.'.value_date, '.$dataTableAlias.'.value_text)';
+	}
+
+	/**
+	 * Delete this field, including any filesystem attachments it owns.
+	 * @return bool
+	 */
+	public function delete()
+	{
+		$rows = $this->getValue('type') == 'attachment'
+			? Custom_Field_Attachment::getRowsForField($this->id)
+			: Array();
+		$res = parent::delete();
+		if ($res && $rows) {
+			Custom_Field_Attachment::deleteFiles($rows);
+		}
+		return $res;
 	}
 }
