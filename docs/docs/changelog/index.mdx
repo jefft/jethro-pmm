@@ -60,6 +60,13 @@ In addition to the per-person 'Messages' tab, a new [Persons → Messages](../us
 
 The SMS Overview lists every send with sender, recipients (with per-recipient delivery badges), body, and date. It can be filtered in real time by sender name, recipient name, body text, date range, and single-recipient sends only, and has an optional 'Cost' column with a running total. Sends with deliveries still pending — scheduled, or within the [send cool-off](../user-manual/sms.mdx#send-cool-off) window — have a Cancel (or 'Cancel all') link.
 
+### Search message bodies
+
+[System-wide search](../user-manual/search.mdx) now also finds the body text of single-recipient
+SMSes, for staff with the **SMS - view all** permission. Bulk sends are not included. Results show
+the message date, recipient and a snippet, and link straight to the message in that person's
+Messages tab. A matching message never stops a single-person search from jumping to that person.
+
 ### New Permission: **SMS - view all**
 
 As Jethro is now storing SMS communications it wasn't before, we need a new [permission](../administration/config/sms.mdx#permissions). **SMS - view all** determines whether you can see SMSes sent by _other_ staff. **SMS - view all** is also needed to access the system-wide SMS history at Persons → Messages.
@@ -147,6 +154,22 @@ Jethro no longer logs to the `SMS_SEND_LOGFILE` file, as a much fuller history i
 The existing log file is not imported or deleted. **Synchronize History** can recover everything your SMS provider still holds (roughly the last 12 months for 5CentSMS), so keep or archive the file if you need older history. See [SMS send log file](../administration/config/sms.mdx#sms-send-log-file).
 
 ## Version 2.39 (unreleased)
+
+### Search results page: live search
+
+The [search results page](../user-manual/search.mdx) now keeps the search box at the top of the page,
+and results update as you type (one character is not enough; the search starts at two). Changing
+"Search for..." re-runs the search too.
+
+Pressing Enter still works exactly as before, including jumping straight to the person, family or
+group when there is only one match. The header search box is hidden on the results page, since the
+page now has its own.
+
+A new **Search in...** option narrows the search to one kind of information: name, phone, email,
+address, contact remarks, or any custom field marked "Include in system-wide search". Address and
+contact remarks are now searched too: address matches the start of any word in a family's street,
+suburb or postcode; contact remarks match anywhere in the text. "Everything" searches all of these.
+People and families that match by name are listed before those that match on another field.
 
 ### Service Planning
 
