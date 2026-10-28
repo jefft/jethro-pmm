@@ -1,6 +1,7 @@
 <?php
 include_once 'include/db_object.class.php';
 include_once 'include/size_detector.class.php';
+include_once __DIR__ . '/../include/jethro_sms.php';
 class Person extends DB_Object
 {
 	protected $_save_permission_level = PERM_EDITPERSON;
@@ -293,43 +294,22 @@ class Person extends DB_Object
 				echo $person_name;
 				return;
 			case 'mobile_tel':
-				if (!strlen($value)) return;
-				$links = Array('<a href="tel:'.ents($value).'"><i class="icon-phone"></i> Call</a>');
-				if (SMS_Sender::canSend()) {
-					$msg = _('SMS via Jethro');
-					$links[] = '<a href="#send-sms-modal" data-toggle="sms-modal" data-personid="' . $this->id . '" data-name="' . $person_name . '"><i class="icon-envelope"></i> '.$msg.'</a>';
-					static $printedSmsModal = FALSE;
-					if (!$printedSmsModal) {
-						SMS_Sender::printModal();
-						$printedSmsModal = TRUE;
-					}
-				}
-				if (FALSE !== strpos(array_get($_SERVER, 'HTTP_USER_AGENT', ''), 'Macintosh')) {
-					// on mac we can use the messages app
-					$msg = _('SMS via iMessage');
-					$links[] = '<a href="imessage:'.ents($value).'"><i class="icon-envelope"></i> '.$msg.'</a>';
-				} else if (SizeDetector::isNarrow()) {
-					// Probably a phone - use SMS link
-					$msg = SMS_Sender::canSend() ? 'SMS via my device' : 'SMS';
-					$links[] = '<a href="sms:'.ents($value).'"><i class="icon-envelope"></i> '.$msg.'</a>';
-				}
-				$internationalNumber = preg_replace('/[^0-9]/', '', SMS_INTERNATIONAL_PREFIX).substr($value, strlen(SMS_LOCAL_PREFIX));
-				$links[] = '<a href="https://wa.me/'.$internationalNumber.'" target="_whatsapp"><i class="icon-comment"></i> Send WhatsApp</a>';
-				$links[] = '<a data-action="copy" data-target="#mobile-'.$this->id.'"><i class="icon-copy"></i> Copy number</a>';
+				if (!strlen((string) $value)) return;
 
-				?>
-				<span class="dropdown nowrap">
-					<a class="dropdown-toggle mobile-tel" id="mobile-<?php echo $this->id; ?>" data-toggle="dropdown" href="#"><?php echo ents($this->getFormattedValue('mobile_tel')); ?></a>
-					<ul class="dropdown-menu" role="menu" aria-labelledby="mobile-<?php echo $this->id; ?>" style="z-index:9999">
-					<?php
-					foreach ($links as $l) {
-						?>
-						<li><?php echo $l; ?></li>
-						<?php
-					}
-					?>
-					</ul>
-				</span>
+				$internationalNumber = preg_replace('/[^0-9]/', '', ifdef('SMS_INTERNATIONAL_PREFIX', '61')).substr((string) $value, strlen(ifdef('SMS_LOCAL_PREFIX', '0')));
+				// The mobile links ('Call', 'SMS via Jethro', 'Send Whatsapp', 'Copy number' are generated from these data-* attributes in Javascript (the a.mobile-tel click handler).
+				// data-optedout only matters to the 'SMS via Jethro' link, so viewers who
+				// can't send never trigger the provider's opt-out lookup.
+				$optedOut = \Jethro\Sms\canSendSms() && \Jethro\Sms\isPersonOptedOut($this);
+?>
+				<a href="javascript:void(0);" class="dropdown-toggle mobile-tel" id="mobile-<?php echo $this->id; ?>"
+				   data-mobilenumber="<?php echo ents($value); ?>"
+				   data-international="<?php echo ents($internationalNumber); ?>"
+				   data-personid="<?php echo $this->id; ?>"
+				   data-name="<?php echo $person_name; ?>"
+				   <?php if ($optedOut) echo 'data-optedout="1"'; ?>
+
+				><?php echo ents($this->getFormattedValue('mobile_tel')); ?></a>
 				<?php
 				return;
 			case 'email':
@@ -427,6 +407,36 @@ class Person extends DB_Object
 			$all_notes = array_reverse($all_notes, TRUE);
 		}
 		return $all_notes;
+	}
+
+	/**
+	 * Get SMS delivery history for this person.
+	 * Delegates to \Jethro\Sms\getPersonSmsHistory().
+	 *
+	 * @return array<int, array<string, mixed>>  Deliveries keyed by sms ID, ordered by created DESC
+	 */
+	function getSmsHistory(): array
+	{
+		require_once JETHRO_ROOT . '/include/jethro_sms.php';
+		return \Jethro\Sms\getPersonSmsHistory((int)$this->id);
+	}
+
+	/**
+	 * Get count of SMS messages sent only to this person (recipient_count = 1).
+	 *
+	 * @param array|null $history  An already-fetched getSmsHistory() result, to avoid re-querying
+	 * @return int  Number of direct (non-broadcast) SMS messages
+	 */
+	function getPersonalSmsCount(?array $history = null): int
+	{
+		$history = $history ?? $this->getSmsHistory();
+		$count = 0;
+		foreach ($history as $entry) {
+			if (($entry['recipient_count'] ?? 1) == 1) {
+				$count++;
+			}
+		}
+		return $count;
 	}
 
 	function validateFields()
@@ -531,13 +541,33 @@ class Person extends DB_Object
 
 	}
 
-	public static function getPersonsBySearch($searchTerm, $includeArchived=true)
+	/**
+	 * Find persons matching $searchTerm, best match first.
+	 *
+	 * Names and searchable custom fields match at the start of the value or of any word in it
+	 * ('term%' / '% term%'); remarks match anywhere ('%term%'), since they are free prose.
+	 *
+	 * Results are ordered by what matched — name, then custom field, then remarks (a person matching
+	 * several ways ranks by their best) — then by status and name. Each row's `search_rank` holds
+	 * that rank (1 = name, 2 = custom field, 3 = remarks).
+	 *
+	 * @param string $searchTerm
+	 * @param bool $includeArchived
+	 * @param list<string>|null $fields Which parts to search: 'name' (first, last, full name),
+	 *        'remarks' (contact remarks), 'custom_<id>' (one searchable custom field; non-searchable
+	 *        ids match nothing), 'custom' (all searchable custom fields). NULL = name + custom, the
+	 *        default used by the persons list and the person chooser.
+	 * @return array<int, array<string, mixed>> personid => person row (plus search_rank)
+	 */
+	public static function getPersonsBySearch($searchTerm, $includeArchived=true, ?array $fields=NULL)
 	{
 		$db = $GLOBALS['db'];
-		$SQL = '
-			SELECT pp.id, pp.*
-			FROM (
-				SELECT p.*
+		$fields = $fields ?? Array('name', 'custom');
+		// One branch per kind of field, each tagged with its rank.
+		$selects = Array();
+		if (in_array('name', $fields)) {
+			$selects[] = '
+				SELECT p.*, 1 AS search_rank
 				FROM person p
 				WHERE (
 					(first_name LIKE '.$db->quote($searchTerm.'%').')
@@ -545,19 +575,37 @@ class Person extends DB_Object
 					OR (first_name LIKE '.$db->quote('% '.$searchTerm.'%').')
 					OR (last_name LIKE '.$db->quote('% '.$searchTerm.'%').')
 					OR (CONCAT(first_name, " ", last_name) LIKE '.$db->quote($searchTerm.'%').')
-				)
-
-				UNION
-
-				SELECT p.*
+				)';
+		}
+		$customFieldIDs = Array();
+		foreach ($fields as $f) {
+			if (preg_match('/^custom_(\d+)$/', $f, $m)) $customFieldIDs[] = (int)$m[1];
+		}
+		if (in_array('custom', $fields) || $customFieldIDs) {
+			$selects[] = '
+				SELECT p.*, 2 AS search_rank
 				FROM person p
 				JOIN custom_field_value cfv ON cfv.personid = p.id
 				JOIN custom_field cf ON cfv.fieldid = cf.id
 				WHERE cf.searchable
+				'.(in_array('custom', $fields) ? '' : 'AND cf.id IN ('.implode(',', $customFieldIDs).')').'
 				AND (
 					(cfv.value_text LIKE '.$db->quote($searchTerm.'%').')
 					OR (cfv.value_text LIKE '.$db->quote('% '.$searchTerm.'%').' )
-				)
+				)';
+		}
+		if (in_array('remarks', $fields)) {
+			$selects[] = '
+				SELECT p.*, 3 AS search_rank
+				FROM person p
+				WHERE p.remarks LIKE '.$db->quote('%'.$searchTerm.'%');
+		}
+		if (empty($selects)) return Array();
+		// UNION ALL: rows differ by rank anyway; GROUP BY collapses each person to their best rank.
+		// The MIN() column comes after pp.* so it overrides pp.search_rank in the fetched row.
+		$SQL = '
+			SELECT pp.id, pp.*, MIN(pp.search_rank) AS search_rank
+			FROM ('.implode("\n\t\t\t\tUNION ALL\n", $selects).'
 			) pp
 			JOIN person_status ps ON ps.id = pp.status
 		';
@@ -568,7 +616,7 @@ class Person extends DB_Object
 		}
 		$SQL .= '
 			GROUP BY pp.id
-			ORDER BY status
+			ORDER BY MIN(pp.search_rank), pp.status, pp.last_name, pp.first_name
 			';
 		$res = $db->queryAll($SQL, null, null, true, true); // 5th param forces array even if one col
 		return $res;
@@ -1026,10 +1074,6 @@ class Person extends DB_Object
 
 		if (!$this->id) unset($this->fields['familyid']);
 
-		// Extra CSRF protection because mobile number is sensitive.
-		$_SESSION['person_form_token'][$this->id] = generate_random_string();
-		print_hidden_field($prefix.'token', $_SESSION['person_form_token'][$this->id]);
-
 		parent::printForm($prefix, $fields);
 
 		unset($this->fields['photo']);
@@ -1089,12 +1133,6 @@ class Person extends DB_Object
 
 	function processForm($prefix='', $fields=NULL)
 	{
-		// Extra CSRF protection because mobile number is sensitive.
-		if (($this->id) && (array_get($_REQUEST, $prefix.'token') != $_SESSION['person_form_token'][$this->id])) {
-			throw new \RuntimeException("Synchroniser token mismatch - person could not be saved");
-			return FALSE;
-		}
-
 		$res = parent::processForm($prefix, $fields);
 
 		$GLOBALS['system']->setFriendlyErrors(TRUE);
