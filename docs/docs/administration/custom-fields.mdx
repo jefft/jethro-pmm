@@ -83,8 +83,9 @@ Attachment fields are intentionally not available as:
 - action-plan fields;
 - system-wide search fields.
 
-They can be displayed in reports and filtered by "has an attachment" or "has no
-attachment".
+They can be displayed in reports and filtered by "has an attachment", "has no
+attachment", or filename. Filename filters are case-insensitive and accept SQL
+`LIKE` wildcards (`%` and `_`).
 
 ### Backup
 
