@@ -1,5 +1,6 @@
 <?php
 include_once 'include/db_object.class.php';
+require_once __DIR__.'/../include/data_permissions.php';
 class Custom_Field extends DB_Object
 {
 	protected $_save_permission_level = PERM_SYSADMIN;
@@ -56,6 +57,11 @@ class Custom_Field extends DB_Object
 							'options'  => Array('No', 'Yes'),
 							'default'	=> 0,
 							'title'		=> 'Whether to include this field in system-wide search',
+						   ),
+			'sensitive' => Array(
+							'type'		=> 'boolean',
+							'default'	=> 0,
+							'title'		=> 'Whether this field can only be viewed by users with the Sensitive custom fields permission',
 						   ),
 			'heading_before'=> Array(
 							'type'		=> 'text',
@@ -120,6 +126,64 @@ class Custom_Field extends DB_Object
 	}
 
 	/**
+	 * Whether the current user may see custom fields at all.
+	 * @return bool
+	 */
+	public static function currentUserCanViewCustomFields()
+	{
+		if (empty($GLOBALS['user_system'])) {
+			return FALSE;
+		}
+		if (method_exists($GLOBALS['user_system'], 'isCLIScript') && $GLOBALS['user_system']->isCLIScript()) {
+			return TRUE;
+		}
+		if (!method_exists($GLOBALS['user_system'], 'haveDataPerm')) {
+			return FALSE;
+		}
+		return $GLOBALS['user_system']->haveDataPerm(DATA_PERM_VIEWCUSTOMFIELDS);
+	}
+
+	/**
+	 * Whether the current user may see fields marked sensitive.
+	 * @return bool
+	 */
+	public static function currentUserCanViewSensitiveFields()
+	{
+		if (empty($GLOBALS['user_system'])) {
+			return FALSE;
+		}
+		if (method_exists($GLOBALS['user_system'], 'isCLIScript') && $GLOBALS['user_system']->isCLIScript()) {
+			return TRUE;
+		}
+		if (!method_exists($GLOBALS['user_system'], 'haveDataPerm')) {
+			return FALSE;
+		}
+		return $GLOBALS['user_system']->haveDataPerm(DATA_PERM_VIEWSENSITIVE);
+	}
+
+	/**
+	 * Check a custom_field data row for visibility to the current user.
+	 * @param array $details
+	 * @return bool
+	 */
+	public static function isFieldDataVisibleToCurrentUser($details)
+	{
+		if (!self::currentUserCanViewCustomFields()) {
+			return FALSE;
+		}
+		return empty($details['sensitive']) || self::currentUserCanViewSensitiveFields();
+	}
+
+	/**
+	 * Whether this field is visible to the current user.
+	 * @return bool
+	 */
+	public function isVisibleToCurrentUser()
+	{
+		return self::isFieldDataVisibleToCurrentUser($this->values);
+	}
+
+	/**
 	 * Print the interface for CONFIGURING this custom field.
 	 * @param string $fieldname	Name of this object's field
 	 * @param string $prefix	Prefix to use on HTML element names
@@ -143,6 +207,7 @@ class Custom_Field extends DB_Object
 			case 'divider_before':
 			case 'show_add_family':
 			case 'searchable':
+			case 'sensitive':
 				print_widget($prefix.$fieldname,
 						Array('type' => 'checkbox', 'attrs' => Array('title' => $this->fields[$fieldname]['title'])),
 						$this->values[$fieldname]);
@@ -367,6 +432,9 @@ class Custom_Field extends DB_Object
 			case 'searchable':
 				$this->setValue($fieldname, !empty($_REQUEST[$prefix.$fieldname]));
 				break;
+			case 'sensitive':
+				$this->setValue($fieldname, (int)!empty($_REQUEST[$prefix.$fieldname]));
+				break;
 			case 'params':
 				$val = Array();
 				$val['allow_note'] = !empty($_REQUEST[$prefix.'allow_note']);
@@ -518,6 +586,9 @@ class Custom_Field extends DB_Object
 	 */
 	public function printWidget($value, $extraParams=Array(), $prefix='')
 	{
+		if (!$this->isVisibleToCurrentUser()) {
+			return;
+		}
 		$widgetParams = $this->getWidgetParams();
 		$otherValue = '';
 		if (($this->getValue('type') == 'select') && strlen($value) && !empty($this->values['params']['allow_other'])) {
@@ -549,6 +620,9 @@ class Custom_Field extends DB_Object
 	 */
 	public function processWidget($prefix='')
 	{
+		if (!$this->isVisibleToCurrentUser()) {
+			return NULL;
+		}
 		$res = process_widget($prefix.'custom_'.$this->id, $this->getWidgetParams(), NULL, TRUE);
 		if (($this->getValue('type') == 'date') && !empty($this->values['params']['allow_note'])) {
 			$notes = process_widget($prefix.'custom_'.$this->id.'_note', Array('type' => 'text'), NULL, TRUE);
@@ -577,6 +651,7 @@ class Custom_Field extends DB_Object
 	 */
 	public function formatValue($val)
 	{
+		if (!$this->isVisibleToCurrentUser()) return '[Restricted]';
 		if (is_array($val)) return implode(', ', array_map(Array($this, 'formatValue'), $val));
 		if (!strlen($val)) return '';
 
@@ -614,6 +689,10 @@ class Custom_Field extends DB_Object
 	 */
 	public function printFormattedValue($val)
 	{
+		if (!$this->isVisibleToCurrentUser()) {
+			echo '[Restricted]';
+			return;
+		}
 		if ($this->getValue('type') == 'link') {
 			$template = array_get($this->values['params'], 'template', '');
 			if (strlen($template)) {

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/../include/field_access.php';
 class Call_document_merge_help extends Call
 {
 	function run()
@@ -77,39 +78,56 @@ class Call_document_merge_help extends Call
 					<li><code>[person.age_bracket]</code></li>
 					<li><code>[person.congregation]</code></li>
 					<li><code>[person.status]</code></li>
+					<?php if (Field_Access::canRead('email')) { ?>
 					<li><code>[person.email]</code></li>
+					<?php } ?>
+					<?php if (Field_Access::canRead('home_tel')) { ?>
 					<li><code>[person.home_tel]</code></li>
+					<?php } ?>
+					<?php if (Field_Access::canRead('mobile_tel')) { ?>
 					<li><code>[person.mobile_tel]</code></li>
 					<li><code>[person.work_tel]</code></li>
+					<?php } ?>
+					<?php if ($GLOBALS['user_system']->haveDataPerm(DATA_PERM_VIEWREMARKS)) { ?>
 					<li><code>[person.contact_remarks]</code></li>
+					<?php } ?>
 					<li><code>[person.date_of_last_status_change]</code></li>
 					<li><code>[person.created_date]</code> - when added to the system</li>
 					<li><code>[person.family_name]</code></li>
+					<?php if (Field_Access::canRead('address_street')) { ?>
 					<li><code>[person.address_street]</code></li>
 					<li><code>[person.address_suburb]</code></li>
 					<li><code>[person.address_state]</code></li>
 					<li><code>[person.address_postcode]</code></li>
+					<?php } ?>
 
 					<?php
 					$fields = $GLOBALS['system']->getDBObjectData('custom_field', Array());
-						foreach ($fields as $id => $field) {
-							?>
-							<li><code>[person.<?php echo $fname = strtoupper(str_replace(' ', '_', $field['name'])); ?>]</code> -  custom field</li>
-							<?php
-						}
+					foreach ($fields as $id => $field) {
+						if (!Custom_Field::isFieldDataVisibleToCurrentUser($field)) continue;
 						?>
+						<li><code>[person.<?php echo $fname = strtoupper(str_replace(' ', '_', $field['name'])); ?>]</code> -  custom field</li>
+						<?php
+					}
+					?>
 				</ul>
 				<br />The available fields for merging <b>per family</b> are:
 				<ul>
 					<li><code>[family.id]</code> - the unique internal identifier number</li>
 					<li><code>[family.family_name]</code></li>
+					<?php if (Field_Access::canRead('address_street')) { ?>
 					<li><code>[family.street_address]</code></li>
 					<li><code>[family.suburb]</code></li>
 					<li><code>[family.state]</code></li>
 					<li><code>[family.postcode]</code></li>
 					<li><code>[family.home_tel]</code></li>
+					<?php } ?>
+					<?php if (Field_Access::canRead('mobile_tel')) { ?>
 					<li><code>[family.mobile_tels]</code> - mobile numbers of the adults</li>
+					<?php } ?>
+					<?php if (Field_Access::canRead('email')) { ?>
 					<li><code>[family.emails]</code> - email addresses of the adults</li>
+					<?php } ?>
 					<li><code>[family.status]</code></li>
 					<li><code>[family.created_date]</code> - when added to the system</li>
 					<li><code>[family.members]</code> - first names</li>

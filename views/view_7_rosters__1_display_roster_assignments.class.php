@@ -1,4 +1,5 @@
 <?php
+require_once JETHRO_ROOT.'/include/field_access.php';
 class View_Rosters__Display_Roster_Assignments extends View
 {
 	var $_start_date = '';
@@ -107,7 +108,9 @@ class View_Rosters__Display_Roster_Assignments extends View
 				if (!$this->_editing) {
 					echo '<div class="no-print margin-below">';
 					echo '<a target="print-roster" class="med-newwin nowrap" href="?call=display_roster&viewid='.$viewid.'&start_date='.$this->_start_date.'&end_date='.$this->_end_date.'"><i class="icon-print"></i>Show printable version</a> &nbsp; ';
-					echo '<a href="?call=email&print_modal=1&roster_view='.$viewid.'&start_date='.$this->_start_date.'&end_date='.$this->_end_date.'" target="_append" class="nowrap"><i class="icon-email">@</i>Email all assignees</a> &nbsp; ';
+					if (Field_Access::canRead('email')) {
+						echo '<a href="?call=email&print_modal=1&roster_view='.$viewid.'&start_date='.$this->_start_date.'&end_date='.$this->_end_date.'" target="_append" class="nowrap"><i class="icon-email">@</i>Email all assignees</a> &nbsp; ';
+					}
 
 					require_once 'include/jethro_sms.php';
 

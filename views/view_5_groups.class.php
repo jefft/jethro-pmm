@@ -172,11 +172,13 @@ class View_Groups extends View
 				<?php
 			}
 			if (!empty($persons)) {
+				if (Field_Access::canRead('email')) {
 				?>
 				<div class="email-link">
 					<a href="<?php echo build_url(Array('view' => NULL, 'call' => 'email', 'groupid' => $this->_group->id, 'print_modal' => 1)); ?>" target="_append"><i class="icon-email">@</i><?php echo _('Email members');?></a>
 				</div>
 				<?php
+				}
 				if (Jethro\Sms\canSendSms()) {
 					?>
 				<div class="sms-link">

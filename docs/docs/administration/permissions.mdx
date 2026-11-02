@@ -114,12 +114,26 @@ Permissions not listed above (People, SMS, Reports, Groups, System Administratio
 
 Separate from permission levels, user accounts can have **congregation restrictions** and **group restrictions**. These limit which people, families, and groups a user can see, regardless of their permission level. SysAdmins bypass these restrictions.
 
+## Viewable person fields
+
+Which person fields a user can see is set separately from the permission levels, as **Viewable Person Fields** on the user-account form:
+
+- **Address** (`VIEWADDRESS`) — family address and home phone
+- **Email** (`VIEWEMAIL`) — person email
+- **Mobile** (`VIEWMOBILE`) — person mobile and work phone
+- **Contact remarks** (`VIEWREMARKS`) — the contact remarks field
+- **Custom fields** (`VIEWCUSTOMFIELDS`) — all custom fields
+- **Sensitive custom fields** (`VIEWSENSITIVE`) — fields marked sensitive; requires Custom fields
+
+A hidden field is blank wherever it would appear, and the user cannot change it. SysAdmins see every field. Changes take effect at the user's next login. See [Contact field permissions](../developer/reference/contact-field-permissions.md).
+
 ## Configuration
 
 <table>
   <thead><tr><th>Setting</th><th>Default</th><th>Purpose</th></tr></thead>
   <tbody>
     <tr><td><code>DEFAULT_PERMISSIONS</code></td><td><em>(most permissions)</em></td><td>Permission set granted to new user accounts</td></tr>
+    <tr><td><code>DEFAULT_DATA_PERMISSIONS</code></td><td><em>(all viewable fields except sensitive custom fields)</em></td><td>Viewable person fields granted to new user accounts</td></tr>
     <tr><td><code>ENABLED_FEATURES</code></td><td><em>(all features)</em></td><td>Which feature modules are active</td></tr>
     <tr><td><code>2FA_REQUIRED_PERMS</code></td><td><em>(empty)</em></td><td>Comma-separated permission names that require 2-factor authentication</td></tr>
     <tr><td><code>RESTRICTED_USERS_CAN_ADD</code></td><td>Off</td><td>Allow users with congregation/group restrictions to create new persons and families</td></tr>

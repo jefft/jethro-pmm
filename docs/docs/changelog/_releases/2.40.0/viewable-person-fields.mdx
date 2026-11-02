@@ -1,0 +1,18 @@
+### Viewable person fields
+
+- **Person fields can be hidden independently.** A new **Viewable Person Fields**
+  section on the user-account form grants Address, Email, Mobile, Contact remarks
+  and Custom fields separately from the functions that use them. Existing staff
+  keep all of them on upgrade, and new accounts get them by default. A hidden
+  field is blanked on pages, reports, exports and in history, and the user cannot
+  change it. See [Permissions](../administration/permissions.mdx) and
+  [Contact field permissions](../developer/reference/contact-field-permissions).
+- **Sensitive custom fields.** A custom field can be marked **Sensitive**; only
+  users granted **Sensitive custom fields** can see it. No one except SysAdmins
+  has that permission until it is granted. See
+  [Custom Fields](../administration/custom-fields.mdx#sensitive-fields).
+- **Reports, history and note templates respect field visibility.** Report
+  filters, sorting and grouping are checked against fields the user may view.
+  History hides values for restricted fields, and note templates no longer copy
+  custom-field names or values into note text; those values remain on the person
+  record.

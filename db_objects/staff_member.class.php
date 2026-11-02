@@ -65,6 +65,14 @@ class Staff_Member extends Person
 									'default'	=> '1',
 									'label'		=> 'Account active?',
 						   ),
+			'data_permissions' => Array(
+									'type'		=> 'bitmask',
+									'options'	=> $GLOBALS['user_system']->getDataPermissionLevels(),
+									'default'	=> ifdef('DEFAULT_DATA_PERMISSIONS', 1040187392),
+									'label'		=> 'Viewable Person Fields',
+									'cols'		=> 3,
+									'note'      => 'NOTE: Changes to viewable fields only take effect the next time a user logs in',
+						   ),
 			'permissions'  => Array(
 									'type'		=> 'bitmask',
 									'options'	=> $GLOBALS['user_system']->getPermissionLevels(),
@@ -78,10 +86,31 @@ class Staff_Member extends Person
 
 	}
 	
-	// Undo the override in person class
+	/**
+	 * Undo the Person override: staff fields are inserted into staff_member.
+	 * @return string
+	 */
 	protected function _getInsertTableName()
 	{
 		return 'staff_member';
+	}
+
+	/**
+	 * Undo the Person override: staff fields are updated in staff_member.
+	 * @return string
+	 */
+	protected function _getUpdateTableName()
+	{
+		return 'staff_member';
+	}
+
+	/**
+	 * Delete the staff row, then the base person row (the person view is read-only).
+	 * @return array<int,string>
+	 */
+	protected function _getDeleteTableNames()
+	{
+		return Array('staff_member', '_person');
 	}
 
 	private function _check2FAAccess()
@@ -231,7 +260,7 @@ class Staff_Member extends Person
 	function printForm($prefix='', $fields=NULL)
 	{
 		if ($fields === NULL) {
-			$fields = Array('username', 'password', 'active', 'permissions', 'restrictions');
+			$fields = Array('username', 'password', 'active', 'data_permissions', 'permissions', 'restrictions');
 		}
 		$offset = array_search('permissions', array_keys($this->fields))+1;
 		$this->fields['restrictions'] = Array('type' => 'custom');
@@ -332,10 +361,11 @@ class Staff_Member extends Person
 				}
 				break;
 			case 'permissions':
-				if ($name == 'permissions') {
+			case 'data_permissions':
+				if ($name == 'permissions' || $name == 'data_permissions') {
 					// Subtly display the numeric permission level to help with config.php
 					?>
-					<div title="This number represents this combination of permissions, and can be used to set the default permissions in the config file" style="color: #ccc; position: absolute; right: 10px; padding: 3px"><?php echo $this->getValue($name) ?></div>
+					<div title="This number represents this combination of <?php echo ($name == 'permissions') ? 'permissions' : 'viewable person fields'; ?>, and can be used to set <?php echo ($name == 'permissions') ? 'DEFAULT_PERMISSIONS' : 'DEFAULT_DATA_PERMISSIONS'; ?> in the config file" style="color: #ccc; position: absolute; right: 10px; padding: 3px"><?php echo $this->getValue($name) ?></div>
 					<?php
 				}
 				if ($GLOBALS['user_system']->havePerm(PERM_SYSADMIN)) {
@@ -368,6 +398,7 @@ class Staff_Member extends Person
 				break;
 
 			case 'permissions':
+			case 'data_permissions':
 				if (!$GLOBALS['user_system']->havePerm(PERM_SYSADMIN)) {
 					return;
 				}
@@ -405,7 +436,7 @@ class Staff_Member extends Person
 	function processForm($prefix='', $fields=NULL)
 	{
 		if ($fields === NULL) {
-			$fields = Array('username', 'password', 'active', 'permissions', 'restrictions');
+			$fields = Array('username', 'password', 'active', 'data_permissions', 'permissions', 'restrictions');
 		}
 		parent::processForm($prefix, $fields);
 		if ($GLOBALS['user_system']->havePerm(PERM_SYSADMIN) && !empty($_REQUEST['restrictions'])) {
