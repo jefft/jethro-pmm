@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { realpathSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
@@ -100,9 +100,10 @@ function dbSetupStatus(): { pid: string; status: string; exitCode: string } {
  * process-compose job — the single definition of "fresh test data"
  * (process-compose.yml). `devbox services restart` returns as soon as the job
  * is relaunched, and HEALTH stays Ready from the previous run, so wait until a
- * new PID reports Completed, and fail on a non-zero exit code.
+ * new PID reports Completed, and fail on a non-zero exit code. Returns that
+ * PID, which identifies this reset (see releaseRunLock()).
  */
-async function resetFunctestDatabases() {
+async function resetFunctestDatabases(): Promise<string> {
   const before = dbSetupStatus().pid;
   devbox("services", "restart", DB_SETUP_SERVICE);
   const deadline = Date.now() + DB_SETUP_TIMEOUT_MS;
@@ -112,7 +113,7 @@ async function resetFunctestDatabases() {
       if (exitCode !== "0") {
         throw new Error(`${DB_SETUP_SERVICE} failed (exit code ${exitCode}); see: devbox services attach`);
       }
-      return;
+      return pid;
     }
     if (Date.now() > deadline) {
       throw new Error(`${DB_SETUP_SERVICE} did not complete within ${DB_SETUP_TIMEOUT_MS / 1000}s (status ${status})`);
@@ -121,10 +122,100 @@ async function resetFunctestDatabases() {
   }
 }
 
+/** Exclusive per-checkout run lock; see acquireRunLock(). */
+const RUN_LOCK = path.join(PROJECT_ROOT, ".devbox", "run", "functests.lock");
+
+/** Contents of RUN_LOCK. dbSetupPid is null until the databases are reset. */
+interface RunLock {
+  pid: number;
+  started: string;
+  dbSetupPid: string | null;
+}
+
+/** True if a process with this PID exists (EPERM still means it exists). */
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+function readRunLock(): RunLock | null {
+  try {
+    return JSON.parse(readFileSync(RUN_LOCK, "utf8")) as RunLock;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Take the per-checkout run lock, or refuse to start.
+ *
+ * All runs of one checkout share its functest databases and each run's setup
+ * recreates them, so an overlapping run would wipe another run's data mid-test
+ * and both would report misleading failures. The lock is created atomically
+ * ('wx'); a lock left by a dead runner (crash, SIGKILL) is taken over. This
+ * process is the Playwright runner, alive for the whole run. See
+ * DEVELOPMENT_FUNCTESTS.md "One suite run at a time".
+ */
+function acquireRunLock(): void {
+  mkdirSync(path.dirname(RUN_LOCK), { recursive: true });
+  const mine: RunLock = { pid: process.pid, started: new Date().toISOString(), dbSetupPid: null };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      writeFileSync(RUN_LOCK, JSON.stringify(mine), { flag: "wx" });
+      return;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+    }
+    const held = readRunLock();
+    if (held && isAlive(held.pid)) {
+      throw new Error(
+        `Another functest run (pid ${held.pid}, started ${held.started}) is using this checkout's ` +
+          "functest databases; this run's setup would recreate them under it. Wait for it to finish, " +
+          `or stop it. If no run is active, delete ${RUN_LOCK}.`,
+      );
+    }
+    rmSync(RUN_LOCK, { force: true });
+  }
+  throw new Error(`Could not take the functest run lock ${RUN_LOCK}; another run is starting concurrently.`);
+}
+
+/** Record which functest_databases_setup PID this run's data came from. */
+function recordDbSetupPid(dbSetupPid: string): void {
+  const lock = readRunLock();
+  if (lock?.pid !== process.pid) throw new Error(`Functest run lock ${RUN_LOCK} was taken over during setup`);
+  writeFileSync(RUN_LOCK, JSON.stringify({ ...lock, dbSetupPid }));
+}
+
+/**
+ * Release the run lock (global-teardown.ts) and report whether the run's data
+ * survived: throws if functest_databases_setup has run again since this run's
+ * reset — an out-of-band restart or a run that bypassed the lock recreated the
+ * databases mid-run, so test results are not trustworthy.
+ */
+export function releaseRunLock(): void {
+  const lock = readRunLock();
+  if (lock?.pid !== process.pid) return;
+  rmSync(RUN_LOCK, { force: true });
+  if (lock.dbSetupPid === null) return;
+  const now = dbSetupStatus().pid;
+  if (now !== lock.dbSetupPid) {
+    throw new Error(
+      `RUN INVALID: ${DB_SETUP_SERVICE} was re-run during this suite (pid ${lock.dbSetupPid} -> ${now}), ` +
+        "recreating the functest databases mid-run. Failures above may be caused by that, not by the code. " +
+        "Re-run the suite with nothing else using this checkout's functest services.",
+    );
+  }
+}
+
 /**
  * Suite-wide setup, run once before any test.
  *
- * Refuses to run against another checkout's functest server, then resets the
+ * Refuses to run against another checkout's functest server or while another
+ * run of this checkout holds the run lock (acquireRunLock()), then resets the
  * functest databases (resetFunctestDatabases()) so every run starts from the
  * same data, and compiles the css/js bundles for the current JETHRO_VERSION.
  *
@@ -135,6 +226,12 @@ async function resetFunctestDatabases() {
  */
 export default async function globalSetup() {
   await assertFunctestServerIsThisCheckout();
-  await resetFunctestDatabases();
-  execFileSync("jethro_compile", [], { cwd: PROJECT_ROOT, stdio: "inherit" });
+  acquireRunLock();
+  try {
+    recordDbSetupPid(await resetFunctestDatabases());
+    execFileSync("jethro_compile", [], { cwd: PROJECT_ROOT, stdio: "inherit" });
+  } catch (err) {
+    rmSync(RUN_LOCK, { force: true });
+    throw err;
+  }
 }

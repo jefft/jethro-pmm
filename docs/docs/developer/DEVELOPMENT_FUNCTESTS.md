@@ -55,6 +55,21 @@ stderr). Edits to the job's `command:` in `process-compose.yml` only take
 effect after `devbox services stop && devbox services up -b`: a process
 restart reuses the configuration process-compose loaded at startup.
 
+#### One suite run at a time
+
+Because every run recreates the shared databases, two overlapping runs of one
+checkout corrupt each other: the second run's setup wipes the first run's data
+mid-test, producing failures that look like regressions (e.g. `Undefined constant
+"MEMBER_LOGIN_ENABLED"` in the walkthrough, SMS stuck "scheduled"). So
+`global-setup.ts` takes an exclusive lock, `.devbox/run/functests.lock` (runner
+pid, start time, the `functest_databases_setup` PID it produced), and refuses to
+start while a live run holds it; a lock left by a dead runner is taken over.
+`global-teardown.ts` releases it and fails the run as **RUN INVALID** if
+`functest_databases_setup` ran again during the suite (an out-of-band
+`devbox services restart`), so such a run is never read as a pass or a real
+failure. When several people or agents share a checkout, give exactly one of
+them the job of running the suite.
+
 ### 2. `devbox.d/functest_jethro_server/` — the test webroot
 
 A directory of symlinks back into the real source tree (`include`, `views`,

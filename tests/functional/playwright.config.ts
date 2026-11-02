@@ -19,6 +19,8 @@ const HOST = `http://${FUNCTEST_HOST}:${PORT}`;
 export default defineConfig({
   globalSetup: "./global-setup.ts",
   testDir: ".",
+  // Releases the one-run-at-a-time lock; fails the run if its DBs were reset mid-run.
+  globalTeardown: "./global-teardown.ts",
   // Under the Inspector (--debug / PWDEBUG=1) disable all timeouts so paused
   // PHP breakpoints (Xdebug step-debugging) can't fail the test mid-session.
   timeout: process.env.PWDEBUG ? 0 : 30000,
