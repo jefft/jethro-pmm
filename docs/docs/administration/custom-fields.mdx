@@ -1,1 +1,36 @@
 # Custom Fields
+
+Custom fields let you record extra information on person records. Configure them under **Admin &rarr; Custom Fields**.
+
+## Field types
+
+| Type | Use |
+|---|---|
+| Text | Short free text. Text fields can be included in system-wide search. |
+| Selection | One or more values from a configurable list. Supports an "Other" free-text option. |
+| Date | A date, optionally with a note or a blank year. |
+| Link | Text that is rendered as a link, with an optional URL template. |
+
+## Sensitive fields
+
+Staff need **Custom fields** to see any custom fields at all. Without it,
+they see only the person core fields. The separate **Contact remarks**
+permission controls the core contact remarks field.
+
+Tick **Sensitive** on a custom field to hide it from users who do not also hold
+the **Sensitive custom fields** permission. Sensitive fields are omitted from:
+
+- person summaries and edit forms;
+- report filters, display columns, grouping and sorting;
+- CSV and report exports;
+- document merge data and the merge-field help;
+- imports, bulk updates, action plans, and note templates;
+- system-wide search.
+
+Users with both **Custom fields** and **Sensitive custom fields**
+see and edit the field normally. System administrators have both permissions
+automatically. Grant them to other roles under **Admin &rarr; User Accounts**.
+
+Sensitive fields are hidden by default; marking a field sensitive does not
+automatically grant **Sensitive custom fields** to existing
+non-administrator accounts.

@@ -32,7 +32,9 @@ $selected = Array(array_get($_REQUEST, 'bulk_action', '') => 'selected="selected
 					<?php
 				}
 				?>
+					<?php if (Field_Access::canRead('email')) { ?>
 					<option value="email" <?php echo array_get($selected, 'email', ''); ?>><?php echo _('Send email')?></option>
+					<?php } ?>
 				<?php
 				if (Jethro\Sms\canSendSms()) {
 					?>
@@ -104,6 +106,7 @@ $selected = Array(array_get($_REQUEST, 'bulk_action', '') => 'selected="selected
 							'options' => Array('Replacing existing values ', 'Adding to existing values')
 						);
 			foreach ($customFields as $fieldid => $fieldDetails) {
+				if (!Custom_Field::isFieldDataVisibleToCurrentUser($fieldDetails)) continue;
 				$dummy->populate($fieldid, $fieldDetails);
 				echo '<tr><td>Set '.ents($dummy->getValue('name')).' to: </td><td>';
 				$dummy->printWidget('');
@@ -218,11 +221,13 @@ $selected = Array(array_get($_REQUEST, 'bulk_action', '') => 'selected="selected
 	}
 	?>
 		<div class="bulk-action well" id="email">
+			<?php if (Field_Access::canRead('email')) { ?>
 			<p><?php echo _('Send an email to')?></p>
 			<label class="radio"><input class="compulsory" type="radio" name="email_type" value="person" id="email_type_person" checked="checked" /><?php echo _('the selected persons')?></label>
 			<label class="radio"><input type="radio" name="email_type" value="family" id="email_type_family" /><?php echo _('the adults in the selected persons&#8217; families')?></label></p>
 			<label class="checkbox"><input type="checkbox" name="method" value="public" id="method-public" /><?php echo _('Allow recipients to see each other&#8217;s email addresses')?></label>
 			<input type="submit" class="btn " value="Go" data-set-form-target="hidden" data-set-form-action="?call=email" />
+			<?php } ?>
 		</div>
 	<?php
 	if (Jethro\Sms\canSendSms()) {

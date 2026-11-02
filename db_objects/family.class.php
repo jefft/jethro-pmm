@@ -1,9 +1,67 @@
 <?php
 include_once 'include/db_object.class.php';
 include_once 'include/size_detector.class.php';
+include_once 'include/field_access.php';
 class Family extends DB_Object
 {
 	protected $_save_permission_level = PERM_EDITPERSON;
+
+	/**
+	 * Read through the permission-masked `family` view; writes target `_family`.
+	 * @return string
+	 */
+	protected function _getTableNames()
+	{
+		return 'family';
+	}
+
+	protected function _getInsertTableName()
+	{
+		return '_family';
+	}
+
+	protected function _getUpdateTableName()
+	{
+		return '_family';
+	}
+
+	protected function _getDeleteTableNames()
+	{
+		return Array('_family');
+	}
+
+	protected function _protectHistoryLine($name, $line)
+	{
+		return Field_Access::isContactField($name) ? Field_Access::tagHistoryLine($name, $line) : $line;
+	}
+
+	protected function _formatHistoryEntry($entry)
+	{
+		$permissionByLabel = Array();
+		foreach (array_keys($this->fields) as $name) {
+			$permissionByLabel[$this->getFieldLabel($name)] = Field_Access::permissionFor($name) ?? 0;
+		}
+		return Field_Access::filterHistoryEntry($entry, Array('Field_Access', 'permissionFor'), $permissionByLabel);
+	}
+
+	/**
+	 * Copy another family's contact details into this saved family, including
+	 * fields the current user cannot see. Nothing is shown to the user; used
+	 * when a person moves to a new family made from their old one.
+	 * @param int $familyid
+	 * @return void
+	 */
+	public function copyContactDetailsFrom($familyid)
+	{
+		$sets = Array();
+		foreach (Array('address_street', 'address_suburb', 'address_state', 'address_postcode', 'home_tel') as $col) {
+			$sets[] = 'nf.`'.$col.'` = old.`'.$col.'`';
+		}
+		$GLOBALS['db']->query('UPDATE `_family` nf JOIN `_family` old ON old.id = '.(int)$familyid.'
+			SET '.implode(', ', $sets).'
+			WHERE nf.id = '.(int)$this->id);
+	}
+
 	private $_photo_data = NULL;
 
 	protected static function _getFields()
@@ -101,6 +159,12 @@ class Family extends DB_Object
 		if (!$this->id) {
 			$this->fields['status']['editable'] = false;
 		}
+		foreach (Array('address_street', 'address_suburb', 'address_state', 'address_postcode', 'home_tel') as $field) {
+			if (isset($this->fields[$field]) && !Field_Access::canRead($field)) {
+				$this->fields[$field]['show_in_summary'] = FALSE;
+				$this->fields[$field]['editable'] = FALSE;
+			}
+		}
 	}
 
 
@@ -108,7 +172,7 @@ class Family extends DB_Object
 	{
 		return Array(
 			 "
-			CREATE TABLE `family` (
+			CREATE TABLE `_family` (
 			  `id` int(11) NOT NULL auto_increment,
 			  `family_name` varchar(128) NOT NULL default '',
 			  `address_street` varchar(255) NOT NULL default '',
@@ -127,7 +191,7 @@ class Family extends DB_Object
 			"CREATE TABLE family_photo (
 				familyid INT NOT NULL,
 				photodata MEDIUMBLOB NOT NULL,
-				CONSTRAINT `famliyphotofamilyid` FOREIGN KEY (`familyid`) REFERENCES `family` (`id`) ON DELETE CASCADE,
+				CONSTRAINT `famliyphotofamilyid` FOREIGN KEY (`familyid`) REFERENCES `_family` (`id`) ON DELETE CASCADE,
 				PRIMARY KEY (familyid)
 			 ) ENGINE=InnoDB;
 			"
@@ -359,6 +423,7 @@ class Family extends DB_Object
 
 	function getAllEmailAddrs()
 	{
+		if (!Field_Access::canRead('email')) return Array();
 		$all_emails = Array();
 		foreach ($this->getMemberData() as $person) {
 			$e = $person['email'];
@@ -377,6 +442,7 @@ class Family extends DB_Object
 
 	function create()
 	{
+		Field_Access::filterWritableContactValues($this->values);
 		if (parent::create()) {
 			$this->savePhoto();
 			return TRUE;
@@ -475,6 +541,7 @@ class Family extends DB_Object
 				}
 			}
 		}
+		Field_Access::filterWritableContactChanges($this->_old_values, $this->values);
 		$res = parent::save();
 		$this->savePhoto();
 		if ($msg) add_message($msg);
@@ -621,6 +688,10 @@ class Family extends DB_Object
 		}
 		$this->clearPhoto();
 		if (!$this->save(FALSE)) return FALSE;
+
+		// Archive cleanup is a privacy operation: clear contact data even when
+		// the current user cannot normally see or edit it.
+		$GLOBALS['db']->exec("UPDATE _family SET address_street='', address_suburb='', address_state='', address_postcode='', home_tel='' WHERE id=".(int)$this->id);
 
 		$notes = $GLOBALS['system']->getDBObjectData('family_note', Array('familyid' => $this->id));
 		foreach ($notes as $noteid => $data) {

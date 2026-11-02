@@ -1,6 +1,7 @@
 <?php
 include_once 'include/db_object.class.php';
 include_once 'include/size_detector.class.php';
+include_once 'include/field_access.php';
 include_once __DIR__ . '/../include/jethro_sms.php';
 class Person extends DB_Object
 {
@@ -15,7 +16,32 @@ class Person extends DB_Object
 			// Every person can save their own details
 			$this->_save_permission_level = 0;
 		}
-		return parent::__construct($id);
+		$res = parent::__construct($id);
+		foreach (Array('mobile_tel', 'email', 'work_tel', 'remarks') as $field) {
+			if (isset($this->fields[$field]) && !Field_Access::canRead($field)) {
+				$this->fields[$field]['show_in_summary'] = FALSE;
+				$this->fields[$field]['editable'] = FALSE;
+			}
+		}
+		return $res;
+	}
+
+	/**
+	 * Whether the current user may see the person contact remarks field.
+	 * @return bool
+	 */
+	public static function currentUserCanViewRemarks()
+	{
+		if (empty($GLOBALS['user_system'])) {
+			return FALSE;
+		}
+		if (method_exists($GLOBALS['user_system'], 'isCLIScript') && $GLOBALS['user_system']->isCLIScript()) {
+			return TRUE;
+		}
+		if (!method_exists($GLOBALS['user_system'], 'haveDataPerm')) {
+			return FALSE;
+		}
+		return $GLOBALS['user_system']->haveDataPerm(DATA_PERM_VIEWREMARKS);
 	}
 
 	static function allowedToAdd()
@@ -216,7 +242,15 @@ class Person extends DB_Object
 	{
 		return "
 			CREATE VIEW person AS
-			SELECT * from _person p
+			SELECT p.`id`, p.`first_name`, p.`last_name`, p.`gender`, p.`age_bracketid`,
+			       CASE WHEN currentUserHasDataPerm('VIEWEMAIL') THEN p.`email` ELSE '' END AS `email`,
+			       CASE WHEN currentUserHasDataPerm('VIEWMOBILE') THEN p.`mobile_tel` ELSE '' END AS `mobile_tel`,
+			       CASE WHEN currentUserHasDataPerm('VIEWMOBILE') THEN p.`work_tel` ELSE '' END AS `work_tel`,
+			       CASE WHEN currentUserHasDataPerm('VIEWREMARKS') THEN p.`remarks` ELSE '' END AS `remarks`,
+			       p.`status`, p.`status_last_changed`, p.`history`, p.`creator`, p.`created`,
+			       p.`congregationid`, p.`familyid`, p.`member_password`, p.`resethash`,
+			       p.`resetexpires`, p.`feed_uuid`
+			FROM _person p
 			WHERE
 				/* members-area session: staff restrictions do not apply */
 				(getCurrentMemberID() IS NOT NULL)
@@ -251,7 +285,24 @@ class Person extends DB_Object
 	protected function _getInsertTableName()
 	{
 		return '_person';
-	}	
+	}
+
+	/**
+	 * Writes go to the base table; the person view masks contact fields and is read-only.
+	 * @return string
+	 */
+	protected function _getUpdateTableName()
+	{
+		return '_person';
+	}
+
+	/**
+	 * @return array<int,string>
+	 */
+	protected function _getDeleteTableNames()
+	{
+		return Array('_person');
+	}
 
 	/**
 	 *
@@ -262,7 +313,7 @@ class Person extends DB_Object
 		return Array(
 				'_person.age_bracketid' => '`age_bracket`(`id`) ON DELETE RESTRICT',
 				'_person.status' => '`person_status`(`id`) ON DELETE RESTRICT',
-				'_person.familyid' => '`family`(`id`) ON DELETE RESTRICT',
+				'_person.familyid' => '`_family`(`id`) ON DELETE RESTRICT',
 				'_person.congregationid' => '`congregation`(`id`) ON DELETE RESTRICT',
 		);
 	}
@@ -285,8 +336,19 @@ class Person extends DB_Object
 	}
 
 
+	public function getFormattedValue($name, $value=NULL)
+	{
+		if ($name === 'remarks' && !self::currentUserCanViewRemarks()) {
+			return '';
+		}
+		return parent::getFormattedValue($name, $value);
+	}
+
 	function printFieldValue($name, $value=NULL)
 	{
+		if ($name === 'remarks' && !self::currentUserCanViewRemarks()) {
+			return;
+		}
 		if (is_null($value)) $value = $this->getValue($name);
 		$person_name = ents($this->getValue('first_name')).'&nbsp;'.ents($this->getValue('last_name'));
 		switch ($name) {
@@ -352,6 +414,7 @@ class Person extends DB_Object
 		$dummyField = new Custom_Field();
 		foreach (self::getCustomFields() as $fieldid => $fieldDetails) {
 			$dummyField->populate($fieldid, $fieldDetails);
+			if (!$dummyField->isVisibleToCurrentUser()) continue;
 			if ($fieldDetails['divider_before']) {
 				$showDivider = TRUE;
 			}
@@ -563,6 +626,8 @@ class Person extends DB_Object
 	{
 		$db = $GLOBALS['db'];
 		$fields = $fields ?? Array('name', 'custom');
+		$canViewCustomFields = Custom_Field::currentUserCanViewCustomFields();
+		$sensitiveSql = Custom_Field::currentUserCanViewSensitiveFields() ? '' : ' AND NOT cf.sensitive';
 		// One branch per kind of field, each tagged with its rank.
 		$selects = Array();
 		if (in_array('name', $fields)) {
@@ -581,7 +646,7 @@ class Person extends DB_Object
 		foreach ($fields as $f) {
 			if (preg_match('/^custom_(\d+)$/', $f, $m)) $customFieldIDs[] = (int)$m[1];
 		}
-		if (in_array('custom', $fields) || $customFieldIDs) {
+		if ($canViewCustomFields && (in_array('custom', $fields) || $customFieldIDs)) {
 			$selects[] = '
 				SELECT p.*, 2 AS search_rank
 				FROM person p
@@ -589,12 +654,13 @@ class Person extends DB_Object
 				JOIN custom_field cf ON cfv.fieldid = cf.id
 				WHERE cf.searchable
 				'.(in_array('custom', $fields) ? '' : 'AND cf.id IN ('.implode(',', $customFieldIDs).')').'
+				'.$sensitiveSql.'
 				AND (
 					(cfv.value_text LIKE '.$db->quote($searchTerm.'%').')
 					OR (cfv.value_text LIKE '.$db->quote('% '.$searchTerm.'%').' )
 				)';
 		}
-		if (in_array('remarks', $fields)) {
+		if (self::currentUserCanViewRemarks() && in_array('remarks', $fields)) {
 			$selects[] = '
 				SELECT p.*, 3 AS search_rank
 				FROM person p
@@ -812,6 +878,7 @@ class Person extends DB_Object
 
 
 
+		Field_Access::filterWritableContactChanges($this->_old_values, $this->values);
 		$res = parent::save();
 		if ($res) {
 			$this->_savePhoto();
@@ -843,19 +910,26 @@ class Person extends DB_Object
 		return $db->query($SQL);
 	}
 
-	private function _clearCustomValues()
+	private function _clearCustomValues($fieldIDs = NULL)
 	{
 		$db =& $GLOBALS['db'];
-		$SQL = 'DELETE FROM custom_field_value WHERE personid = '.(int)$this->id;
+		$SQL = 'DELETE FROM `_custom_field_value` WHERE personid = '.(int)$this->id;
+		if (is_array($fieldIDs)) {
+			if (empty($fieldIDs)) return;
+			$fieldIDs = array_map('intval', $fieldIDs);
+			$SQL .= ' AND fieldid IN ('.implode(',', $fieldIDs).')';
+		}
 		$res = $db->query($SQL);
 	}
 
 	private function _saveCustomValues()
 	{
 		if (empty($this->_old_custom_values)) return; // Nothing to do.
-		$this->_clearCustomValues();
+		// Only replace the fields this user can see. Hidden sensitive values
+		// must survive a save by a user who cannot see them.
+		$this->_clearCustomValues(array_keys($this->_custom_values));
 		$db =& $GLOBALS['db'];
-		$SQL = 'INSERT INTO custom_field_value
+		$SQL = 'INSERT INTO `_custom_field_value`
 				(personid, fieldid, value_text, value_date, value_optionid)
 				VALUES ';
 		$customFields = self::getCustomFields();
@@ -904,10 +978,48 @@ class Person extends DB_Object
 			$dummyField = new Custom_Field();
 			foreach ($this->_old_custom_values as $fieldid => $oldVal) {
 				$dummyField->populate($fieldid, $customFields[$fieldid]);
-				$res[] = $dummyField->getValue('name').' changed from "'.$dummyField->formatValue($oldVal).'" to "'.$dummyField->formatValue($this->_custom_values[$fieldid]).'"';
+				$res[] = Field_Access::tagHistoryLine('cf:'.(int)$fieldid, $dummyField->getValue('name').' changed from "'.$dummyField->formatValue($oldVal).'" to "'.$dummyField->formatValue($this->_custom_values[$fieldid]).'"');
 			}
 		}
 		return $res;
+	}
+
+	protected function _protectHistoryLine($name, $line)
+	{
+		return Field_Access::isContactField($name) ? Field_Access::tagHistoryLine($name, $line) : $line;
+	}
+
+	protected function _formatHistoryEntry($entry)
+	{
+		$customFields = self::getCustomFields();
+		$permissionByLabel = Array();
+		$customFieldLabels = Array();
+		foreach (array_keys($this->fields) as $name) {
+			$permissionByLabel[$this->getFieldLabel($name)] = Field_Access::permissionFor($name) ?? 0;
+		}
+		// Custom fields last: a custom field named like a core field (e.g.
+		// "Email") must be judged by the stricter custom-field permission.
+		foreach ($customFields as $field) {
+			$permissionByLabel[$field['name']] = self::_customFieldDataPermission($field);
+			$customFieldLabels[$field['name']] = TRUE;
+		}
+		return Field_Access::filterHistoryEntry($entry, function ($key) use ($customFields) {
+			if (strpos($key, 'cf:') === 0) {
+				$field = $customFields[(int)substr($key, 3)] ?? NULL;
+				return $field ? self::_customFieldDataPermission($field) : NULL;
+			}
+			return Field_Access::permissionFor($key);
+		}, $permissionByLabel, $customFieldLabels);
+	}
+
+	/**
+	 * Data permission bits needed to see a custom field's values.
+	 * @param array $field custom_field row
+	 * @return int
+	 */
+	private static function _customFieldDataPermission($field)
+	{
+		return DATA_PERM_VIEWCUSTOMFIELDS | (empty($field['sensitive']) ? 0 : DATA_PERM_VIEWSENSITIVE);
 	}
 
 	public function reset()
@@ -920,9 +1032,12 @@ class Person extends DB_Object
 
 	function create()
 	{
+		$GLOBALS['system']->doTransaction('BEGIN');
+		Field_Access::filterWritableContactValues($this->values);
 		if (parent::create()) {
 			$this->_savePhoto();
 			$this->_saveCustomValues();
+			$GLOBALS['system']->doTransaction('COMMIT');
 			return TRUE;
 		}
 		return FALSE;
@@ -1019,11 +1134,18 @@ class Person extends DB_Object
 		$customFields = self::getCustomFields();
 		$resTemplate = Array();
 		foreach ($customFields as $fieldid => $fieldDetails) {
+			if (!Custom_Field::isFieldDataVisibleToCurrentUser($fieldDetails)) {
+				unset($customFields[$fieldid]);
+				continue;
+			}
 			$customFields[$fieldid] = new Custom_Field();
 			$customFields[$fieldid]->populate($fieldid, $fieldDetails);
 			$resTemplate[strtoupper(str_replace(' ', '_', $fieldDetails['name']))] = '';
 		}
 		foreach ($qres as $row) {
+			if (!isset($customFields[$row['fieldid']])) {
+				continue;
+			}
 			if (!isset($res[$row['personid']])) {
 				// Make sure we have something for every field in the result
 				$res[$row['personid']] = $resTemplate;
@@ -1089,6 +1211,7 @@ class Person extends DB_Object
 				<?php
 				foreach ($customFields as $fieldid => $fieldDetails) {
 					$dummyField->populate($fieldid, $fieldDetails);
+					if (!$dummyField->isVisibleToCurrentUser()) continue;
 					$tableClass = $fieldDetails['allow_multiple'] ? 'expandable no-name-increment' : '';
 					$values = isset($this->_custom_values[$fieldid]) ? $this->_custom_values[$fieldid] : Array('');
 
@@ -1139,6 +1262,7 @@ class Person extends DB_Object
 		if (empty($fields)) {
 			foreach ($this->getCustomFields() as $fieldid => $fieldDetails) {
 				$field = $GLOBALS['system']->getDBObject('custom_field', $fieldid);
+				if (!$field->isVisibleToCurrentUser()) continue;
 				$this->setCustomValue($fieldid, $field->processWidget($prefix));
 			}
 		}
@@ -1149,6 +1273,12 @@ class Person extends DB_Object
 
 	function printFieldInterface($name, $prefix='')
 	{
+		if ($name === 'remarks' && !self::currentUserCanViewRemarks()) {
+			return;
+		}
+		if (Field_Access::isContactField($name) && !Field_Access::canRead($name)) {
+			return;
+		}
 		switch ($name) {
 			case 'photo':
 				$existing_photo_url = NULL;
@@ -1204,6 +1334,12 @@ class Person extends DB_Object
 	public function setCustomValue($fieldid, $newVal, $addToExisting=FALSE)
 	{
 		$fields = self::getCustomFields();
+		if (!Custom_Field::currentUserCanViewCustomFields()) {
+			return;
+		}
+		if (!empty($fields[$fieldid]['sensitive']) && !Custom_Field::currentUserCanViewSensitiveFields()) {
+			return;
+		}
 		$oldVal = array_get($this->_custom_values, $fieldid, '');
 		if ((!empty($oldVal) || !empty($newVal)) && ($addToExisting || ($oldVal != $newVal))) {
 			$this->_old_custom_values[$fieldid] = $oldVal;
@@ -1232,6 +1368,7 @@ class Person extends DB_Object
 		if ($customFields === NULL) {
 			$fields = $GLOBALS['system']->getDBObjectdata('custom_field');
 			foreach ($fields as $fieldID => $field) {
+				if (!Custom_Field::isFieldDataVisibleToCurrentUser($field)) continue;
 				$field['id'] = $fieldID;
 				$customFields[str_replace(' ', '_', strtolower($field['name']))] = $GLOBALS['system']->getDBObject('custom_field', $fieldID);
 			}
@@ -1311,6 +1448,10 @@ class Person extends DB_Object
 		$this->_clearCustomValues();
 		$this->_clearPhoto();
 		if (!$this->save(FALSE)) return FALSE;
+
+		// Archive cleanup is a privacy operation: clear contact data even when
+		// the current user cannot normally see or edit it.
+		$GLOBALS['db']->exec("UPDATE _person SET email='', mobile_tel='', work_tel='', remarks='' WHERE id=".(int)$this->id);
 
 		$notes = $GLOBALS['system']->getDBObjectData('person_note', Array('personid' => $this->id));
 		foreach ($notes as $noteid => $data) {

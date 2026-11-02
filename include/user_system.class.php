@@ -17,6 +17,7 @@ class User_System extends Abstract_User_System
 	public function __construct()
 	{
 		$this->_loadPermissionLevels();
+		$this->_loadDataPermissionLevels();
 
 		if (empty($_SESSION['user']) && ifdef('PASSWORD_RESET_ENABLED', TRUE)) {
 			// Self-service "forgot password" flow (see docs/docs/developer/reference/password-reset.mdx)
@@ -141,7 +142,14 @@ class User_System extends Abstract_User_System
 			$_SESSION['last_activity_time'] = time();
 
 			if (!empty($_SESSION['user'])) {
-				$GLOBALS['db']->setCurrentUserID((int)$_SESSION['user']['id']);
+				if (!array_key_exists('data_permissions', $_SESSION['user'])) {
+					// Session started before the upgrade that added this column.
+					$_SESSION['user']['data_permissions'] = (int)$GLOBALS['db']->queryOne('SELECT data_permissions FROM staff_member WHERE id = '.(int)$_SESSION['user']['id']);
+				}
+				// Same mask as haveDataPerm(): SysAdmin sees every field.
+				$isSysadmin = (((int)array_get($_SESSION['user'], 'permissions', 0) & PERM_SYSADMIN) == PERM_SYSADMIN);
+				$dataMask = $isSysadmin ? -1 : (int)$_SESSION['user']['data_permissions'];
+				$GLOBALS['db']->setCurrentUserID((int)$_SESSION['user']['id'], $dataMask);
 			}
 		}
 
@@ -245,6 +253,24 @@ class User_System extends Abstract_User_System
 			trigger_error('Your user account does not have permission to perform this action');
 			exit;
 		}
+	}
+
+	/**
+	 * Whether the current staff account may see a data domain. Public and CLI
+	 * sessions are unrestricted, matching existing public/CLI behaviour.
+	 * @param int $permission
+	 * @return bool
+	 */
+	public function haveDataPerm($permission)
+	{
+		if (!is_int($permission)) throw new \RuntimeException("Non-numeric data permission level is invalid");
+		if ($permission == 0) return true;
+		if (!empty($GLOBALS['JETHRO_INSTALLING'])) return true;
+		if ($this->_is_public || $this->_is_cli_script) return true;
+		if ($this->havePerm(PERM_SYSADMIN)) return true;
+		if (!array_key_exists($permission, $this->_data_permission_levels)) return false;
+		$mask = (int)$this->getCurrentUser('data_permissions');
+		return (($mask & $permission) == $permission);
 	}
 	
 	// Called by the public interface to indicate no login expected

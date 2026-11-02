@@ -242,6 +242,7 @@ class View_Admin__Import extends View
 
 		$custom_fields = Array();
 		foreach (Person::getCustomFields() as $id => $detail) {
+			if (!Custom_Field::isFieldDataVisibleToCurrentUser($detail)) continue;
 			$custom_fields[self::_stringToKey($detail['name'])] = $id;
 		}
 
@@ -1140,6 +1141,7 @@ class View_Admin__Import extends View
 		));
 		$custom_fields = Person::getCustomFields();
 		foreach ($custom_fields as $field) {
+			if (!Custom_Field::isFieldDataVisibleToCurrentUser($field)) continue;
 			$header[] = self::_stringToKey($field['name']);
 		}
 		$header[] = 'note';

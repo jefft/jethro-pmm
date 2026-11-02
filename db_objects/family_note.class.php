@@ -29,7 +29,7 @@ class Family_Note extends Abstract_Note
 
 	function getForeignKeys() {
 		return Array(
-			'familyid' => 'family(id) ON DELETE CASCADE',
+			'familyid' => '_family(id) ON DELETE CASCADE',
 			'id' => '_abstract_note(id) ON DELETE CASCADE',
 		);
 	}

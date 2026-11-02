@@ -1,4 +1,5 @@
 <?php
+require_once JETHRO_ROOT.'/include/field_access.php';
 
 class Call_SMS extends Call
 {
@@ -12,6 +13,11 @@ class Call_SMS extends Call
             } else {
                 echo json_encode($refusal);
             }
+            return;
+        }
+        if (!\Field_Access::canRead('mobile_tel')) {
+            $refusal = ['error' => 'You do not have permission to view mobile numbers, so SMS messages cannot be sent.'];
+            if ($datastar) self::_respondDatastar($refusal); else echo json_encode($refusal);
             return;
         }
         try {

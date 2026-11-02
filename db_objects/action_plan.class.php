@@ -206,6 +206,7 @@ class Action_Plan extends DB_Object
 										'options' => Array('Replacing existing values ', 'Adding to existing values')
 									);
 						foreach ($customFields as $fieldid => $fieldDetails) {
+							if (!Custom_Field::isFieldDataVisibleToCurrentUser($fieldDetails)) continue;
 							$value = '';
 							$addToExisting = TRUE;
 							$v = array_get($fields, 'custom_'.$fieldid);
@@ -398,6 +399,7 @@ class Action_Plan extends DB_Object
 			if (0 === strpos($k, 'custom_')) {
 				$fieldID = substr($k, 7);
 				$field = new Custom_Field($fieldID);
+				if (!$field->isVisibleToCurrentUser()) continue;
 				if ($field->getValue('type') == 'date') {
 					// FUture expansion: allow static dates here; for now we just support
 					// the reference date, represented by magic number -1.

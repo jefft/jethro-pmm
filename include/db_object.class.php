@@ -283,6 +283,30 @@ class DB_Object
 	}
 
 	/**
+	 * Table to UPDATE. Overridden when the read path is a view.
+	 * @return string
+	 */
+	protected function _getUpdateTableName()
+	{
+		return strtolower(get_class($this));
+	}
+
+	/**
+	 * Tables to DELETE, in order.
+	 * @return array<int,string>
+	 */
+	protected function _getDeleteTableNames()
+	{
+		$tables = Array(strtolower(get_class($this)));
+		$parent = get_parent_class($this);
+		while ($parent && $parent != 'DB_Object') {
+			$tables[] = strtolower($parent);
+			$parent = get_parent_class($parent);
+		}
+		return array_values(array_unique($tables));
+	}
+
+	/**
 	* Get the fields for this class only
 	*
 	* (Fields for parent classes are automatically added when instanting objects of this class
@@ -431,7 +455,7 @@ class DB_Object
 			}
 		}
 		if (!empty($sets)) {
-			$sql = 'UPDATE '.strtolower(get_class($this)).'
+			$sql = 'UPDATE '.$this->_getUpdateTableName().'
 					SET '.implode("\n, ", $sets).'
 					WHERE id = '.$db->quote($this->id);
 			$res = $db->query($sql);
@@ -455,9 +479,32 @@ class DB_Object
 			) {
 				continue;
 			}
-			$changes[] = $this->getFieldLabel($name).' changed from "'.ents($this->getFormattedValue($name, $old_val)).'" to "'.ents($this->getFormattedValue($name)).'"';
+			$line = $this->getFieldLabel($name).' changed from "'.ents($this->getFormattedValue($name, $old_val)).'" to "'.ents($this->getFormattedValue($name)).'"';
+			$changes[] = $this->_protectHistoryLine($name, $line);
 		}
 		return $changes;
+	}
+
+	/**
+	 * Hook for subclasses whose fields are hidden by data permissions: mark a
+	 * history line so its values are only shown to users who may see the field.
+	 * @param string $name Field name
+	 * @param string $line "<label> changed from ... to ..."
+	 * @return string
+	 */
+	protected function _protectHistoryLine($name, $line)
+	{
+		return $line;
+	}
+
+	/**
+	 * Hook for subclasses: prepare one stored history entry for display.
+	 * @param string $entry
+	 * @return string
+	 */
+	protected function _formatHistoryEntry($entry)
+	{
+		return $entry;
 	}
 
 	public function reset()
@@ -515,11 +562,9 @@ class DB_Object
 
 		$GLOBALS['system']->doTransaction('begin');
 		$db =& $GLOBALS['db'];
-		$table_name = strtolower(get_class($this));
-		while ($table_name != 'db_object') {
+		foreach ($this->_getDeleteTableNames() as $table_name) {
 			$sql = 'DELETE FROM '.$table_name.' WHERE id='.$db->quote($this->id);
 			$res = $db->query($sql);
-			$table_name = strtolower(get_parent_class($table_name));
 		}
 		$GLOBALS['system']->doTransaction('commit');
 		return TRUE;
@@ -770,7 +815,7 @@ class DB_Object
 				?>
 				<tr>
 					<th class="narrow"><?php echo format_datetime($time); ?></th>
-					<td><?php echo nl2br(ents($detail)); ?></td>
+					<td><?php echo nl2br(ents($this->_formatHistoryEntry($detail))); ?></td>
 				</tr>
 				<?php
 			}
