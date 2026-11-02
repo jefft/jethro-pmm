@@ -296,6 +296,13 @@ class Call_Document_Merge extends Call
 				break;
 		}
 
+		if (!Person::currentUserCanViewRemarks()) {
+			foreach ($merge_data as &$mergeRow) {
+				unset($mergeRow['remarks']);
+			}
+			unset($mergeRow);
+		}
+
 		$headerrow = Array('id' => 'id');
 		foreach (array_keys(reset($merge_data)) as $header) {
 			if ($header == 'familyid') continue;

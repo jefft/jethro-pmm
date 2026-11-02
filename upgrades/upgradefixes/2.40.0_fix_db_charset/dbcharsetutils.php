@@ -191,11 +191,17 @@ class DB_Charset_Utils
 		$db = $GLOBALS['db'];
 		$risky = Array();
 
-		// Find all latin1 text columns.
+		// Find all latin1 text columns in base tables. Views are excluded: an
+		// unconverted site's masked views (family, custom_field_value) expose
+		// the same columns as their base tables with the same bytes, so
+		// sampling them would report each risky column twice.
 		$columns = $db->queryAll(
 			"SELECT c.TABLE_NAME AS tbl, c.COLUMN_NAME AS col, c.DATA_TYPE AS dtype
 			 FROM information_schema.COLUMNS c
+			 JOIN information_schema.TABLES t
+			   ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
 			 WHERE c.TABLE_SCHEMA = DATABASE()
+			   AND t.TABLE_TYPE = 'BASE TABLE'
 			   AND c.CHARACTER_SET_NAME LIKE 'latin1%'
 			   AND c.DATA_TYPE IN ('char', 'varchar', 'text', 'mediumtext', 'longtext', 'tinytext', 'enum', 'set')
 			 ORDER BY c.TABLE_NAME, c.COLUMN_NAME"
@@ -257,6 +263,39 @@ class DB_Charset_Utils
 			'risky_columns' => $risky,
 			'risky' => !empty($risky),
 		);
+	}
+
+	/**
+	 * Execute every view in the database.
+	 *
+	 * Views need no conversion themselves, but their columns are resolved from
+	 * the base tables at query time; a masked view built with CASE/joins (person,
+	 * family, custom_field_value, ...) fails if a converted base table lost a
+	 * column or a charset mismatch appeared. Enumerating information_schema.VIEWS
+	 * means views added by later upgrades are checked too.
+	 *
+	 * @param mixed $db A JethroDB/PDO-like connection exposing queryAll() and query(); defaults to $GLOBALS['db'].
+	 * @return array<string,string> View name => error message, for views that could not be selected.
+	 */
+	public static function checkViews($db = NULL)
+	{
+		if ($db === NULL) {
+			$db = $GLOBALS['db'];
+		}
+		$views = $db->queryAll(
+			"SELECT TABLE_NAME AS v FROM information_schema.VIEWS
+			 WHERE TABLE_SCHEMA = DATABASE()
+			 ORDER BY TABLE_NAME"
+		);
+		$broken = Array();
+		foreach ($views as $row) {
+			try {
+				$db->query('SELECT COUNT(*) FROM `'.$row['v'].'`');
+			} catch (Exception $e) {
+				$broken[$row['v']] = $e->getMessage();
+			}
+		}
+		return $broken;
 	}
 
 	/**

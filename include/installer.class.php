@@ -212,6 +212,19 @@ class Installer
 			-- (see docs/docs/developer/reference/db-session-identity.md)
 			CREATE FUNCTION getCurrentMemberID() RETURNS INTEGER NO SQL RETURN @current_member_id;",
 
+			"CREATE FUNCTION currentUserHasDataPerm(symbol VARCHAR(32)) RETURNS TINYINT NO SQL
+			 RETURN (@current_member_id IS NOT NULL)
+			     OR (@current_user_id = -1)
+			     OR CASE symbol
+			          WHEN 'VIEWADDRESS'      THEN ((@current_user_data_permissions & 134217728) <> 0)
+			          WHEN 'VIEWEMAIL'        THEN ((@current_user_data_permissions & 536870912) <> 0)
+			          WHEN 'VIEWMOBILE'       THEN ((@current_user_data_permissions & 268435456) <> 0)
+			          WHEN 'VIEWREMARKS'      THEN ((@current_user_data_permissions & 33554432) <> 0)
+			          WHEN 'VIEWCUSTOMFIELDS' THEN ((@current_user_data_permissions & 67108864) <> 0)
+			          WHEN 'VIEWSENSITIVE'    THEN ((@current_user_data_permissions & 16777216) <> 0)
+			          ELSE 0
+			        END;",
+
 			"CREATE TABLE account_group_restriction (
 			   personid INTEGER NOT NULL,
 			   groupid INTEGER NOT NULL,
@@ -255,6 +268,15 @@ class Installer
 				CONSTRAINT sms_registered_sender_person FOREIGN KEY (personid) REFERENCES _person (id) ON DELETE CASCADE
 			) ENGINE=InnoDB;",
 
+			"CREATE OR REPLACE VIEW `family` AS
+			 SELECT f.`id`, f.`family_name`, f.`status`,
+			        CASE WHEN currentUserHasDataPerm('VIEWADDRESS') THEN f.`address_street` ELSE '' END AS `address_street`,
+			        CASE WHEN currentUserHasDataPerm('VIEWADDRESS') THEN f.`address_suburb` ELSE '' END AS `address_suburb`,
+			        CASE WHEN currentUserHasDataPerm('VIEWADDRESS') THEN f.`address_state` ELSE '' END AS `address_state`,
+			        CASE WHEN currentUserHasDataPerm('VIEWADDRESS') THEN f.`address_postcode` ELSE '' END AS `address_postcode`,
+			        CASE WHEN currentUserHasDataPerm('VIEWADDRESS') THEN f.`home_tel` ELSE '' END AS `home_tel`,
+			        f.`created`, f.`creator`, f.`history`
+			 FROM `_family` f;",
 
 			'CREATE VIEW member AS
 			SELECT mp.id, mp.first_name, mp.last_name, mp.gender, mp.age_bracketid, mp.congregationid,
@@ -262,7 +284,7 @@ class Installer
 			mf.family_name, mf.address_street, mf.address_suburb, mf.address_state, mf.address_postcode, mf.home_tel
 			FROM _person mp
 			JOIN person_status mps ON mps.id = mp.status
-			JOIN family mf ON mf.id = mp.familyid
+			JOIN _family mf ON mf.id = mp.familyid
 			JOIN person_group_membership pgm1 ON pgm1.personid = mp.id
 			JOIN _person_group pg ON pg.id = pgm1.groupid AND pg.share_member_details = 1
 			JOIN person_group_membership pgm2 ON pgm2.groupid = pg.id
@@ -280,7 +302,7 @@ class Installer
 			mf.family_name, mf.address_street, mf.address_suburb, mf.address_state, mf.address_postcode, mf.home_tel
 			FROM _person mp
 			JOIN person_status mps ON mps.id = mp.status
-			JOIN family mf ON mf.id = mp.familyid
+			JOIN _family mf ON mf.id = mp.familyid
 			JOIN _person self ON self.familyid = mp.familyid
 			JOIN person_status selfs ON selfs.id = self.status
 			WHERE
@@ -309,7 +331,11 @@ class Installer
 			-- Synced with upgrades/2026-upgrade-to-2.40.sql:196-200 — SMS in ENABLED_FEATURES
 			(@rank:=@rank+5, 'Permissions and Security','ENABLED_FEATURES','Which Jethro features are visible to users?','multiselect{\"NOTES\":\"Notes\",\"PHOTOS\":\"Photos\",\"ATTENDANCE\":\"Attendance\",\"ROSTERS&SERVICES\":\"Rosters & Services\",\"SERVICEDETAILS\":\"Service Details\",\"DOCUMENTS\":\"Documents\",\"SERVICEDOCUMENTS\":\"Service documents\",\"SMS\":\"SMS\"}','NOTES,PHOTOS,ATTENDANCE,ROSTERS&SERVICES,SERVICEDETAILS,DOCUMENTS,SERVICEDOCUMENTS,SMS'),
 			-- 7995391 includes PERM_VIEWSMS (524288). Existing installs instead get it conditionally; see upgrades/2026-upgrade-to-2.40.sql
+			-- 1040187392 = address, email, mobile, contact remarks and custom fields (include/data_permissions.php); sensitive custom fields are opt-in.
 			(@rank:=@rank+5, '',                         'DEFAULT_PERMISSIONS','Permissions to grant to new user accounts by default','int','7995391'),
+			(@rank:=@rank+5, '','DEFAULT_DATA_PERMISSIONS','Viewable person fields to grant to new user accounts by default','int','1040187392'),
+			-- Marks the one-time grant in upgrades/2026-upgrade-to-2.40.sql as done, so re-applying that upgrade to a fresh install does not undo revocations.
+			(@rank:=@rank+5, '',                         'DATA_PERMISSIONS_MIGRATED','Internal: the one-off viewable-person-fields grant for existing staff has run','hidden','1'),
 			(@rank:=@rank+5, '',                         'RESTRICTED_USERS_CAN_ADD','Allow users with group/congregation restrictions to create new persons and families?','bool','0'),
 			(@rank:=@rank+5, '',                         'PASSWORD_MIN_LENGTH','Minimum password length','int','8'),
 			(@rank:=@rank+5, '',                         'SESSION_TIMEOUT_MINS','Inactive sessions will be logged out after this number of minutes','int','90'),

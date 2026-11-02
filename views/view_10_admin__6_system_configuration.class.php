@@ -21,10 +21,18 @@ class View_Admin__System_Configuration extends View {
 			if (defined($symbol.'_IN_CONFIG_FILE')) continue;
 			switch ($symbol) {
 				case 'DEFAULT_PERMISSIONS':
-					if (isset($_REQUEST['permissions'])) {
+					if (isset($_REQUEST['permissions_submitted'])) {
 						$sm = new Staff_Member();
 						$sm->processFieldInterface('permissions');
 						Config_Manager::saveSetting('DEFAULT_PERMISSIONS', $sm->getValue('permissions'));
+						$saved = TRUE;
+					}
+					break;
+				case 'DEFAULT_DATA_PERMISSIONS':
+					if (isset($_REQUEST['data_permissions_submitted'])) {
+						$sm = new Staff_Member();
+						$sm->processFieldInterface('data_permissions');
+						Config_Manager::saveSetting('DEFAULT_DATA_PERMISSIONS', $sm->getValue('data_permissions'));
 						$saved = TRUE;
 					}
 					break;
@@ -356,7 +364,14 @@ class View_Admin__System_Configuration extends View {
 			case 'DEFAULT_PERMISSIONS':
 				$sm = new Staff_Member();
 				$sm->setValue('permissions', DEFAULT_PERMISSIONS);
+				print_hidden_field('permissions_submitted', 1);
 				$sm->printFieldInterface('permissions');
+				break;
+			case 'DEFAULT_DATA_PERMISSIONS':
+				$sm = new Staff_Member();
+				$sm->setValue('data_permissions', ifdef('DEFAULT_DATA_PERMISSIONS', 1040187392));
+				print_hidden_field('data_permissions_submitted', 1);
+				$sm->printFieldInterface('data_permissions');
 				break;
 			case 'AGE_BRACKET_OPTIONS':
 				$this->printAgeBracketOptions();
@@ -661,7 +676,7 @@ class View_Admin__System_Configuration extends View {
 			if (!empty($_POST['age_bracket_delete'])) {
 				$idSet = implode(',', array_map(Array($db, 'quote'), $_POST['age_bracket_delete']));
 				// Reset any persons using this age bracket to the default status
-				$sql = 'UPDATE person
+				$sql = 'UPDATE _person
 						SET age_bracketid = (SELECT id FROM age_bracket WHERE is_default = 1 AND id NOT IN ('.$idSet.'))
 						WHERE age_bracketid IN ('.$idSet.')';
 				$res = $db->query($sql);

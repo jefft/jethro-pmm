@@ -8,6 +8,16 @@ class Note_Template_Field extends DB_Object
 		parent::__construct($id);
 	}
 
+	/**
+	 * Hidden sensitive fields cannot be referenced by note templates.
+	 * @param Custom_Field $field
+	 * @return bool
+	 */
+	public static function isSelectableCustomField($field)
+	{
+		return $field->isVisibleToCurrentUser();
+	}
+
 	protected static function _getFields()
 	{
 		return Array(
@@ -24,6 +34,9 @@ class Note_Template_Field extends DB_Object
 			'customfieldid'	=> Array(
 							'type'		=> 'reference',
 							'references' => 'custom_field',
+							'filter'	=> function ($field) {
+								return Note_Template_Field::isSelectableCustomField($field);
+							},
 							'allow_empty'	=> true,
 					   ),
 			// You specify EITHER a customfieldid above, OR the three fields below

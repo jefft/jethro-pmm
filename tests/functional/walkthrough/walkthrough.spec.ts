@@ -433,8 +433,9 @@ test.describe("Jethro actions", () => {
     await page.locator('input[name="custom_2[]"]').fill("WWCC123456");
     await page.locator('button:has-text("Update Person")').click();
     await expect(page.getByText("Person Updated")).toBeVisible();
-    expect(WALKTHROUGH_DB(`SELECT value_date FROM custom_field_value WHERE personid=${calvinId} AND fieldid=1`)).toContain("1985-07");
-    expect(WALKTHROUGH_DB(`SELECT value_text FROM custom_field_value WHERE personid=${calvinId} AND fieldid=2`)).toBe("WWCC123456");
+    expect(WALKTHROUGH_DB(`SELECT value_date FROM _custom_field_value WHERE personid=${calvinId} AND fieldid=1`)).toContain("1985-07");
+    expect(WALKTHROUGH_DB(`SELECT value_text FROM _custom_field_value WHERE personid=${calvinId} AND fieldid=2`)).toBe("WWCC123456");
+    expect(WALKTHROUGH_DB(`SET @current_user_id=-1; SELECT value_date FROM custom_field_value WHERE personid=${calvinId} AND fieldid=1`)).toContain("1985-07");
   });
 
   test("adds members to person groups", async ({ page }) => {
@@ -475,7 +476,7 @@ test.describe("Jethro actions", () => {
   });
 
   test("edits a family's details", async ({ page }) => {
-    const calvinFamilyId = WALKTHROUGH_DB("SELECT id FROM family WHERE family_name='Calvin'");
+    const calvinFamilyId = WALKTHROUGH_DB("SELECT id FROM _family WHERE family_name='Calvin'");
     await page.goto(`?view=_edit_family&familyid=${calvinFamilyId}`);
     await page.locator('textarea[name="address_street"]').fill("11 Rue des Chanoines");
     await page.fill('input[name="address_suburb"]', "Geneva");
@@ -484,7 +485,7 @@ test.describe("Jethro actions", () => {
     await page.fill('input[name="home_tel"]', "0223101564");
     await page.locator('button:has-text("Update Family")').click();
     await expect(page.getByText("Family Updated")).toBeVisible();
-    expect(WALKTHROUGH_DB(`SELECT address_street FROM family WHERE id=${calvinFamilyId}`)).toBe("11 Rue des Chanoines");
+    expect(WALKTHROUGH_DB(`SELECT address_street FROM _family WHERE id=${calvinFamilyId}`)).toBe("11 Rue des Chanoines");
   });
 
   test("records attendance for the 4pm congregation", async ({ page }) => {

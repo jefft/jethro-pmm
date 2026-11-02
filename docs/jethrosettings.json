@@ -65,8 +65,16 @@
       "label": "Default Permissions",
       "description": "Permissions to grant to new user accounts by default",
       "explanation": "",
-      "default": 8519679,
+      "default": 7995391,
       "note": "Permissions to grant to new user accounts by default"
+    },
+    "DEFAULT_DATA_PERMISSIONS": {
+      "type": "number",
+      "label": "Default Viewable Person Fields",
+      "description": "Viewable person fields to grant to new user accounts by default",
+      "explanation": "",
+      "default": 1040187392,
+      "note": "Viewable person fields to grant to new user accounts by default"
     },
     "RESTRICTED_USERS_CAN_ADD": {
       "type": "select",
@@ -1275,6 +1283,7 @@
       "settings": [
         "ENABLED_FEATURES",
         "DEFAULT_PERMISSIONS",
+        "DEFAULT_DATA_PERMISSIONS",
         "RESTRICTED_USERS_CAN_ADD",
         "PASSWORD_MIN_LENGTH",
         "PASSWORD_RESET_ENABLED",

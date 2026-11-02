@@ -1,5 +1,6 @@
 <?php
 include_once 'include/db_object.class.php';
+include_once 'include/field_access.php';
 class Person_Query extends DB_Object
 {
 	private $_field_details = Array();
@@ -59,6 +60,9 @@ class Person_Query extends DB_Object
 
 			$this->_custom_fields = $GLOBALS['system']->getDBObjectData('custom_field', Array(), 'OR', 'rank');
 			$this->_dummy_custom_field = new Custom_Field();
+			if (!Person::currentUserCanViewRemarks()) {
+				$this->_show_fields = array_values(array_diff($this->_show_fields, Array('p.remarks')));
+			}
 		}
 		return parent::__construct($id);
 	}
@@ -176,6 +180,7 @@ class Person_Query extends DB_Object
 		<table class="table table-border table-auto-width indent-left table-condensed">
 		<?php
 		foreach ($this->_query_fields as $i) {
+			if (!$this->_isReportFieldAllowed($i, 'rule')) continue;
 			$v = $this->_field_details[$i];
 			unset($v['filter']); // remove the holds_persons restriction for congregations; there might be inactive congregations we want to analyse.
 			if (in_array($v['type'], Array('select', 'reference', 'datetime', 'text'))
@@ -239,6 +244,7 @@ class Person_Query extends DB_Object
 			$dummyField = new Custom_Field();
 			foreach ($this->_custom_fields as $fieldid => $fieldDetails) {
 				$dummyField->populate($fieldid, $fieldDetails);
+				if (!$dummyField->isVisibleToCurrentUser()) continue;
 				?>
 					<tr>
 						<td>
@@ -555,7 +561,7 @@ class Person_Query extends DB_Object
 					foreach ($this->_show_fields as $i => $opt) {
 						if (is_null($opt)) {
 							$options['--'.$i] = '-----';
-						} else {
+						} else if ($this->_isReportFieldAllowed($opt, 'column')) {
 							$options[$opt] = $this->_field_details[$opt]['label'];
 						}
 					}
@@ -575,6 +581,7 @@ class Person_Query extends DB_Object
 					if ($this->_custom_fields) {
 						$options['--A'] = '-----';
 						foreach ($this->_custom_fields as $fieldid => $fielddetails) {
+							if (!Custom_Field::isFieldDataVisibleToCurrentUser($fielddetails)) continue;
 							$options[self::CUSTOMFIELD_PREFIX.$fieldid] = ucfirst($fielddetails['name']);
 						}
 					}
@@ -620,13 +627,15 @@ class Person_Query extends DB_Object
 						'groupid' => _('Which person groups they are in'),
 			);
 			foreach ($this->_query_fields as $i) {
+				if (!$this->_isReportFieldAllowed($i, 'group')) continue;
 				$v = $this->_field_details[$i];
 				if (in_array($v['type'], Array('select', 'reference'))) {
 					$options[$i] = _($v['label']);
-				}
+			}
 			}
 			foreach ($this->_custom_fields as $id => $f) {
 				if ($f['type'] != 'select') continue; // restrict it to option fields for now.
+				if (!Custom_Field::isFieldDataVisibleToCurrentUser($f)) continue;
 				$options['custom-'.$id] = $f['name'];
 			}
 			print_widget(
@@ -648,7 +657,7 @@ class Person_Query extends DB_Object
 				?>
 				<option disabled="disabled">------</option>
 				<?php
-			} else {
+			} else if ($this->_isReportFieldAllowed($name, 'sort')) {
 				?>
 				<option value="<?php echo $name; ?>"<?php if ($sb == $name) echo ' selected="selected"'; ?>><?php echo ents($this->_field_details[$name]['label']); ?></option>
 				<?php
@@ -656,8 +665,10 @@ class Person_Query extends DB_Object
 		}
 		?>
 		<option disabled="disabled">------</option>
+		<?php if ($GLOBALS['user_system']->havePerm(PERM_VIEWATTENDANCE)) { ?>
 		<option value="attendance_percent"<?php if ($sb == "attendance_percent") echo ' selected="selected"'; ?>>Attendance rate during the specified period</option>
 		<option value="attendance_numabsences"<?php if ($sb == "attendance_numabsences") echo ' selected="selected"'; ?>>Number of absences since last marked present</option>
+		<?php } ?>
 		<option disabled="disabled">------</option>
 		<option value="membershipstatus"<?php if ($sb == "membershipstatus") echo ' selected="selected"'; ?>>Group membership status</option>
 		<?php
@@ -666,6 +677,7 @@ class Person_Query extends DB_Object
 			<option disabled="disabled">------</option>
 			<?php
 			foreach ($this->_custom_fields as $fieldid => $fielddetails) {
+				if (!Custom_Field::isFieldDataVisibleToCurrentUser($fielddetails)) continue;
 				$selected = ($sb == self::CUSTOMFIELD_PREFIX.$fieldid) || ($sb == 'date---'.$fieldid)
 				?>
 				<option value="<?php echo self::CUSTOMFIELD_PREFIX.$fieldid; ?>"<?php if ($selected) echo ' selected="selected"'; ?>><?php echo ents($fielddetails['name']); ?></option>
@@ -824,6 +836,8 @@ class Person_Query extends DB_Object
 
 	function processForm($prefix='', $fields=NULL)
 	{
+		$existingParams = $this->_convertParams($this->getValue('params'));
+		if (!is_array($existingParams)) $existingParams = Array();
 		switch ($_POST['save_option']) {
 			case 'new':
 				$this->populate(0, Array());
@@ -870,6 +884,7 @@ class Person_Query extends DB_Object
 		$rules = Array();
 		if (!empty($_POST['enable_rule'])) {
 			foreach ($_POST['enable_rule'] as $field) {
+				if (!$this->_isReportFieldAllowed($field, 'rule')) continue;
 				$rules[$field] = $this->_processRuleDetails($field);
 			}
 		}
@@ -879,6 +894,7 @@ class Person_Query extends DB_Object
 		$params['custom_fields'] = Array();
 		foreach ($this->_custom_fields as $fieldid => $fieldDetails) {
 			if (in_array($fieldid, array_get($_REQUEST, 'enable_custom_field', Array()))) {
+				if (!Custom_Field::isFieldDataVisibleToCurrentUser($fieldDetails)) continue;
 				switch ($this->_custom_fields[$fieldid]['type']) {
 					case 'date':
 						$params['custom_fields'][$fieldid] = Array(
@@ -949,6 +965,10 @@ class Person_Query extends DB_Object
 			$params['group_by'] = '';
 		}
 
+		$params['show_fields'] = array_values(array_filter($params['show_fields'], function ($field) {
+			return $this->_isReportFieldAllowed($field, 'column');
+		}));
+
 		// SORT BY
 		$params['sort_by'] = $_POST['sort_by'];
 		if (in_array($params['sort_by'], Array('attendance_percent', 'attendance_numabsences', 'membershipstatus'))) {
@@ -957,9 +977,36 @@ class Person_Query extends DB_Object
 				$params['show_fields'][] = $params['sort_by'];
 			}
 		}
+		if (!$this->_isReportFieldAllowed($params['sort_by'], 'sort')) $params['sort_by'] = 'p.last_name';
+		if (!$this->_isReportFieldAllowed($params['group_by'], 'group')) $params['group_by'] = '';
 		if (empty($params['include_groups']) && ($params['sort_by'] == 'membershipstatus')) {
 			add_message('No groups were chosen, so results cannot be ordered by membership status', 'error');
 			$params['sort_by'] = '';
+		}
+		// A restricted editor cannot see (so cannot re-post) hidden fields.
+		// Keep the stored rules/columns/order for them instead of deleting
+		// them from a shared report.
+		if (!empty($existingParams)) {
+			foreach ((array)array_get($existingParams, 'rules', Array()) as $field => $value) {
+				if ($this->_isReportFieldHidden($field)) $params['rules'][$field] = $value;
+			}
+			foreach ((array)array_get($existingParams, 'show_fields', Array()) as $field) {
+				if ($this->_isReportFieldHidden($field) && !in_array($field, $params['show_fields'], TRUE)) $params['show_fields'][] = $field;
+			}
+			foreach ((array)array_get($existingParams, 'custom_fields', Array()) as $fieldid => $value) {
+				$field = $this->_custom_fields[$fieldid] ?? NULL;
+				if ($field && !Custom_Field::isFieldDataVisibleToCurrentUser($field) && !isset($params['custom_fields'][$fieldid])) {
+					$params['custom_fields'][$fieldid] = $value;
+				}
+			}
+			$oldSort = array_get($existingParams, 'sort_by');
+			if ($oldSort !== NULL && $this->_isReportFieldHidden($oldSort) && $params['sort_by'] == 'p.last_name') {
+				$params['sort_by'] = $oldSort;
+			}
+			$oldGroup = array_get($existingParams, 'group_by');
+			if ($oldGroup && $this->_isReportFieldHidden($oldGroup) && empty($params['group_by'])) {
+				$params['group_by'] = $oldGroup;
+			}
 		}
 		$this->setValue('params', $params);
 	}
@@ -994,6 +1041,7 @@ class Person_Query extends DB_Object
 	{
 		$out = Array();
 		if (!strlen($str)) return ;
+		if (!Custom_Field::isFieldDataVisibleToCurrentUser($this->_custom_fields[$fieldid])) return '';
 		$this->_dummy_custom_field->populate($fieldid, $this->_custom_fields[$fieldid]);
 		$rows = explode(self::CUSTOMFIELDVAL_SEP, $str);
 		foreach ($rows as $row) {
@@ -1011,6 +1059,7 @@ class Person_Query extends DB_Object
 	private function _printCustomFieldValue($str, $fieldid)
 	{
 		if (!strlen($str)) return ;
+		if (!Custom_Field::isFieldDataVisibleToCurrentUser($this->_custom_fields[$fieldid])) return;
 		$this->_dummy_custom_field->populate($fieldid, $this->_custom_fields[$fieldid]);
 		$rows = explode(self::CUSTOMFIELDVAL_SEP, $str);
 		foreach ($rows as $i => $row) {
@@ -1091,6 +1140,85 @@ class Person_Query extends DB_Object
 	// ['criteria' => ..., 'val' => [<bad option ids>]] rather than TRUE, to preserve context.
 	//
 	// $badParams can be passed to formatValidationErrors() to produce human-readable messages.
+	/**
+	 * Whether a report field is a contact field this user may not see.
+	 * @param string $field e.g. "p.email", "f.address_suburb"
+	 * @return bool
+	 */
+	private function _isFieldMasked($field)
+	{
+		$bare = preg_replace('/^[pf]\./', '', (string)$field);
+		return Field_Access::isContactField($bare) && !Field_Access::canRead($bare);
+	}
+
+	/**
+	 * Whether a report field (contact, custom or sort key) is hidden from this user.
+	 * @param string $field
+	 * @return bool
+	 */
+	private function _isReportFieldHidden($field)
+	{
+		if ($this->_isFieldMasked($field)) return TRUE;
+		foreach (Array(self::CUSTOMFIELD_PREFIX, 'date---', 'custom-') as $prefix) {
+			if (strpos((string)$field, $prefix) === 0) {
+				$fieldid = substr((string)$field, strlen($prefix));
+				$details = $this->_custom_fields[$fieldid] ?? NULL;
+				return !$details || !Custom_Field::isFieldDataVisibleToCurrentUser($details);
+			}
+		}
+		return FALSE;
+	}
+
+	/**
+	 * Whether a field is a selectable option for a report control.
+	 * This intentionally excludes database columns that are not report choices,
+	 * such as raw history and authentication fields.
+	 */
+	private function _isReportFieldAllowed($field, $control)
+	{
+		if ($this->_isReportFieldHidden($field)) return FALSE;
+		$allowed = Array();
+		if ($control == 'rule' || $control == 'group') {
+			foreach ($this->_query_fields as $candidate) {
+				$details = $this->_field_details[$candidate] ?? Array();
+				if ($this->_isReportFieldHidden($candidate)) continue;
+				$type = $details['type'] ?? '';
+				if ($control == 'group' ? in_array($type, Array('select', 'reference')) :
+					(in_array($type, Array('select', 'reference', 'datetime', 'text'))
+						&& !in_array($candidate, Array('p.first_name', 'p.last_name', 'f.family_name', 'p.remarks', 'p.email')))) {
+					$allowed[] = $candidate;
+				}
+			}
+			if ($control == 'group') {
+				$allowed[] = 'groupid';
+				foreach ($this->_custom_fields as $id => $details) {
+					if ($details['type'] == 'select' && Custom_Field::isFieldDataVisibleToCurrentUser($details)) $allowed[] = 'custom-'.$id;
+				}
+			}
+		} else {
+			foreach ($this->_show_fields as $candidate) {
+				if ($candidate !== NULL && !$this->_isReportFieldHidden($candidate)) $allowed[] = $candidate;
+			}
+			if ($control == 'column') {
+				if ($GLOBALS['user_system']->havePerm(PERM_VIEWATTENDANCE)) $allowed = array_merge($allowed, Array('attendance_percent', 'attendance_numabsences'));
+				if ($GLOBALS['user_system']->havePerm(PERM_VIEWNOTE)) $allowed = array_merge($allowed, Array('notes.subjects', 'actionnotes.subjects'));
+				if ($GLOBALS['system']->featureEnabled('PHOTOS')) $allowed[] = 'photo';
+				$allowed = array_merge($allowed, Array('groups', 'membershipstatus', 'all_members', 'adult_members', 'familymember_group_members', 'view_link', 'edit_link', 'checkbox'));
+				if ($GLOBALS['user_system']->havePerm(PERM_EDITNOTE)) $allowed[] = 'note_link';
+			} else {
+				if ($GLOBALS['user_system']->havePerm(PERM_VIEWATTENDANCE)) $allowed = array_merge($allowed, Array('attendance_percent', 'attendance_numabsences'));
+				$allowed[] = 'membershipstatus';
+			}
+			foreach ($this->_custom_fields as $id => $details) {
+				if (!Custom_Field::isFieldDataVisibleToCurrentUser($details)) continue;
+				$allowed[] = self::CUSTOMFIELD_PREFIX.$id;
+				if ($control == 'sort') $allowed[] = 'date---'.$id;
+			}
+		}
+		return in_array($field, $allowed, TRUE);
+	}
+
+
 	function validateQueryParams(array $params): array
 	{
 		$db =& $GLOBALS['db'];
@@ -1100,6 +1228,8 @@ class Person_Query extends DB_Object
 		foreach (array_keys(array_get($params, 'custom_fields', Array())) as $fieldid) {
 			if (!isset($this->_custom_fields[$fieldid])) {
 				$badParams['custom_fields'][$fieldid] = TRUE;
+				unset($params['custom_fields'][$fieldid]);
+			} else if (!Custom_Field::isFieldDataVisibleToCurrentUser($this->_custom_fields[$fieldid])) {
 				unset($params['custom_fields'][$fieldid]);
 			}
 		}
@@ -1175,12 +1305,30 @@ class Person_Query extends DB_Object
 			}
 		}
 
+		// Drop rules, columns, sorting and grouping on contact fields this
+		// user cannot see: the views blank them, so using them would silently
+		// give wrong results (e.g. a filter matching every row).
+		foreach (array_keys((array)array_get($params, 'rules', Array())) as $field) {
+			if (!$this->_isReportFieldAllowed($field, 'rule')) unset($params['rules'][$field]);
+		}
+		foreach (array_get($params, 'show_fields', Array()) as $key => $field) {
+			if (!$this->_isReportFieldAllowed($field, 'column')) unset($params['show_fields'][$key]);
+		}
+		if (!$this->_isReportFieldAllowed(array_get($params, 'sort_by'), 'sort')) {
+			$params['sort_by'] = 'p.last_name';
+		}
+		if (!$this->_isReportFieldAllowed(array_get($params, 'group_by'), 'group')) {
+			$params['group_by'] = '';
+		}
+
 		// CUSTOM FIELD DISPLAY COLUMNS
 		foreach (array_get($params, 'show_fields', Array()) as $key => $field) {
 			if (0 === strpos($field, self::CUSTOMFIELD_PREFIX)) {
 				$fieldid = substr($field, strlen(self::CUSTOMFIELD_PREFIX));
 				if (!isset($this->_custom_fields[$fieldid])) {
 					$badParams['show_fields'][] = $field;
+					unset($params['show_fields'][$key]);
+				} else if (!Custom_Field::isFieldDataVisibleToCurrentUser($this->_custom_fields[$fieldid])) {
 					unset($params['show_fields'][$key]);
 				}
 			}
@@ -1196,6 +1344,21 @@ class Person_Query extends DB_Object
 		if ($sortCustomField !== NULL && !isset($this->_custom_fields[$sortCustomField])) {
 			$badParams['sort_by'] = $params['sort_by'];
 			$params['sort_by'] = 'p.last_name';
+		} else if ($sortCustomField !== NULL
+			&& !Custom_Field::isFieldDataVisibleToCurrentUser($this->_custom_fields[$sortCustomField])
+		) {
+			// Hidden, not deleted: no warning.
+			$params['sort_by'] = 'p.last_name';
+		}
+
+		// CUSTOM FIELD GROUPING
+		if (0 === strpos((string)array_get($params, 'group_by', ''), 'custom-')) {
+			list($null, $groupFieldId) = explode('-', $params['group_by']);
+			if (!isset($this->_custom_fields[$groupFieldId])
+				|| !Custom_Field::isFieldDataVisibleToCurrentUser($this->_custom_fields[$groupFieldId])
+			) {
+				$params['group_by'] = '';
+			}
 		}
 
 		// GROUP FILTERS
@@ -1376,6 +1539,11 @@ class Person_Query extends DB_Object
 		// CUSTOM FIELD FILTERS
 		$customFieldWheres = Array();
 		foreach (array_get($params, 'custom_fields', Array()) as $fieldid => $values) {
+			if (isset($this->_custom_fields[$fieldid])
+				&& !Custom_Field::isFieldDataVisibleToCurrentUser($this->_custom_fields[$fieldid])
+			) {
+				continue;
+			}
 			$query['from'] .= ' LEFT JOIN custom_field_value pd'.$fieldid.' ON pd'.$fieldid.'.personid = p.id AND pd'.$fieldid.'.fieldid = '.(int)$fieldid."\n";
 			switch ($this->_custom_fields[$fieldid]['type']) {
 				case 'date':
@@ -1592,6 +1760,14 @@ class Person_Query extends DB_Object
 		}
 
 		// GROUPING
+		if (0 === strpos((string)array_get($params, 'group_by', ''), 'custom-')) {
+			list($null, $groupFieldId) = explode('-', $params['group_by']);
+			if (!isset($this->_custom_fields[$groupFieldId])
+				|| !Custom_Field::isFieldDataVisibleToCurrentUser($this->_custom_fields[$groupFieldId])
+			) {
+				$params['group_by'] = '';
+			}
+		}
 		$grouping_order = '';
 		$grouping_field = ''; // this will be the first SELECT col and used for grouping in PHP rendering; not actually used in SQL GROUP_BY
 		if (!$this->hasGroupingField($params)) {
@@ -1807,7 +1983,9 @@ class Person_Query extends DB_Object
 							$customFieldID = substr($field, 14);
 						}
 						if ($customFieldID) {
-							if (isset($this->_custom_fields[$customFieldID])) {
+							if (isset($this->_custom_fields[$customFieldID])
+								&& Custom_Field::isFieldDataVisibleToCurrentUser($this->_custom_fields[$customFieldID])
+							) {
 								$field = new Custom_Field();
 								$field->populate($customFieldID, $this->_custom_fields[$customFieldID]);
 								$query['from'] .= ' LEFT JOIN custom_field_value cfv'.$customFieldID.' ON cfv'.$customFieldID.'.personid = p.id AND cfv'.$customFieldID.'.fieldid = '.$db->quote($customFieldID)."\n";
@@ -1836,6 +2014,13 @@ class Person_Query extends DB_Object
 				$customOrder = substr($params['sort_by'], 8);
 			} else if (0 === strpos($params['sort_by'], self::CUSTOMFIELD_PREFIX)) {
 				$customOrder = substr($params['sort_by'], 14);
+			}
+			if ($customOrder
+				&& (!isset($this->_custom_fields[$customOrder])
+					|| !Custom_Field::isFieldDataVisibleToCurrentUser($this->_custom_fields[$customOrder]))
+			) {
+				$params['sort_by'] = 'p.last_name';
+				$customOrder = NULL;
 			}
 			if ($customOrder) {
 				$query['from'] .= ' LEFT JOIN custom_field_value cfvorder ON cfvorder.personid = p.id AND cfvorder.fieldid = '.$db->quote($customOrder)."\n";
@@ -1928,6 +2113,7 @@ class Person_Query extends DB_Object
 		$db =& $GLOBALS['db'];
 		$params = $this->_convertParams($this->getValue('params'));
 		if ($params === null) return;
+		list($params,) = $this->validateQueryParams($params);
 
 		$sql = $this->getSQL();
 		if (is_null($sql)) return;

@@ -178,6 +178,35 @@ Jethro no longer logs to the `SMS_SEND_LOGFILE` file, as a much fuller history i
 
 The existing log file is not imported or deleted. **Synchronize History** can recover everything your SMS provider still holds (roughly the last 12 months for 5CentSMS), so keep or archive the file if you need older history. See [SMS send log file](../administration/config/sms.mdx#sms-send-log-file).
 
+#### Restricted database accounts: re-grant on the renamed tables
+
+If `conf.php` sets `DB_MEMBERS_USERNAME` or `DB_PUBLIC_USERNAME` to a separate
+MySQL account that is allowed only the tables each area needs (see
+[Database accounts](../administration/config/index.mdx#database-accounts-optional)),
+2.40 renames two tables that Jethro writes to. `family` and
+`custom_field_value` are now read-only views, and the writers point at the
+renamed base tables `_family` and `_custom_field_value`. Grants for the old
+table names do not follow the rename: after upgrading, a members-area account
+can no longer save family details, and fails with
+`ERROR 1142 (42000): UPDATE command denied ... '_family'`.
+
+Give the members-area account the new write tables (its database-wide `SELECT`
+covers the read views):
+
+```sql
+GRANT SELECT ON `jethro`.* TO 'site_members'@'localhost';
+GRANT UPDATE ON `jethro`.`_family` TO 'site_members'@'localhost';
+GRANT INSERT, UPDATE, DELETE ON `jethro`.`_custom_field_value` TO 'site_members'@'localhost';
+GRANT INSERT, UPDATE, DELETE ON `jethro`.`db_object_lock` TO 'site_members'@'localhost';
+```
+
+Substitute your database name and account names. `_person` and `db_object_lock`
+kept their 2.39 names, so existing grants on them still apply. The public area
+is read-only and the views kept their names, so a `DB_PUBLIC_USERNAME` account
+with `SELECT` on the database needs no change. Check the result with
+`SHOW GRANTS FOR 'site_members'@'localhost';`: it must include `_family` and
+`_custom_field_value`.
+
 ### Security: forms from other sites are refused (upgrade notes)
 
 Jethro now asks the browser where each form submission came from, using the
@@ -228,8 +257,26 @@ Refusals are written to the web server's PHP error log, as
 `Refused staff login: browser did not confirm a same-origin request (...)`
 (`members login` for the members area). See
 [Request origin protection](../developer/reference/request-origin-protection.mdx)
-for the full rules.
-## Version 2.39 (unreleased)
+
+### Viewable person fields
+
+- **Person fields can be hidden independently.** A new **Viewable Person Fields**
+  section on the user-account form grants Address, Email, Mobile, Contact remarks
+  and Custom fields separately from the functions that use them. Existing staff
+  keep all of them on upgrade, and new accounts get them by default. A hidden
+  field is blanked on pages, reports, exports and in history, and the user cannot
+  change it. See [Permissions](../administration/permissions.mdx) and
+  [Contact field permissions](../developer/reference/contact-field-permissions).
+- **Sensitive custom fields.** A custom field can be marked **Sensitive**; only
+  users granted **Sensitive custom fields** can see it. No one except SysAdmins
+  has that permission until it is granted. See
+  [Custom Fields](../administration/custom-fields.mdx#sensitive-fields).
+- **Reports, history and note templates respect field visibility.** Report
+  filters, sorting and grouping are checked against fields the user may view.
+  History hides values for restricted fields, and note templates no longer copy
+  custom-field names or values into note text; those values remain on the person
+  record.
+
 
 ### Search results page: live search
 

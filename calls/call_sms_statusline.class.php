@@ -1,4 +1,5 @@
 <?php
+require_once JETHRO_ROOT.'/include/field_access.php';
 
 /**
  * SSE endpoint backing the Datastar-driven SMS bulk/modal composer.
@@ -32,6 +33,11 @@ class Call_SMS_Statusline extends Call
     {
         // Enforce PERM_SENDSMS exactly like Call_SMS.
         if (!$GLOBALS['user_system']->havePerm(PERM_SENDSMS)) {
+            http_response_code(403);
+            return;
+        }
+
+        if (!\Field_Access::canRead('mobile_tel')) {
             http_response_code(403);
             return;
         }

@@ -18,6 +18,8 @@ class View__Move_Person_To_Family extends View
 				$family = $this->_person->getFamily();
 				$family->id = 0;
 				$family->create();
+				// The user may not see (so could not copy) the old address.
+				$family->copyContactDetailsFrom($old_familyid);
 				$this->_person->setValue('familyid', $family->id);
 				$this->_person->save();
 				add_message('New family created with same details as old family.  You should update the new family\'s details as required');

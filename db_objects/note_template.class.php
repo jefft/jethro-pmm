@@ -172,9 +172,8 @@ class Note_Template extends DB_Object
 		</table>
 		<small>When someone uses this template to add a note to a person, they will be prompted to enter values for these fields.<br />
 			Values for "independent" fields are saved only within the note itself. <br />
-			Values for "person" fields are saved within the note and will also update the corresponding
-			<a href="<?php build_url(Array('view' => 'admin__custom_fields')); ?>">custom field</a>
-			in the person record.</small>
+			Values for "person" fields are saved in the person record and update the corresponding
+			<a href="<?php build_url(Array('view' => 'admin__custom_fields')); ?>">custom field</a> there.</small>
 		<?php
 	}
 
@@ -268,6 +267,17 @@ class Note_Template extends DB_Object
 	}
 
 	/**
+	 * Whether a custom field referenced by this template is visible to the current user.
+	 * @param int $customfieldid
+	 * @return bool
+	 */
+	private function _isVisibleCustomField($customfieldid)
+	{
+		$field = $GLOBALS['system']->getDBObject('custom_field', $customfieldid);
+		return $field && $field->isVisibleToCurrentUser();
+	}
+
+	/**
 	 * Print interface for POPULATING the fields within this note template
 	 * (used when adding a note to a person)
 	 */
@@ -278,6 +288,7 @@ class Note_Template extends DB_Object
 		<div class="note-template-fields">
 			<?php
 			foreach ($fields as $id => $details) {
+				if ($details['customfieldid'] && !$this->_isVisibleCustomField($details['customfieldid'])) continue;
 				?>
 				<div class="control-group">
 					<label class="control-label">
@@ -313,6 +324,7 @@ class Note_Template extends DB_Object
 	{
 		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', Array('templateid' => $this->id), 'OR', 'rank');
 		foreach ($fields as $id => $details) {
+			if ($details['customfieldid'] && !$this->_isVisibleCustomField($details['customfieldid'])) continue;
 			if ($details['customfieldid']) {
 				$cf = $GLOBALS['system']->getDBObject('custom_field', $details['customfieldid']);
 				$this->_field_values[$id] = $cf->processWidget();
@@ -333,7 +345,7 @@ class Note_Template extends DB_Object
 	{
 		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', Array('templateid' => $this->id), 'OR', 'rank');
 		foreach ($fields as $id => $details) {
-			if ($details['customfieldid']) return TRUE;
+			if ($details['customfieldid'] && $this->_isVisibleCustomField($details['customfieldid'])) return TRUE;
 		}
 		return FALSE;
 	}
@@ -347,6 +359,7 @@ class Note_Template extends DB_Object
 	{
 		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', Array('templateid' => $this->id), 'OR', 'rank');
 		foreach ($fields as $id => $details) {
+			if ($details['customfieldid'] && !$this->_isVisibleCustomField($details['customfieldid'])) continue;
 			if ($details['customfieldid']) {
 				$person->setCustomValue($details['customfieldid'], $this->_field_values[$id], FALSE);
 			}
@@ -363,19 +376,27 @@ class Note_Template extends DB_Object
 		$res = '';
 		$fields = $GLOBALS['system']->getDBObjectData('note_template_field', Array('templateid' => $this->id), 'OR', 'rank');
 		$maxLength = 0;
+		$hasCustomFields = FALSE;
 		foreach ($fields as $id => $details) {
+			if ($details['customfieldid'] && !$this->_isVisibleCustomField($details['customfieldid'])) continue;
 			$params = unserialize($details['params']);
 			$params['type'] = $details['type'];
-			$line = ($details['customfieldid'] ? $details['customfieldname'] : $details['label']).': ';
 			if ($details['customfieldid']) {
-				$cf = $GLOBALS['system']->getDBObject('custom_field', $details['customfieldid']);
-				$line .= $cf->formatValue($this->_field_values[$id]);
-			} else {
-				$line .= format_value($this->_field_values[$id], $params);
+				// Note text is visible to note readers, regardless of their custom-field
+				// permissions. Keep both custom-field names and values on the person record.
+				$hasCustomFields = TRUE;
+				continue;
 			}
+			$line = $details['label'].': '.format_value($this->_field_values[$id], $params);
 			$maxLength = max($maxLength, strlen($line));
 			$res .= $line."\n";
 		}
+		if ($hasCustomFields) {
+			$line = _('Custom field values are recorded on the person record.');
+			$maxLength = max($maxLength, strlen($line));
+			$res .= $line."\n";
+		}
+		if ($res === '') return;
 		$divider = str_repeat('-', (int)($maxLength*1.6));
 		$res = $res.$divider."\n";
 		$note->setValue('details', $res.$note->getValue('details'));

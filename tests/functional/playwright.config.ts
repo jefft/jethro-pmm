@@ -120,7 +120,7 @@ export default defineConfig({
     // The mock answers as the live APIs did: bin/record against the mock,
     // diffed with smsmockserver/recordings/<provider>/actual/. No browser.
     { name: "smsmock-recordings", testMatch: ["smsmock/recordings.spec.ts"] },
-    { name: "lookaround", testMatch: ["lookaround/lookaround.spec.ts"] },
+    { name: "lookaround", testMatch: ["lookaround/lookaround.spec.ts", "lookaround/report-security.spec.ts"] },
     {
       // Member self-registration: emailed activation link -> set password ->
       // logged in. Uses the MailPit capture (email/mailpit-api.ts) and reads the
