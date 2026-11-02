@@ -13,11 +13,23 @@ Focus for this round: {FOCUS}
 
 ## Do
 
-- Review the stack with `jj --ignore-working-copy diff -r <change> --git` and by
-  running the code (scratch databases named `jethro_review_<your actor>`, your own
-  functest runs with `FUNCTEST_LOCK_WAIT=1800`).
-- Reproduce every finding. Inference without a reproduction is a comment on the
+- Before any write probe, create a private instance with
+  `./devbox run -- bin/review_loop scratch` (requires `BEADS_ACTOR`; its
+  database name sanitizes hyphens to underscores). Use `--fresh` for an empty
+  install. Never write to shared dev/functest databases. Scratch DB fixtures
+  are allowed; tracked-file edits are not.
+- Review the stack with `jj --ignore-working-copy diff -r <change> --git` and
+  run the code. For your own functest runs, set `FUNCTEST_LOCK_WAIT=1800`.
+- Reproduce every finding. Inference without reproduction is a comment on the
   epic, not a bug.
+- `verify` should be an existing command that fails before and passes after the
+  fix. If no test exists, name the test the fixer should add and give exact
+  reproduction steps; docs-only fixes may use a narrowly scoped docs check.
+- Before each `bd create`, refresh `bd list --parent {EPIC} --status open` to
+  catch bugs filed concurrently. Use `bd duplicate` for a confirmed duplicate.
+- Reserve P0 for catastrophic impact (e.g. cross-tenant data loss or broadly
+  exploitable disclosure); use P1 for serious but narrower security/data
+  exposure. Don't rate every security issue P0.
 - File each bug with the template, so `bd lint` passes:
 
   ```sh

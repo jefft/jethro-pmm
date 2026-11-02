@@ -8,6 +8,9 @@
 #   review_loop integrate BUG [GATE-ARGS...]
 #                                 integrator: gate the fix on the tip, then squash it into its target
 #   review_loop cleanup BUG       forget the bug's workspace once it is integrated or abandoned
+#   review_loop scratch [--actor NAME] [--db NAME] [--port PORT] [--fresh]
+#                                 reviewer: private database + docroot + serve command, so
+#                                 write-probes never touch the shared dev/functest instances
 #
 # Bug metadata (bd update BUG --set-metadata key=value):
 #   target      jj change ID the fix belongs in (set when the bug is filed)
@@ -196,7 +199,82 @@ cmd_cleanup() {
 	bd update "$bug" --unset-metadata workspace > /dev/null
 }
 
-[[ $# -ge 1 ]] || { sed -n '2,18s/^# \?//p' "$0"; exit 2; }
+# One free TCP port in the range, for the scratch web server.
+free_port_from() {
+	local p
+	for p in $(seq "$1" "$2"); do
+		ss -ltnH "( sport = :$p )" 2>/dev/null | grep -q . || { echo "$p"; return 0; }
+	done
+	return 1
+}
+
+# A private, throwaway instance: own database, own attachments tree and a
+# docroot built from the functest one, so a reviewer can submit forms without
+# touching the shared dev (8081) or functest databases.
+cmd_scratch() {
+	local actor=${BEADS_ACTOR:-} db= port= fresh=0 dir root entry sock
+	while [[ $# -gt 0 ]]; do
+		case $1 in
+			--actor) actor=${2:-}; shift 2 ;;
+			--db) db=${2:-}; shift 2 ;;
+			--port) port=${2:-}; shift 2 ;;
+			--fresh) fresh=1; shift ;;
+			*) die "usage: review_loop scratch [--actor NAME] [--db NAME] [--port PORT] [--fresh]" ;;
+		esac
+	done
+	[[ -n $actor ]] || die "set BEADS_ACTOR or pass --actor NAME"
+	[[ -n $db ]] || db="jethro_review_${actor//[^a-zA-Z0-9]/_}"
+	db=${db,,}
+	[[ $db =~ ^[a-z][a-z0-9_]*$ ]] || die "database name '$db' must be [a-z0-9_]+ (hyphens are not allowed)"
+	root=$(jj root) || die "not inside a jj repository"
+	[[ -n $port ]] || port=$(free_port_from 8600 8699) || die "no free port in 8600-8699"
+	command -v mariadb_recreate_db > /dev/null || die "run inside devbox (devbox run -- bin/review_loop scratch ...)"
+	dir=/tmp/jethro-scratch/$db
+
+	if [[ $fresh == 1 ]]; then
+		mariadb_recreate_db "$db" > /dev/null || die "could not create database $db"
+		jethro_install_db "$db" > /dev/null || die "fresh install into $db failed"
+	else
+		# Recreates the database itself: demo data plus the released upgrades.
+		jethro_load_demodata "$db" > /dev/null || die "could not load demo data into $db"
+	fi
+
+	mkdir -p "$dir/web" "$dir/attachments"
+	for entry in "$root"/devbox.d/functest_jethro_server/*; do
+		[[ $(basename "$entry") != conf.php ]] || continue
+		ln -sfn "$entry" "$dir/web/$(basename "$entry")"
+	done
+	# Start from the dev instance's conf.php, pointed at the scratch database,
+	# and pin the socket: a php -S started outside `devbox shell` must still
+	# reach MariaDB.
+	sock=${MYSQL_UNIX_PORT:-}
+	[[ -n $sock ]] || die "MYSQL_UNIX_PORT is not set; run inside devbox"
+	sed -E "s|dbname=jethro|dbname=$db|; s|\\('DB_DATABASE', 'jethro'\\)|('DB_DATABASE', '$db')|; s|getenv\\('MYSQL_UNIX_PORT'\\)|'$sock'|" \
+		"$root/devbox.d/web/conf.php" > "$dir/web/conf.php" || die "could not write $dir/web/conf.php"
+	printf "\n# Scratch instance: its own attachments tree, so deletes cannot reach the repo's.\ndefine('ATTACHMENTS_ROOT_PATH', '%s');\n" \
+		"$dir/attachments" >> "$dir/web/conf.php"
+
+	if [[ $fresh == 1 ]]; then
+		cat <<-EOF
+		Database:    $db
+		Attachments: $dir/attachments
+		Docroot:     $dir/web
+		Serve:       php -S 127.0.0.1:$port -t $dir/web
+		No demo data or demo login is configured for this fresh install.
+		EOF
+	else
+		cat <<-EOF
+		Database:    $db
+		Attachments: $dir/attachments
+		Docroot:     $dir/web
+		Serve:       php -S 127.0.0.1:$port -t $dir/web
+		Login:       demo / qfntt7eYuwHs123 (PREFILL_USERNAME/PASSWORD in conf.php)
+		Log in first, then browse; write-probes belong here, never on 8081 or the functest port.
+		EOF
+	fi
+}
+
+[[ $# -ge 1 ]] || { sed -n '2,19s/^# \?//p' "$0"; exit 2; }
 sub=$1; shift
 case "$sub" in
 	init) cmd_init "$@" ;;
@@ -204,6 +282,7 @@ case "$sub" in
 	submit) [[ $# -eq 1 ]] || die "usage: review_loop submit BUG"; cmd_submit "$1" ;;
 	integrate) [[ $# -ge 1 ]] || die "usage: review_loop integrate BUG [GATE-ARGS...]"; cmd_integrate "$@" ;;
 	cleanup) [[ $# -eq 1 ]] || die "usage: review_loop cleanup BUG"; cmd_cleanup "$1" ;;
-	-h|--help|help) sed -n '2,18s/^# \?//p' "$0" ;;
+	scratch) cmd_scratch "$@" ;;
+	-h|--help|help) sed -n '2,19s/^# \?//p' "$0" ;;
 	*) die "unknown command $sub" ;;
 esac

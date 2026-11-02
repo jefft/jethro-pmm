@@ -72,3 +72,27 @@ goes in) and test commands before starting reviewers. Every agent gets
 
 Run everything inside `devbox shell` so `jethro_gate`, `php` and `mariadb` are
 on PATH.
+
+## Reviewer scratch instances
+
+Do not use the shared dev or functest database for write probes. From the repo,
+run `./devbox run -- bin/review_loop scratch` (set `BEADS_ACTOR` first). It
+creates `jethro_review_<sanitised-actor>` with demo data, a private attachment
+directory and a temporary docroot, then prints a `php -S` command and demo
+login. Use `--fresh` for an empty fresh install, or `--db NAME --port PORT` to
+override defaults. Database names use underscores, not actor-name hyphens.
+Reviewer-created DB fixtures are allowed; do not edit tracked files.
+
+Only one full deepreview should run per repository and reviewed range at a
+time. The merge slot serializes integration only; it does not prevent duplicate
+review/fixer work or collisions in shared workspaces and test services. For
+different repositories, use separate `DEEPREVIEW_BEADS` directories and
+non-overlapping web ports.
+
+For a bug with no existing test, `verify` may name the test the fixer must add;
+the reviewer must still reproduce the behavior and document the exact steps.
+Docs-only fixes may use a narrowly scoped documentation check. Re-run
+`bd list --parent EPIC --status open` immediately before each `bd create` to
+avoid near-simultaneous duplicates. The walkthrough project can fail in its
+setup wizard before its later tests run; do not treat those later tests as
+coverage on this stack.
