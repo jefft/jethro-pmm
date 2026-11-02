@@ -2,7 +2,7 @@
 class View__Add_User_Account extends View
 {
 	var $_sm;
-	var $_sm_fields = Array('username', 'password', 'active', 'permissions', 'restrictions');
+	var $_sm_fields = Array('username', 'password', 'active', 'data_permissions', 'permissions', 'restrictions');
 
 	static function getMenuPermissionLevel()
 	{

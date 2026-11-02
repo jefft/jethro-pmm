@@ -237,17 +237,28 @@ class View_Families__Add extends View
 						}
 						?>
 
+							<?php if (Field_Access::canRead('mobile_tel')) { ?>
 							<label><?php echo _('Mobile');?></label>
+							<?php } ?>
+							<?php if (Field_Access::canRead('email')) { ?>
 							<label><?php echo _('Email');?></label>
+							<?php } ?>
+							<?php if (Field_Access::canRead('mobile_tel')) { ?>
 							<div><?php $person->printFieldInterface('mobile_tel', 'members_0_'); ?></div>
+							<?php } ?>
+							<?php if (Field_Access::canRead('email')) { ?>
 							<div><?php $person->printFieldInterface('email', 'members_0_'); ?></div>
+							<?php } ?>
 
+							<?php if (Field_Access::canRead('remarks')) { ?>
                             <label class="fullwidth"><?php echo _('Contact Remarks');?></label>
                             <div class="fullwidth"><?php $person->printFieldInterface('remarks', 'members_0_'); ?></div>
+							<?php } ?>
 						<?php
 						$field = new Custom_Field();
 						foreach ($customFields as $fieldID => $fDetails) {
 							$field->populate($fieldID, $fDetails);
+							if (!$field->isVisibleToCurrentUser()) continue;
 							?>
 							<label class="fullwidth"><?php $field->printFieldValue('name'); ?></label>
 							<div class="fullwidth"><?php $field->printWidget('', Array(), 'members_0_'); ?></div>
@@ -269,8 +280,12 @@ class View_Families__Add extends View
 						<td><?php echo _('Age');?></td>
 						<td><?php echo _('Status');?></td>
 						<td><?php echo _('Cong.');?></td>
+						<?php if (Field_Access::canRead('mobile_tel')) { ?>
 						<td><?php echo _('Mobile Tel');?></td>
+						<?php } ?>
+						<?php if (Field_Access::canRead('email')) { ?>
 						<td><?php echo _('Email');?></td>
+						<?php } ?>
 					</tr>
 				<thead>
 				<tbody>
@@ -281,8 +296,12 @@ class View_Families__Add extends View
 						<td><?php $person->printFieldInterface('age_bracketid', 'members_0_'); ?></td>
 						<td class="person-status preserve-value"><?php $person->printFieldInterface('status', 'members_0_'); ?></td>
 						<td class="congregation preserve-value"><?php $person->printFieldInterface('congregationid', 'members_0_'); ?></td>
+						<?php if (Field_Access::canRead('mobile_tel')) { ?>
 						<td><?php $person->printFieldInterface('mobile_tel', 'members_0_'); ?></td>
+						<?php } ?>
+						<?php if (Field_Access::canRead('email')) { ?>
 						<td><?php $person->printFieldInterface('email', 'members_0_'); ?></td>
+						<?php } ?>
 					</tr>
 				</tbody>
 				<?php
@@ -291,10 +310,16 @@ class View_Families__Add extends View
 			</table>
 			</div>
 
+			<?php if (Field_Access::canRead('home_tel') || Field_Access::canRead('address_street')) { ?>
 			<h3><?php echo _('Family Details');?> <small><?php echo _('(optional)');?></small></h3>
 			<?php
-			$this->_family->printForm('', Array('home_tel', 'address_street', 'address_suburb', 'address_state', 'address_postcode'));
+			$familyFields = Array();
+			foreach (Array('home_tel', 'address_street', 'address_suburb', 'address_state', 'address_postcode') as $familyField) {
+				if (Field_Access::canRead($familyField)) $familyFields[] = $familyField;
+			}
+			$this->_family->printForm('', $familyFields);
 			?>
+			<?php } ?>
 
 		<?php
 		if ($GLOBALS['user_system']->havePerm(PERM_EDITNOTE)) {

@@ -25,6 +25,7 @@ const sidebars: SidebarsConfig = {
         'administration/congregations',
         'administration/user-accounts',
         'administration/permissions',
+        'administration/custom-fields',
         'administration/note-templates',
         'administration/action-plans',
         {
@@ -67,6 +68,8 @@ const sidebars: SidebarsConfig = {
         'developer/developer_tips',
         'contributing',
         'developer/reference/view-menu-convention',
+        'developer/reference/contact-field-permissions',
+        'developer/reference/sensitive-custom-fields',
         'developer/reference/import',
         'contributing',
         'developer/DEVELOPMENT_FUNCTESTS',

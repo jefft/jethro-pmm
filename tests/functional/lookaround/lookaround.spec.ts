@@ -30,6 +30,38 @@ test.describe("Role-based permission checks", () => {
   // Luthers are mixed (Elizabeth is 4pm Kids), the Williamsons are 4pm, and
   // "Newsletter" / "Band - Arvo" are groups nobody here is restricted to.
 
+
+  test("report group_by injection is ignored while valid grouping still works", async ({ page }) => {
+    await login(page, "6pmonly");
+    await page.goto("./?view=persons__reports&queryid=0&configure=1");
+    await expect(page.locator("#body h1")).toHaveText("Configure Person Report");
+
+    const injectedGroupBy = "p.id + (SELECT 1 UNION SELECT 2)";
+    await page.locator('select[name="group_by"]').evaluate((element, value) => {
+      const select = element as HTMLSelectElement;
+      const option = new Option(value, value, true, true);
+      select.add(option);
+      select.value = value;
+    }, injectedGroupBy);
+    await Promise.all([
+      page.waitForURL(/queryid=TEMP/),
+      page.locator('input[value="Save and view results"]').click(),
+    ]);
+
+    const response = await page.locator("#body").innerText();
+    expect(response).not.toContain("Fatal Error");
+    expect(response).not.toContain("John Calvin");
+    expect(response).not.toContain("torrie_medical_hiv.pdf");
+    await expect(page.locator("table.query-results").first()).toBeVisible();
+
+    await page.goto("./?view=persons__reports&queryid=0&configure=1");
+    await page.selectOption('select[name="group_by"]', "p.status");
+    await Promise.all([
+      page.waitForURL(/queryid=TEMP/),
+      page.locator('input[value="Save and view results"]').click(),
+    ]);
+    expect(await page.locator("table.query-results").count()).toBeGreaterThan(1);
+  });
   test("6pmonly sees only its 6pm congregation and lacks sysadmin", async ({ page }) => {
     await login(page, "6pmonly");
 
@@ -168,6 +200,110 @@ test.describe("Role-based permission checks", () => {
 });
 
 test.describe("Login", () => {
+  const NOTE_TEMPLATE_NAME = "Private Field Regression";
+  const NOTE_TEMPLATE_SUBJECT = "Private Field Regression Note";
+  const ORDINARY_FIELD_NAME = "Regression Ordinary Field";
+  const SENSITIVE_FIELD_NAME = "Regression Sensitive Field";
+  const ORDINARY_FIELD_VALUE = "ordinary-regression-value";
+  const SENSITIVE_FIELD_VALUE = "sensitive-regression-value";
+
+  function noteTemplateDb(sql: string): string {
+    const result = Bun.spawnSync(
+      ["mariadb", "jethro_functest", "-sNBe", sql],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    if (result.exitCode !== 0) throw new Error(new TextDecoder().decode(result.stderr));
+    return new TextDecoder().decode(result.stdout).trim();
+  }
+
+  function clearNoteTemplateFixtures(): void {
+    noteTemplateDb(`
+      DELETE pn FROM \`person_note\` pn
+        JOIN \`_abstract_note\` n ON n.\`id\` = pn.\`id\`
+        WHERE n.\`subject\` = '${NOTE_TEMPLATE_SUBJECT}';
+      DELETE FROM \`_abstract_note\` WHERE \`subject\` = '${NOTE_TEMPLATE_SUBJECT}';
+      DELETE FROM \`note_template\` WHERE \`name\` = '${NOTE_TEMPLATE_NAME}';
+      DELETE FROM \`_custom_field_value\`
+        WHERE fieldid IN (
+          SELECT id FROM \`custom_field\`
+          WHERE name IN ('${ORDINARY_FIELD_NAME}', '${SENSITIVE_FIELD_NAME}')
+        );
+      DELETE FROM \`custom_field\`
+        WHERE name IN ('${ORDINARY_FIELD_NAME}', '${SENSITIVE_FIELD_NAME}');
+    `);
+  }
+
+  function seedNoteTemplateFixtures(): {
+    templateId: number;
+    ordinaryFieldId: number;
+    sensitiveFieldId: number;
+  } {
+    clearNoteTemplateFixtures();
+    noteTemplateDb(`
+      INSERT INTO \`custom_field\`
+        (\`name\`, \`rank\`, \`type\`, \`allow_multiple\`, \`show_add_family\`, \`searchable\`,
+         \`heading_before\`, \`divider_before\`, \`params\`, \`tooltip\`, \`sensitive\`)
+        VALUES
+          ('${ORDINARY_FIELD_NAME}', 0, 'text', '', '', '', '', '', 'a:0:{}', '', 0),
+          ('${SENSITIVE_FIELD_NAME}', 1, 'text', '', '', '', '', '', 'a:0:{}', '', 1);
+      INSERT INTO \`note_template\` (\`name\`, \`subject\`)
+        VALUES ('${NOTE_TEMPLATE_NAME}', '${NOTE_TEMPLATE_SUBJECT}');
+      INSERT INTO \`note_template_field\`
+        (\`templateid\`, \`rank\`, \`customfieldid\`, \`label\`, \`type\`, \`params\`)
+        SELECT \`id\`, 0, (SELECT \`id\` FROM \`custom_field\` WHERE \`name\` = '${ORDINARY_FIELD_NAME}'),
+               '', 'text', 'a:0:{}' FROM \`note_template\`
+        WHERE \`name\` = '${NOTE_TEMPLATE_NAME}';
+      INSERT INTO \`note_template_field\`
+        (\`templateid\`, \`rank\`, \`customfieldid\`, \`label\`, \`type\`, \`params\`)
+        SELECT \`id\`, 1, (SELECT \`id\` FROM \`custom_field\` WHERE \`name\` = '${SENSITIVE_FIELD_NAME}'),
+               '', 'text', 'a:0:{}' FROM \`note_template\`
+        WHERE \`name\` = '${NOTE_TEMPLATE_NAME}';
+    `);
+    return {
+      templateId: Number(noteTemplateDb(
+        `SELECT \`id\` FROM \`note_template\` WHERE \`name\` = '${NOTE_TEMPLATE_NAME}'`,
+      )),
+      ordinaryFieldId: Number(noteTemplateDb(
+        `SELECT \`id\` FROM \`custom_field\` WHERE \`name\` = '${ORDINARY_FIELD_NAME}'`,
+      )),
+      sensitiveFieldId: Number(noteTemplateDb(
+        `SELECT \`id\` FROM \`custom_field\` WHERE \`name\` = '${SENSITIVE_FIELD_NAME}'`,
+      )),
+    };
+  }
+
+  test("note template custom fields hidden from note details", async ({ page }) => {
+    const personId = Number(noteTemplateDb(
+      "SELECT p.id FROM _person p LEFT JOIN staff_member s ON s.id=p.id WHERE s.id IS NULL ORDER BY p.id LIMIT 1",
+    ));
+    if (!personId) throw new Error("Note-template regression requires a non-staff person");
+    const { templateId, ordinaryFieldId, sensitiveFieldId } = seedNoteTemplateFixtures();
+    try {
+      await login(page);
+      await page.goto(`./?view=_add_note_to_person&personid=${personId}&note_template_id=${templateId}`);
+      await page.locator(`input[name="custom_${ordinaryFieldId}[]"]`).fill(ORDINARY_FIELD_VALUE);
+      await page.locator(`input[name="custom_${sensitiveFieldId}[]"]`).fill(SENSITIVE_FIELD_VALUE);
+      await page.locator('input[name="subject"]').fill(NOTE_TEMPLATE_SUBJECT);
+      await page.locator('input[name="new_note_submitted"]').click();
+
+      const values = noteTemplateDb(
+        `SELECT GROUP_CONCAT(CONCAT(fieldid, '=', value_text) ORDER BY fieldid)
+         FROM _custom_field_value
+         WHERE personid = ${personId} AND fieldid IN (${ordinaryFieldId}, ${sensitiveFieldId})`,
+      );
+      expect(values).toContain(`${ordinaryFieldId}=${ORDINARY_FIELD_VALUE}`);
+      expect(values).toContain(`${sensitiveFieldId}=${SENSITIVE_FIELD_VALUE}`);
+      const details = noteTemplateDb(
+        `SELECT \`details\` FROM \`_abstract_note\` WHERE \`subject\` = '${NOTE_TEMPLATE_SUBJECT}'`,
+      );
+      expect(details).toContain("Custom field values are recorded on the person record.");
+      for (const secret of [ORDINARY_FIELD_NAME, SENSITIVE_FIELD_NAME, ORDINARY_FIELD_VALUE, SENSITIVE_FIELD_VALUE]) {
+        expect(details).not.toContain(secret);
+      }
+    } finally {
+      clearNoteTemplateFixtures();
+    }
+  });
   test("logs in with demo credentials and lands on the home page", async ({ page }) => {
     await login(page);
 

@@ -16,8 +16,63 @@ VALUES ('NEEDS_UTF8MB4_UPGRADE', 'hidden', "1", "Whether the database charset up
 DROP FUNCTION IF EXISTS getCurrentMemberID;
 CREATE FUNCTION getCurrentMemberID() RETURNS INTEGER NO SQL RETURN @current_member_id;
 
-CREATE OR REPLACE VIEW person AS
-SELECT * from _person p
+-- Viewable person fields (see the data_permissions section below): hidden
+-- contact fields are blanked by the person and family views using the
+-- session's @current_user_data_permissions. Defined here, next to the family
+-- rename, so no point in this script leaves `family` missing or `person`
+-- unmasked. Synced with include/installer.class.php and Person::getViewSQL().
+--
+-- The symbol mapping mirrors include/data_permissions.php. Keep it in a single
+-- RETURN expression: the installer runs each SQL item as one statement, so a
+-- BEGIN/END body would need delimiter handling. The unit tests compare this
+-- mapping and the view call sites against the PHP constants.
+DROP FUNCTION IF EXISTS currentUserHasDataPerm;
+CREATE FUNCTION currentUserHasDataPerm(symbol VARCHAR(32)) RETURNS TINYINT NO SQL
+RETURN (@current_member_id IS NOT NULL)
+    OR (@current_user_id = -1)
+    OR CASE symbol
+         WHEN 'VIEWADDRESS'      THEN ((@current_user_data_permissions & 134217728) <> 0)
+         WHEN 'VIEWEMAIL'        THEN ((@current_user_data_permissions & 536870912) <> 0)
+         WHEN 'VIEWMOBILE'       THEN ((@current_user_data_permissions & 268435456) <> 0)
+         WHEN 'VIEWREMARKS'      THEN ((@current_user_data_permissions & 33554432) <> 0)
+         WHEN 'VIEWCUSTOMFIELDS' THEN ((@current_user_data_permissions & 67108864) <> 0)
+         WHEN 'VIEWSENSITIVE'    THEN ((@current_user_data_permissions & 16777216) <> 0)
+         ELSE 0
+       END;
+
+-- Rename the base family table; `family` becomes the masked read view.
+-- Idempotent for databases that have already been cut over.
+SET @family_is_table = (SELECT COUNT(*) FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family' AND TABLE_TYPE = 'BASE TABLE');
+SET @family_base_exists = (SELECT COUNT(*) FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '_family');
+SET @stmt = IF(@family_is_table = 1 AND @family_base_exists = 0,
+    'RENAME TABLE `family` TO `_family`',
+    'SELECT 1');
+PREPARE stmt FROM @stmt;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+CREATE OR REPLACE VIEW `family` AS
+SELECT f.`id`, f.`family_name`, f.`status`,
+       CASE WHEN currentUserHasDataPerm('VIEWADDRESS') THEN f.`address_street` ELSE '' END AS `address_street`,
+       CASE WHEN currentUserHasDataPerm('VIEWADDRESS') THEN f.`address_suburb` ELSE '' END AS `address_suburb`,
+       CASE WHEN currentUserHasDataPerm('VIEWADDRESS') THEN f.`address_state` ELSE '' END AS `address_state`,
+       CASE WHEN currentUserHasDataPerm('VIEWADDRESS') THEN f.`address_postcode` ELSE '' END AS `address_postcode`,
+       CASE WHEN currentUserHasDataPerm('VIEWADDRESS') THEN f.`home_tel` ELSE '' END AS `home_tel`,
+       f.`created`, f.`creator`, f.`history`
+FROM `_family` f;
+
+CREATE OR REPLACE VIEW `person` AS
+SELECT p.`id`, p.`first_name`, p.`last_name`, p.`gender`, p.`age_bracketid`,
+       CASE WHEN currentUserHasDataPerm('VIEWEMAIL') THEN p.`email` ELSE '' END AS `email`,
+       CASE WHEN currentUserHasDataPerm('VIEWMOBILE') THEN p.`mobile_tel` ELSE '' END AS `mobile_tel`,
+       CASE WHEN currentUserHasDataPerm('VIEWMOBILE') THEN p.`work_tel` ELSE '' END AS `work_tel`,
+       CASE WHEN currentUserHasDataPerm('VIEWREMARKS') THEN p.`remarks` ELSE '' END AS `remarks`,
+       p.`status`, p.`status_last_changed`, p.`history`, p.`creator`, p.`created`,
+       p.`congregationid`, p.`familyid`, p.`member_password`, p.`resethash`,
+       p.`resetexpires`, p.`feed_uuid`
+FROM `_person` p
 WHERE
 	/* members-area session: staff restrictions do not apply */
 	(getCurrentMemberID() IS NOT NULL)
@@ -25,16 +80,16 @@ WHERE
 	getCurrentUserID() IS NOT NULL
 	AND (
 		/* the person in question IS the current user */
-		(`p`.`id` = `getCurrentUserID`())
+		(p.`id` = getCurrentUserID())
 		OR /* we've been set to public mode */
-		(`getCurrentUserID`() = -(1))
+		(getCurrentUserID() = -1)
 		OR /* current user has no group/cong restrictions */
-		((0 = (select count(congregationid) from account_congregation_restriction cr WHERE cr.personid = getCurrentUserID()))
-		   AND (0 = (select count(gr.groupid) from account_group_restriction gr WHERE gr.personid = getCurrentUserID())))
+		((0 = (SELECT COUNT(*) FROM account_congregation_restriction cr WHERE cr.personid = getCurrentUserID()))
+		   AND (0 = (SELECT COUNT(*) FROM account_group_restriction gr WHERE gr.personid = getCurrentUserID())))
 		OR /* person is within a permitted cong */
-		(`p`.`congregationid` in (select `cr`.`congregationid` AS `congregationid` from `account_congregation_restriction` `cr` where (`cr`.`personid` = `getCurrentUserID`())))
+		(p.`congregationid` IN (SELECT cr.congregationid FROM account_congregation_restriction cr WHERE cr.personid = getCurrentUserID()))
 		OR /* person is within a permitted group */
-		(`p`.`id` in (select `m`.`personid` AS `personid` from (`person_group_membership` `m` join `account_group_restriction` `gr` on((`m`.`groupid` = `gr`.`groupid`))) where (`gr`.`personid` = `getCurrentUserID`())))
+		(p.`id` IN (SELECT m.personid FROM person_group_membership m JOIN account_group_restriction gr ON m.groupid = gr.groupid WHERE gr.personid = getCurrentUserID()))
 	)
 	);
 
@@ -57,7 +112,7 @@ mp.email, mp.mobile_tel, mp.work_tel, mp.familyid,
 mf.family_name, mf.address_street, mf.address_suburb, mf.address_state, mf.address_postcode, mf.home_tel
 FROM _person mp
 JOIN person_status mps ON mps.id = mp.status
-JOIN family mf ON mf.id = mp.familyid
+JOIN _family mf ON mf.id = mp.familyid
 JOIN person_group_membership pgm1 ON pgm1.personid = mp.id
 JOIN _person_group pg ON pg.id = pgm1.groupid AND pg.share_member_details = 1
 JOIN person_group_membership pgm2 ON pgm2.groupid = pg.id
@@ -73,7 +128,7 @@ mp.email, mp.mobile_tel, mp.work_tel, mp.familyid,
 mf.family_name, mf.address_street, mf.address_suburb, mf.address_state, mf.address_postcode, mf.home_tel
 FROM _person mp
 JOIN person_status mps ON mps.id = mp.status
-JOIN family mf ON mf.id = mp.familyid
+JOIN _family mf ON mf.id = mp.familyid
 JOIN _person self ON self.familyid = mp.familyid
 JOIN person_status selfs ON selfs.id = self.status
 WHERE
@@ -389,6 +444,125 @@ SET @staff_reset_sql = IF(@staff_reset_missing = '', 'DO 0', CONCAT('ALTER TABLE
 PREPARE staff_reset_stmt FROM @staff_reset_sql;
 EXECUTE staff_reset_stmt;
 DEALLOCATE PREPARE staff_reset_stmt;
+
+-- Sensitive custom fields: hidden from users without DATA_PERM_VIEWSENSITIVE.
+-- Idempotent; MySQL 8 lacks ADD COLUMN IF NOT EXISTS.
+SET @missing = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'custom_field' AND COLUMN_NAME = 'sensitive');
+SET @stmt = IF(@missing,
+    'ALTER TABLE `custom_field` ADD COLUMN `sensitive` TINYINT(1) UNSIGNED NOT NULL DEFAULT 0',
+    'SELECT 1');
+PREPARE stmt FROM @stmt;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- =========================================================================
+-- Viewable person fields: a data-visibility mask (staff_member.data_permissions),
+-- separate from the function permissions. Bits mirror include/data_permissions.php:
+--   address 134217728, email 536870912, mobile 268435456,
+--   contact remarks 33554432, custom fields 67108864, sensitive custom fields 16777216.
+-- The person and family views are defined near the top of this script.
+
+-- Custom field values are read through a permission-filtered view so a
+-- sensitive field's values are hidden even if a caller forgets the PHP check.
+-- Rename the base table once, then expose only visible fields through the view.
+SET @custom_field_value_is_table = (SELECT COUNT(*) FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'custom_field_value'
+      AND TABLE_TYPE = 'BASE TABLE');
+SET @custom_field_value_base_exists = (SELECT COUNT(*) FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '_custom_field_value');
+SET @stmt = IF(@custom_field_value_is_table = 1 AND @custom_field_value_base_exists = 0,
+    'RENAME TABLE `custom_field_value` TO `_custom_field_value`',
+    'SELECT 1');
+PREPARE stmt FROM @stmt;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- RENAME TABLE keeps the pre-rename constraint and index names
+-- (custom_field_valuepersonid, ...). A fresh install gets the names
+-- Custom_Field_Value::getForeignKeys() declares (_custom_field_value<column>),
+-- so rename them: scripts that add/drop foreign keys by name must behave the
+-- same on both kinds of site. Guarded so a re-run (or a fresh install, which
+-- already has the new names) is a no-op.
+SET @stmt = IF((SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '_custom_field_value'
+      AND CONSTRAINT_NAME = 'custom_field_valuepersonid' AND CONSTRAINT_TYPE = 'FOREIGN KEY') = 1,
+    'ALTER TABLE `_custom_field_value` DROP FOREIGN KEY `custom_field_valuepersonid`, DROP INDEX `custom_field_valuepersonid`, ADD INDEX `_custom_field_valuepersonid` (`personid`), ADD CONSTRAINT `_custom_field_valuepersonid` FOREIGN KEY (`personid`) REFERENCES `_person` (`id`) ON DELETE CASCADE',
+    'SELECT 1');
+PREPARE stmt FROM @stmt;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @stmt = IF((SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '_custom_field_value'
+      AND CONSTRAINT_NAME = 'custom_field_valuefieldid' AND CONSTRAINT_TYPE = 'FOREIGN KEY') = 1,
+    'ALTER TABLE `_custom_field_value` DROP FOREIGN KEY `custom_field_valuefieldid`, DROP INDEX `custom_field_valuefieldid`, ADD INDEX `_custom_field_valuefieldid` (`fieldid`), ADD CONSTRAINT `_custom_field_valuefieldid` FOREIGN KEY (`fieldid`) REFERENCES `custom_field` (`id`) ON DELETE CASCADE',
+    'SELECT 1');
+PREPARE stmt FROM @stmt;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @stmt = IF((SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = '_custom_field_value'
+      AND CONSTRAINT_NAME = 'custom_field_valuevalue_optionid' AND CONSTRAINT_TYPE = 'FOREIGN KEY') = 1,
+    'ALTER TABLE `_custom_field_value` DROP FOREIGN KEY `custom_field_valuevalue_optionid`, DROP INDEX `custom_field_valuevalue_optionid`, ADD INDEX `_custom_field_valuevalue_optionid` (`value_optionid`), ADD CONSTRAINT `_custom_field_valuevalue_optionid` FOREIGN KEY (`value_optionid`) REFERENCES `custom_field_option` (`id`) ON DELETE CASCADE',
+    'SELECT 1');
+PREPARE stmt FROM @stmt;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+CREATE OR REPLACE VIEW `custom_field_value` AS
+SELECT v.id, v.personid, v.fieldid, v.value_text, v.value_date, v.value_optionid
+FROM `_custom_field_value` v
+JOIN `custom_field` f ON f.id = v.fieldid
+WHERE currentUserHasDataPerm('VIEWCUSTOMFIELDS')
+  AND (f.sensitive = 0 OR currentUserHasDataPerm('VIEWSENSITIVE'));
+
+-- The installer (and Staff_Member::_getFields()'s DEFAULT_DATA_PERMISSIONS
+-- fallback) creates this column with DEFAULT 1040187392. Keep the same default
+-- here so a staff row inserted outside Staff_Member gets viewable fields on an
+-- upgraded site too.
+SET @missing = (SELECT COUNT(*) = 0 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'staff_member' AND COLUMN_NAME = 'data_permissions');
+SET @stmt = IF(@missing,
+    'ALTER TABLE `staff_member` ADD COLUMN `data_permissions` varchar(255) NOT NULL DEFAULT ''1040187392'' AFTER `active`',
+    'SELECT 1');
+PREPARE stmt FROM @stmt;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Databases that already ran an earlier 2.40 migration have the column with
+-- DEFAULT '0' and, because ADD COLUMN appends, after `permissions`. The guarded
+-- ADD COLUMN above will not touch them, so converge on the installer's
+-- definition and ordinal position here. Modifying to the definition it already
+-- has is a no-op, so this stays idempotent.
+ALTER TABLE `staff_member` MODIFY COLUMN `data_permissions` varchar(255) NOT NULL DEFAULT '1040187392' AFTER `active`;
+
+-- The installer (include/installer.class.php) inserts DEFAULT_PERMISSIONS,
+-- DEFAULT_DATA_PERMISSIONS and DATA_PERMISSIONS_MIGRATED in one sequence with
+-- @rank+5 between each. Derive the same ranks so an upgraded database matches a
+-- fresh install exactly; the UPDATEs converge databases that ran the original
+-- migration (DEFAULT_PERMISSIONS +1, and marker rank 1001).
+SET @default_data_permissions_rank = COALESCE(
+    (SELECT `rank` FROM setting WHERE symbol = 'DEFAULT_PERMISSIONS' LIMIT 1), 16) + 5;
+INSERT IGNORE INTO setting (`rank`, heading, symbol, note, type, value)
+VALUES (@default_data_permissions_rank, '', 'DEFAULT_DATA_PERMISSIONS', 'Viewable person fields to grant to new user accounts by default', 'int', '1040187392');
+UPDATE setting SET `rank` = @default_data_permissions_rank
+WHERE symbol = 'DEFAULT_DATA_PERMISSIONS' AND `rank` <> @default_data_permissions_rank;
+
+-- Existing staff keep seeing everything they saw before: grant the default
+-- viewable fields (all but sensitive custom fields, which are new and opt-in).
+-- OR'd in, and run once: a marker stops a re-run from restoring access an
+-- admin has since revoked.
+SET @data_permissions_grant_pending = (SELECT COUNT(*) = 0 FROM setting WHERE symbol = 'DATA_PERMISSIONS_MIGRATED');
+UPDATE staff_member
+SET data_permissions = CAST(data_permissions AS UNSIGNED) | 1040187392
+WHERE @data_permissions_grant_pending;
+SET @data_permissions_migrated_rank = @default_data_permissions_rank + 5;
+INSERT IGNORE INTO setting (`rank`, heading, symbol, note, type, value)
+VALUES (@data_permissions_migrated_rank, '', 'DATA_PERMISSIONS_MIGRATED', 'Internal: the one-off viewable-person-fields grant for existing staff has run', 'hidden', '1');
+UPDATE setting SET `rank` = @data_permissions_migrated_rank
+WHERE symbol = 'DATA_PERMISSIONS_MIGRATED' AND `rank` <> @data_permissions_migrated_rank;
 
 -- Expose the sendmail transport alternative on the System Configuration page.
 -- Synced with include/installer.class.php and include/config_manager.class.php

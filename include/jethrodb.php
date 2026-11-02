@@ -259,19 +259,24 @@ class JethroDB extends PDO
 	}
 
 	/**
-	 * Set the current staff-account ID variable (@current_user_id) in the DB.
+	 * Set the current staff-account ID variable (@current_user_id) and its
+	 * data-visibility mask (@current_user_data_permissions) in the DB.
 	 * The person, person_group and abstract_note views apply this account's
-	 * restrictions and permissions; -1 means public/CLI (unrestricted).
+	 * restrictions; the person, family and custom_field_value views apply the
+	 * data mask. -1 means public/CLI (unrestricted).
 	 * Never set this to a member's ID: see setCurrentMemberID() and
 	 * docs/docs/developer/reference/db-session-identity.md
 	 * @param int $userid
+	 * @param int $dataPermissions Effective data mask; -1 grants every bit.
+	 *        Callers must pass the same mask PHP uses in haveDataPerm(), so
+	 *        SQL and PHP agree on which fields are visible.
 	 * @return void
 	 */
-	public function setCurrentUserID($userid)
+	public function setCurrentUserID($userid, $dataPermissions = 0)
 	{
 		try {
-			$sql = 'SET @current_user_id = ' . $userid;
-			$result = parent::query($sql);
+			parent::query('SET @current_user_id = ' . (int)$userid);
+			parent::query('SET @current_user_data_permissions = ' . (int)$dataPermissions);
 		} catch (PDOException $e) {
 			throw new \RuntimeException('Failed to set user id in database');
 		}
@@ -289,6 +294,7 @@ class JethroDB extends PDO
 	{
 		try {
 			parent::query('SET @current_member_id = ' . (int)$personid);
+			parent::query('SET @current_user_data_permissions = 0');
 		} catch (PDOException $e) {
 			throw new \RuntimeException('Failed to set member id in database');
 		}

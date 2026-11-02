@@ -243,7 +243,10 @@ class System_Controller
 	public function getDBObjectData($classname, $params=Array(), $logic='OR', $order='', $refreshCache=FALSE)
 	{
 		static $cache = Array();
-		$cacheKey = "$classname-$logic-$order-".serialize($params);
+		$cacheKey = "$classname-$logic-$order-".serialize($params)
+			."-user-".(int)$GLOBALS['user_system']->getCurrentUser('id')
+			."-member-".(int)$GLOBALS['user_system']->getCurrentMember('id')
+			."-data-".(int)$GLOBALS['user_system']->getCurrentUser('data_permissions');
 		if ($refreshCache || !isset($cache[$cacheKey])) {
 			$this->includeDBClass($classname);
 			$sample = new $classname();
@@ -268,6 +271,15 @@ class System_Controller
 				@$GLOBALS['db']->rollback();
 				$this->_transaction_depth = 0;
 		}
+	}
+
+	/**
+	 * Number of nested transactions currently open (0 = none).
+	 * @return int
+	 */
+	public function transactionDepth()
+	{
+		return $this->_transaction_depth;
 	}
 
 	public function setFriendlyErrors($enabled)

@@ -1,8 +1,18 @@
 <?php
+require_once JETHRO_ROOT.'/include/field_access.php';
 class Call_Email extends Call
 {
 	function run()
 	{
+		if (!\Field_Access::canRead('email')) {
+			$msg = 'You do not have permission to view email addresses, so emails cannot be sent.';
+			if (!empty($_REQUEST['print_modal'])) {
+				echo '<div class="modal fade modal-wide" data-show="true" role="dialog"><div class="modal-header"><h4>Email</h4></div><div class="modal-body"><p class="alert alert-error">'.ents($msg).'</p></div></div>';
+			} else {
+				echo ents($msg);
+			}
+			return;
+		}
 		if (!empty($_REQUEST['print_popup'])) {
 			$GLOBALS['system']->initErrorHandler();
 		}

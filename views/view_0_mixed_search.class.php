@@ -74,17 +74,20 @@ class View__Mixed_Search extends View
 				if (in_array($in, Array('*', 'email')) && $p['email'] !== '' && strcasecmp($p['email'], $search) === 0) {
 					$this->addMatch('p', $id, $person->getFieldLabel('email'), self::matchSnippet($p['email'], 0, strlen($p['email'])));
 				}
-				if (in_array($in, Array('*', 'remarks'))) {
+				if (Person::currentUserCanViewRemarks() && in_array($in, Array('*', 'remarks'))) {
 					$pos = stripos((string)$p['remarks'], $search);
 					if ($pos !== FALSE) {
 						$this->addMatch('p', $id, $person->getFieldLabel('remarks'), self::matchSnippet($p['remarks'], $pos, strlen($search)));
 					}
 				}
 			}
-			// Custom fields: '*' searches every searchable field, 'custom_<id>' just that one.
+			// Custom fields: '*' searches every searchable field the user may see (the 'custom_<id>'
+			// choices), 'custom_<id>' just that one.
 			$fieldIDs = Array();
 			if ($in === '*') {
-				$fieldIDs = array_keys($GLOBALS['system']->getDBObjectData('custom_field', Array('searchable' => 1)));
+				foreach (array_keys(self::getSearchInOptions()) as $key) {
+					if (preg_match('/^custom_(\d+)$/', $key, $m)) $fieldIDs[] = (int)$m[1];
+				}
 			} else if (preg_match('/^custom_(\d+)$/', $in, $m)) {
 				$fieldIDs = Array((int)$m[1]);
 			}
@@ -171,8 +174,10 @@ class View__Mixed_Search extends View
 
 	/**
 	 * The "Search in" choices: value => label. '*' (everything) searches every field the other
-	 * choices do: names, phone, email, address, contact remarks and searchable custom fields. Each
-	 * searchable (text) custom field gets its own 'custom_<id>' choice.
+	 * choices do: names, phone, email, address, contact remarks, searchable custom fields, plus
+	 * message text. Each searchable (text) custom field the current user may see gets its own
+	 * 'custom_<id>' choice; sensitive fields are left out for users who can't view them, so they
+	 * can't be chosen (loadResults() falls back to '*' for unknown choices) or annotated.
 	 *
 	 * @return array<string, string>
 	 */
@@ -184,9 +189,12 @@ class View__Mixed_Search extends View
 			'phone' => 'phone',
 			'email' => 'email',
 			'address' => 'address',
-			'remarks' => 'contact remarks',
 		);
+		if (Person::currentUserCanViewRemarks()) {
+			$options['remarks'] = 'contact remarks';
+		}
 		foreach ($GLOBALS['system']->getDBObjectData('custom_field', Array('searchable' => 1), 'AND', 'rank') as $id => $f) {
+			if (!Custom_Field::isFieldDataVisibleToCurrentUser($f)) continue;
 			$options['custom_'.$id] = $f['name'];
 		}
 		return $options;
@@ -421,11 +429,16 @@ class View__Mixed_Search extends View
 			?>
 			</table>
 			<?php
-			// The footnote describes "everything", which includes all searchable custom fields.
+			// The footnote describes "everything", which includes all searchable custom fields the
+			// user may see.
 			$custom_fields = ($this->_search_in === '*') ? $GLOBALS['system']->getDBObjectData('custom_field', Array('searchable' => 1)) : Array();
-			if ($custom_fields) {
+			$names = Array();
+			foreach ($custom_fields as $f) {
+				if (!Custom_Field::isFieldDataVisibleToCurrentUser($f)) continue;
+				$names[] = '"'.$f['name'].'"';
+			}
+			if ($names) {
 				$msg = _("These results include matches on the searchable custom fields %s");
-				foreach ($custom_fields as $f) $names[] = '"'.$f['name'].'"';
 				echo '<p class="smallprint">'.sprintf($msg, implode(', ', $names)).'</p>';
 			}
 		}

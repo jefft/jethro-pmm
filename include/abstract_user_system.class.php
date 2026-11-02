@@ -2,6 +2,7 @@
 abstract class Abstract_User_System
 {
 	protected $_permission_levels = Array();
+	protected $_data_permission_levels = Array();
 
 
 	/**
@@ -47,6 +48,45 @@ abstract class Abstract_User_System
 	{
 		$this->_loadPermissionLevels();
 		return $this->_permission_levels;
+	}
+
+	/**
+	 * Load the enabled data-visibility permissions (bit => label).
+	 * @return void
+	 */
+	protected function _loadDataPermissionLevels()
+	{
+		if (!empty($this->_data_permission_levels)) return;
+		require_once __DIR__.'/data_permissions.php';
+		$enabled_features = explode(',', strtoupper(ifdef('ENABLED_FEATURES', '')));
+		foreach (get_data_permission_levels() as $i => $detail) {
+			list(, $desc, $feature_code) = $detail;
+			if (empty($feature_code) || in_array($feature_code, $enabled_features)) {
+				$this->_data_permission_levels[$i] = $desc;
+			}
+		}
+	}
+
+	/**
+	 * Enabled data-visibility permissions, for the "Viewable Person Fields" widget.
+	 * @return array<int, string> bit => label
+	 */
+	public function getDataPermissionLevels()
+	{
+		$this->_loadDataPermissionLevels();
+		return $this->_data_permission_levels;
+	}
+
+	/**
+	 * Whether the current subject may see a data domain.
+	 * Member and public/CLI sessions override this in the concrete user system;
+	 * staff sessions default to deny.
+	 * @param int $permission
+	 * @return bool
+	 */
+	public function haveDataPerm($permission)
+	{
+		return !empty($this->getCurrentMember());
 	}
 
 	public function handle2FAMobileTelChange($person, $old_mobile)

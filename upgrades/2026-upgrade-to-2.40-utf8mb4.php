@@ -23,7 +23,7 @@
  *   name/address index is 1368 bytes as utf8mb4). DYNAMIC is the modern default
  *   row format anyway (3072-byte key limit).
  * - Views need no rebuilding: their columns resolve to the base tables' charsets
- *   at query time. The script verifies the four known views still execute.
+ *   at query time. The script verifies every view still executes.
  * - Latin1 tables that contain raw UTF-8 bytes (from PHP < 5.3.6 era or
  *   misconfigured connections) are handled safely via a BLOB detour:
  *   CONVERT TO binary preserves bytes, then MODIFY cols to utf8mb4
@@ -134,13 +134,21 @@ if (!empty($dbname)) {
 	}
 }
 
-// Verify the four known views still execute (their columns follow the base tables' charset).
+// Verify every view still executes. Views need no conversion themselves, but
+// their columns are produced by CASE/joins over the converted base tables (the
+// masked person, family and custom_field_value views especially), so a bad
+// conversion shows up as a view that no longer runs. Enumerating the database's
+// views covers views added by later upgrades, not just the original four.
 echo "Verifying views...\n";
-foreach (Array('person', 'person_group', 'member', 'abstract_note') as $view) {
-	$stmnt = $db->query('SELECT COUNT(*) FROM `'.$view.'`');
-	$count = ($stmnt === false) ? 0 : $stmnt->fetchColumn();
-	echo "  - ".$view." OK\n";
+$brokenViews = DB_Charset_Utils::checkViews($db);
+foreach ($brokenViews as $view => $error) {
+	echo "  - ".$view." FAILED: ".$error."\n";
 }
+if ($brokenViews) {
+	echo "ERROR: ".count($brokenViews)." view(s) no longer execute after the conversion.\n";
+	exit(1);
+}
+echo "  - all views OK\n";
 // Final check: nothing left unconverted.
 $target = $db->quote('utf8mb4_unicode_ci');
 $remaining = $db->queryAll(
