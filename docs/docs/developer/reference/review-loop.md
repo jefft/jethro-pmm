@@ -53,17 +53,36 @@ The culprit bug gets `needs-work`, loses `integrated` and `fix_change`, and a
 comment with the passing and failing states and the failing tests. Its fixer
 runs `review_loop workspace BUG` again, which replaces the stale old workspace.
 
+## Stale fixer workspaces
+
+Every fixer workspace is built on its bug's target, so squashing any fix into
+that target (or an earlier commit) rewrites the other fixers' working-copy
+commits from the integrator's workspace, and their working copies go stale. If
+a stale workspace holds edits jj has not recorded,
+`jj workspace update-stale` snapshots them into a second copy of the
+working-copy commit (jj already rebases it onto the new parents) and resets the
+files to the copy without them: a divergent change, and the fixer's edits
+vanish from disk (observed with jj 0.46).
+
+`heal_workspace` in `bin/review_loop` avoids both: it runs `jj status` (records
+edits; works while current), or update-stale and then, if the commit forked,
+`jj edit`s the copy with the edits and abandons the other. `integrate` heals
+every `fix-*` workspace just before the squash and again just after it (or
+after reverting it), so fixers keep working on the current stack; only edits
+made in the sub-second gap between the two can still fork, and that heal
+repairs them. `review_loop resync BUG` runs the same heal for a fixer whose
+workspace went stale another way.
+
 ## Cleanup
 
-A fixer workspace goes stale when its fix is squashed. Running jj there
-afterwards can recreate the pre-rewrite stack commits as divergent copies, which
-stay visible for as long as the workspace exists. `review_loop finish EPIC`:
+Leftover fixer workspaces and their port, trial and bisect commits clutter the
+repository, and a workspace left stale keeps pre-rewrite copies of the stack
+visible as divergent changes. `review_loop finish EPIC`:
 
-1. For each `fix-EPIC.*` workspace: collects the commits only that workspace
-   reaches (`::wc ~ ::(visible_heads() ~ wc)`), refuses if any changes more than
-   `devbox.json` (unintegrated work), otherwise forgets the workspace, abandons
-   those commits and deletes the directory. A stale workspace is not snapshotted,
-   so edits jj has not recorded there are not checked.
+1. For each `fix-EPIC.*` workspace: heals it, collects the commits only that
+   workspace reaches (`::wc ~ ::(visible_heads() ~ wc)`), refuses if any
+   changes more than `devbox.json` (unintegrated work), otherwise forgets the
+   workspace, abandons those commits and deletes the directory.
 2. Deletes `<checkout>-EPIC.N` directories of workspaces forgotten earlier.
 3. Abandons leftover `local: fix-EPIC.N ports`, `trial: integrate EPIC.N` and
    `bisect: EPIC state K` commits that no working copy uses, that have no other
@@ -71,5 +90,6 @@ stay visible for as long as the workspace exists. `review_loop finish EPIC`:
 4. Checks that no such workspace, directory or divergent commit the workspaces
    held remains, and lists unintegrated `Fix EPIC.N` changes it kept.
 
-`--dry-run` prints the plan without changing anything (it still snapshots
-non-stale working copies). `review_loop cleanup BUG` applies step 1 to one bug.
+`--dry-run` prints the plan without healing or abandoning anything (it still
+records edits of current working copies). `review_loop cleanup BUG` applies
+step 1 to one bug.

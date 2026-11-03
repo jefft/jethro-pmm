@@ -30,9 +30,12 @@ supervisor ─ epic ─┬─ reviewers (parallel) ── file bug beads
    `final_passed_seq`), and a closer who neither filed nor fixed it.
 5. **Invariants in the epic win.** If a fix would break one, comment on the bug
    and stop; the supervisor decides.
-6. **Cleanup is part of done.** `review_loop finish EPIC` must report `clean`.
-   A fixer workspace left behind goes stale when its fix is squashed, and keeps
-   the pre-rewrite copies of the stack visible as divergent changes.
+6. **Never `jj workspace update-stale` in a fixer workspace.** Squashing a fix
+   rewrites every fixer workspace built on that target. If one holds edits jj
+   has not recorded, update-stale moves them into a divergent copy and resets
+   the files without them. `review_loop resync BUG` recovers instead.
+7. **Cleanup is part of done.** `review_loop finish EPIC` must report `clean`;
+   leftover workspaces and their commits otherwise clutter the repository.
 
 ## Setup (supervisor, once)
 
@@ -97,6 +100,13 @@ already occurs before the first integration, is reported on the epic instead.
   fix into its target and records it in the ledger. A failed gate rewrites
   nothing. A squash that leaves conflicts is undone with `jj op revert` of that
   one operation, never `jj op restore`, which would roll back other agents' work.
+  Just before and after the squash (and after a revert) it records the edits of
+  every `fix-*` workspace and updates its files to the rewritten commits, so
+  fixers keep working on the current stack instead of a stale copy; a workspace
+  that went stale with edits jj had not recorded keeps them (see `resync`).
+- `review_loop resync BUG`, run inside the fixer's workspace when jj reports it
+  stale, runs update-stale and, if that forked the working-copy commit, keeps
+  the copy holding the unrecorded edits as `@` and abandons the other.
 - `review_loop final` runs the full `jethro_gate` on the tip, with the
   non-Playwright verify commands of every integrated bug; bisect probes restore
   recorded trees into a throwaway child of the working copy and never check out

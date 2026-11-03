@@ -7,6 +7,8 @@
 #   review_loop workspace BUG     fixer: new jj workspace with a fix change on the bug's target commit;
 #                                 replaces the bug's old workspace when a bisect sent the fix back
 #   review_loop submit BUG        fixer: move the fix (everything but devbox.json) into the fix change
+#   review_loop resync BUG        fixer, inside the workspace: recover from "working copy is stale"
+#                                 without forking a divergent copy (use instead of update-stale)
 #   review_loop integrate BUG [GATE-ARGS...]
 #                                 integrator: gate tip + fix without functional tests, squash the fix
 #                                 into its target and append it to the epic's integration ledger
@@ -118,18 +120,61 @@ workspace_root() {
 		| awk -F'\t' -v n="$1" '$1 == n { print $2 }'
 }
 
+# heal_workspace DIR: bring a workspace up to date without forking it. A
+# current one just records its edits. A stale one (its working-copy commit was
+# rewritten from another workspace) gets `jj workspace update-stale`; if it
+# held edits jj had not recorded, that snapshots them into a second, divergent
+# copy of the working-copy commit (already on the new parents) and resets the
+# files to the copy without them, so keep the copy with the edits as @ and
+# abandon the other. Prints what it did; fails if it could not.
+heal_workspace() {
+	local dir=$1 wc cid others
+	jj --repository "$dir" status > /dev/null 2>&1 && return 0
+	jj --repository "$dir" workspace update-stale > /dev/null 2>&1
+	jj --repository "$dir" status > /dev/null 2>&1 || { echo "jj status still fails in $dir"; return 1; }
+	wc=$(jj --repository "$dir" --ignore-working-copy log --no-graph -r @ -T commit_id)
+	cid=$(jj --repository "$dir" --ignore-working-copy log --no-graph -r @ -T change_id)
+	others=$(jj --repository "$dir" --ignore-working-copy log --no-graph -r "change_id($cid) ~ @" -T 'commit_id ++ " "')
+	others=${others% }
+	if [[ -z $others ]]; then echo "updated stale working copy in $dir"; return 0; fi
+	if [[ $others == *" "* || $(jj --ignore-working-copy log --no-graph -r "parents($others)" -T commit_id) \
+		!= $(jj --ignore-working-copy log --no-graph -r "parents($wc)" -T commit_id) ]]; then
+		echo "$dir: @ (${wc:0:12}) has other copies ($others); resolve them by hand"
+		return 1
+	fi
+	jj --repository "$dir" edit "$others" > /dev/null 2>&1 && jj --repository "$dir" abandon "$wc" > /dev/null 2>&1 \
+		|| { echo "$dir: could not switch to $others / abandon $wc"; return 1; }
+	echo "recovered unrecorded edits in $dir: @ is now ${others:0:12}; abandoned ${wc:0:12}"
+}
+
+# Record every fixer workspace's edits before the integrator rewrites the
+# stack, and update them right after, so none is left stale for its fixer to
+# trip over.
+sync_fixer_workspaces() {
+	local name dir
+	while IFS=$'\t' read -r name dir; do
+		[[ $name == fix-* && -d $dir ]] || continue
+		heal_workspace "$dir" | sed "s/^/review_loop: $name: /" >&2
+	done < <(jj --ignore-working-copy workspace list -T 'self.name() ++ "\t" ++ self.root() ++ "\n"')
+}
+
 # remove_workspace BUG DIR [DRY]: forget jj workspace fix-BUG, abandon the
 # commits only it reaches (its port change, empty leftovers) and delete DIR.
 # Refuses when one of those commits changes anything but devbox.json, i.e. holds
-# unintegrated work. Unsnapshotted edits in a stale workspace cannot be checked:
-# snapshotting it would fork its rewritten working-copy commit into a divergent one.
+# unintegrated work. A stale workspace is healed first so its unrecorded edits
+# are checked too; a dry run only records edits of current ones.
 remove_workspace() {
 	local bug=$1 dir=$2 dry=${3:-0} name=fix-$1 wc only c files bad=0
 	if [[ -n $dir && -d $dir ]]; then
 		[[ $dir == *-"$bug" && -e $dir/.jj && $(readlink -f "$dir") != "$(readlink -f "$(jj root)")" ]] \
 			|| { echo "  $name: $dir does not look like a review_loop workspace; not touched"; return 1; }
-		jj --repository "$dir" status > /dev/null 2>&1 \
-			|| echo "  $name: working copy is stale or unregistered; edits jj has not recorded are not checked"
+		if [[ $dry == 1 ]]; then
+			jj --repository "$dir" status > /dev/null 2>&1 \
+				|| echo "  $name: working copy is stale or unregistered; a real run heals it first"
+		else
+			heal_workspace "$dir" > /dev/null \
+				|| echo "  $name: working copy could not be updated (unregistered?); edits jj has not recorded are not checked"
+		fi
 	fi
 	wc=$(jj --ignore-working-copy log --no-graph -r "\"$name\"@" -T commit_id 2>/dev/null) || wc=
 	only=
@@ -229,7 +274,7 @@ cmd_submit() {
 	local bug=$1 fix moved
 	need_env
 	fix=$(meta "$bug" fix_change); [[ -n $fix ]] || die "$bug has no fix change; run review_loop workspace first"
-	jj status > /dev/null || exit 1
+	jj status > /dev/null || die "jj status failed; if the working copy is stale, run 'review_loop resync $bug' (not jj workspace update-stale)"
 	jj squash --into "$fix" 'all() & ~devbox.json' > /dev/null 2>&1 || true
 	moved=$(jj --ignore-working-copy diff -r "$fix" --name-only)
 	[[ -n $moved ]] || die "fix change $fix is empty"
@@ -281,17 +326,22 @@ $summary" > /dev/null
 	fi
 
 	# 2. Squash the fix into its target. Revert just this operation (not
-	# other agents' concurrent ones) if it leaves conflicts.
+	# other agents' concurrent ones) if it leaves conflicts. The squash rebases
+	# every fixer workspace on the target; recording their edits just before
+	# and updating them just after leaves them current instead of stale.
+	sync_fixer_workspaces
 	op_before=$(jj op log --no-graph -n 1 -T 'id.short()')
 	jj squash --from "$fix" --into "$target" -u > /dev/null 2>&1 || die "squash of $fix into $target failed"
 	squash_op=$(jj op log --no-graph -n 1 -T 'id.short()')
 	if [[ -n $(jj --ignore-working-copy log --no-graph -r "conflicts() & ($target::)" -T 'change_id.short()') ]]; then
 		jj op revert "$squash_op" > /dev/null
+		sync_fixer_workspaces
 		bd label add "$bug" needs-work > /dev/null
 		bd comment "$bug" "Gate passed but squashing $fix into $target left conflicts; reverted operation $squash_op (previous $op_before)." > /dev/null
 		rm -f "$log"
 		die "squash left conflicts; reverted"
 	fi
+	sync_fixer_workspaces
 
 	# 3. Record the merge order and the states either side, for bisect.
 	after=$(jj --ignore-working-copy log --no-graph -r @ -T commit_id)
@@ -308,6 +358,17 @@ $summary" > /dev/null
 $summary" > /dev/null
 	rm -f "$log"
 	echo "Integrated $bug as #$seq: $fix -> $target"
+}
+
+# Fixer: recover a workspace left stale by a stack rewrite outside
+# review_loop; heal_workspace explains how.
+cmd_resync() {
+	local bug=$1 dir
+	need_env
+	dir=$(workspace_root "fix-$bug")
+	[[ -n $dir && $(readlink -f "$(jj root)") == "$(readlink -f "$dir")" ]] || die "run this inside $bug's workspace ($dir)"
+	heal_workspace "$dir" || die "could not resync $dir"
+	echo "Working copy is current."
 }
 
 cmd_cleanup() {
@@ -663,6 +724,7 @@ case "$sub" in
 	submit) [[ $# -eq 1 ]] || die "usage: review_loop submit BUG"; cmd_submit "$1" ;;
 	integrate) [[ $# -ge 1 ]] || die "usage: review_loop integrate BUG [GATE-ARGS...]"; cmd_integrate "$@" ;;
 	cleanup) [[ $# -eq 1 ]] || die "usage: review_loop cleanup BUG"; cmd_cleanup "$1" ;;
+	resync) [[ $# -eq 1 ]] || die "usage: review_loop resync BUG"; cmd_resync "$1" ;;
 	final) [[ $# -ge 1 ]] || die "usage: review_loop final EPIC [GATE-ARGS...]"; cmd_final "$@" ;;
 	bisect) [[ $# -eq 1 ]] || die "usage: review_loop bisect EPIC"; cmd_bisect "$1" ;;
 	finish)

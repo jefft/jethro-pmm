@@ -29,13 +29,17 @@ Environment: `export BEADS_DIR={BEADS_DIR} BEADS_ACTOR={ACTOR}`; work inside `de
 - Never commit `devbox.json`; it holds your workspace's ports.
 - Do not change behaviour beyond the bug. Other problems you notice are new
   comments on the epic.
-- Once the bug is `integrated`, stop running jj in your workspace: the squash
-  left it stale, and jj commands there can fork divergent copies of the stack.
-  The supervisor removes it at the end (`review_loop finish`).
+- Other fixes are squashed into the stack under you while you work; the
+  integrator updates your workspace's files when it does. If a jj command says
+  "The working copy is stale", run `review_loop resync {BUG}` there, never
+  `jj workspace update-stale` (it would move your unrecorded edits into a
+  divergent copy and reset your files without them).
+- Once the bug is `integrated`, you are done with the workspace; the supervisor
+  removes it at the end (`review_loop finish`).
 - If the integrator labels the bug `needs-work` with a failed integration gate,
   read its gate comment, fix in the same workspace, and submit again.
 - If a bisect after the final gate labels the bug `needs-work`, your earlier
   fix is already in the stack. From the main checkout run
-  `review_loop workspace {BUG}` again (it replaces your stale workspace),
+  `review_loop workspace {BUG}` again (it replaces your old workspace),
   reproduce with the failing tests in the bisect comment, fix on top, update
   `verify` if needed, and submit.
