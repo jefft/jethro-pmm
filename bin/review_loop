@@ -1,21 +1,35 @@
 #!/bin/bash -u
 # review_loop — the jj and beads mechanics of the multi-agent review loop.
 # Workflow, roles and rules: agents/review-loop/README.md
+# Design notes (ledger, bisect, cleanup): docs/docs/developer/reference/review-loop.md
 #
 #   review_loop init [DIR]        create the shared beads workspace (default ~/beads/jethro-review)
-#   review_loop workspace BUG     fixer: new jj workspace with a fix change on the bug's target commit
+#   review_loop workspace BUG     fixer: new jj workspace with a fix change on the bug's target commit;
+#                                 replaces the bug's old workspace when a bisect sent the fix back
 #   review_loop submit BUG        fixer: move the fix (everything but devbox.json) into the fix change
 #   review_loop integrate BUG [GATE-ARGS...]
-#                                 integrator: gate the fix on the tip, then squash it into its target
-#   review_loop cleanup BUG       forget the bug's workspace once it is integrated or abandoned
+#                                 integrator: gate tip + fix without functional tests, squash the fix
+#                                 into its target and append it to the epic's integration ledger
+#   review_loop final EPIC [GATE-ARGS...]
+#                                 integrator: full gate (functional suite included) on the tip; if it
+#                                 fails, bisect the ledger and send the culprit back to its fixer
+#   review_loop bisect EPIC       integrator: redo the bisect of the last failed final gate
+#   review_loop cleanup BUG       remove the bug's workspace (refuses if it holds unintegrated work)
+#   review_loop finish EPIC [--dry-run]
+#                                 remove every fixer workspace and leftover local/trial/bisect commit
+#                                 of the epic, then check that none remain
 #   review_loop scratch [--actor NAME] [--db NAME] [--port PORT] [--fresh]
 #                                 reviewer: private database + docroot + serve command, so
 #                                 write-probes never touch the shared dev/functest instances
 #
 # Bug metadata (bd update BUG --set-metadata key=value):
-#   target      jj change ID the fix belongs in (set when the bug is filed)
-#   verify      shell command that fails before the fix and passes after it
-#   fix_change  set by `workspace`; workspace, ports likewise
+#   target           jj change ID the fix belongs in (set when the bug is filed)
+#   verify           shell command that fails before the fix and passes after it
+#   fix_change       set by `workspace`; workspace, ports likewise
+#   integration_seq  set by `integrate`: the bug's position in the ledger
+# Epic metadata: final_passed_seq, the last ledger entry a passing final gate covered.
+# Run files, beside the beads database in runs/EPIC/: integrations.tsv (the ledger),
+# final.tsv, final-*.log, final-verify.tsv, last-run.json, bisect-*/.
 #
 # Needs BEADS_DIR (see init) and BEADS_ACTOR (who you are) in the environment.
 
@@ -36,7 +50,8 @@ field() {
 import json, sys
 d = json.load(sys.stdin)
 d = d[0] if isinstance(d, list) else d
-print(d.get(sys.argv[1], ""))' "$2"
+v = d.get(sys.argv[1])
+print("" if v is None else v)' "$2"
 }
 
 need_env() {
@@ -46,6 +61,99 @@ need_env() {
 
 change_exists() {
 	jj --ignore-working-copy log --no-graph -r "$1" -T 'change_id.short()' > /dev/null 2>&1
+}
+
+# The epic a bug belongs to: its parent, or a grandparent when cross-review
+# grouped the bug under a root-cause bug.
+epic_of() {
+	local id=$1 n
+	for n in 1 2 3 4 5; do
+		[[ $(field "$id" issue_type) == epic ]] && { echo "$id"; return 0; }
+		id=$(field "$id" parent)
+		[[ -n $id ]] || return 1
+	done
+	return 1
+}
+
+# Per-epic run directory beside the beads database (deepreview keeps its
+# prompts there too).
+run_dir() { echo "$(dirname "${BEADS_DIR%/}")/runs/$1"; }
+
+# The integration ledger: one line per integration, in merge order.
+# Columns: seq, bug, fix change, target, before, after, time, actor. before and
+# after are commit IDs of the integrator's working copy (tip plus its
+# devbox.json) just before the trial and just after the squash. They stay
+# readable once rewritten, so bisect can restore their trees.
+ledger() { echo "$(run_dir "$1")/integrations.tsv"; }
+
+last_seq() {
+	local f
+	f=$(ledger "$1")
+	if [[ -s $f ]]; then awk -F'\t' 'END { print $1 + 0 }' "$f"; else echo 0; fi
+}
+
+# Verify commands that run Playwright wait for the final gate's full suite.
+is_functional() { [[ $1 == *playwright* || $1 == *functests* ]]; }
+
+take_merge_slot() {
+	bd merge-slot acquire --holder "$BEADS_ACTOR" > /dev/null 2>&1 || die "merge slot is held: $(bd merge-slot check 2>&1 | tail -1)"
+	# shellcheck disable=SC2064  # expand the actor now
+	trap "bd merge-slot release --holder '$BEADS_ACTOR' > /dev/null 2>&1" EXIT
+}
+
+# The integrator's working copy may differ from the tip only in devbox.json
+# (this checkout's ports). Prints its commit ID.
+clean_wc() {
+	jj status > /dev/null || exit 1
+	[[ -z $(jj --ignore-working-copy diff -r @ --name-only 'all() & ~devbox.json') ]] \
+		|| die "the working copy has edits other than devbox.json; commit or move them first"
+	jj --ignore-working-copy log --no-graph -r @ -T commit_id
+}
+
+# Names of the checks a jethro_gate log reports as FAIL.
+gate_failures() { awk '/^Summary:/ { s = 1; next } s && $1 == "FAIL" { print $2 }' "$1"; }
+
+workspace_root() {
+	jj --ignore-working-copy workspace list -T 'self.name() ++ "\t" ++ self.root() ++ "\n"' \
+		| awk -F'\t' -v n="$1" '$1 == n { print $2 }'
+}
+
+# remove_workspace BUG DIR [DRY]: forget jj workspace fix-BUG, abandon the
+# commits only it reaches (its port change, empty leftovers) and delete DIR.
+# Refuses when one of those commits changes anything but devbox.json, i.e. holds
+# unintegrated work. Unsnapshotted edits in a stale workspace cannot be checked:
+# snapshotting it would fork its rewritten working-copy commit into a divergent one.
+remove_workspace() {
+	local bug=$1 dir=$2 dry=${3:-0} name=fix-$1 wc only c files bad=0
+	if [[ -n $dir && -d $dir ]]; then
+		[[ $dir == *-"$bug" && -e $dir/.jj && $(readlink -f "$dir") != "$(readlink -f "$(jj root)")" ]] \
+			|| { echo "  $name: $dir does not look like a review_loop workspace; not touched"; return 1; }
+		jj --repository "$dir" status > /dev/null 2>&1 \
+			|| echo "  $name: working copy is stale or unregistered; edits jj has not recorded are not checked"
+	fi
+	wc=$(jj --ignore-working-copy log --no-graph -r "\"$name\"@" -T commit_id 2>/dev/null) || wc=
+	only=
+	if [[ -n $wc ]]; then
+		only=$(jj --ignore-working-copy log --no-graph -r "::$wc ~ ::(visible_heads() ~ $wc) ~ immutable()" -T 'commit_id ++ " "')
+		for c in $only; do
+			files=$(jj --ignore-working-copy diff -r "$c" --name-only 'all() & ~devbox.json')
+			[[ -z $files ]] && continue
+			echo "  $name: ${c:0:12} '$(jj --ignore-working-copy log --no-graph -r "$c" -T 'description.first_line()')' changes $(echo "$files" | tr '\n' ' ')"
+			bad=1
+		done
+		[[ $bad == 0 ]] || { echo "  $name: kept; integrate, move or abandon that work first"; return 1; }
+	fi
+	if [[ $dry == 1 ]]; then
+		echo "  $name: would forget the workspace${only:+, abandon ${only% }}${dir:+ and delete $dir}"
+		return 0
+	fi
+	if [[ -n $wc ]]; then
+		jj workspace forget "$name" > /dev/null 2>&1 || { echo "  $name: jj workspace forget failed"; return 1; }
+		# shellcheck disable=SC2086  # only is a list of commit IDs
+		[[ -z $only ]] || jj abandon $only > /dev/null 2>&1 || { echo "  $name: could not abandon $only"; return 1; }
+	fi
+	[[ -z $dir || ! -d $dir ]] || rm -rf "$dir" || { echo "  $name: could not delete $dir"; return 1; }
+	echo "  $name: removed${dir:+ ($dir)}"
 }
 
 # A pair of TCP ports (web, functest) that nothing listens on and no other
@@ -80,7 +188,7 @@ cmd_init() {
 }
 
 cmd_workspace() {
-	local bug=$1 target title fix local_change dir ports web ft name
+	local bug=$1 target title fix local_change dir old ports web ft name
 	need_env
 	target=$(meta "$bug" target); [[ -n $target ]] || die "$bug has no target metadata"
 	change_exists "$target" || die "target $target of $bug does not exist"
@@ -88,7 +196,12 @@ cmd_workspace() {
 	title=$(field "$bug" title)
 	name=fix-$bug
 	dir="$(dirname "$(jj root)")/$(basename "$(jj root)")-$bug"
-	[[ ! -e $dir ]] || die "$dir already exists"
+	old=$(workspace_root "$name")
+	if [[ -n $old || -e $dir ]]; then
+		# The fix was sent back after a bisect: its old fix change is already in
+		# the stack and its workspace is stale, so start from a fresh one.
+		remove_workspace "$bug" "${old:-$dir}" || die "could not replace $name's old workspace"
+	fi
 	ports=$(free_ports) || die "no free port pair in 8500-8599"
 	read -r web ft <<< "$ports"
 
@@ -103,7 +216,7 @@ cmd_workspace() {
 	local_change=$(jj log --no-graph -r @ -T 'change_id.short()')
 
 	bd update "$bug" --claim --set-metadata "fix_change=$fix" --set-metadata "workspace=$dir" \
-		--set-metadata "ports=$web/$ft" > /dev/null
+		--set-metadata "ports=$web/$ft" > /dev/null || die "could not claim $bug and record its workspace"
 	bd comment "$bug" "Fixing in workspace $dir: fix change $fix (on target $target), local change $local_change, ports $web/$ft." > /dev/null
 	cat <<-EOF
 	Workspace: $dir
@@ -127,32 +240,30 @@ cmd_submit() {
 
 cmd_integrate() {
 	local bug=$1; shift
-	local fix target verify wc trial trial_parents op_before squash_op summary status=0 log
+	local fix target verify epic wc before after seq trial trial_parents op_before squash_op summary status=0 log also=()
 	need_env
 	fix=$(meta "$bug" fix_change); target=$(meta "$bug" target); verify=$(meta "$bug" verify)
 	[[ -n $fix && -n $target ]] || die "$bug needs target and fix_change metadata"
 	[[ -n $verify ]] || die "$bug has no verify command"
 	change_exists "$fix" || die "fix change $fix does not exist"
+	epic=$(epic_of "$bug") || die "$bug is not under an epic"
 
-	bd merge-slot acquire --holder "$BEADS_ACTOR" > /dev/null 2>&1 || die "merge slot is held: $(bd merge-slot check 2>&1 | tail -1)"
-	# shellcheck disable=SC2064  # expand the actor now
-	trap "bd merge-slot release --holder '$BEADS_ACTOR' > /dev/null 2>&1" EXIT
-
-	jj status > /dev/null || exit 1
+	take_merge_slot
+	before=$(clean_wc) || exit 1
 	wc=$(jj --ignore-working-copy log --no-graph -r @ -T 'change_id.short()')
 	trial_parents=$(jj --ignore-working-copy log --no-graph -r '@-' -T 'change_id.short() ++ " "')
-	[[ -z $(jj --ignore-working-copy diff -r @ --name-only 'all() & ~devbox.json') ]] \
-		|| die "the working copy has edits other than devbox.json; commit or move them first"
 
 	# 1. Trial: the current tip plus the fix, as the working copy, keeping this
 	# checkout's devbox.json ports. Nothing is rewritten yet, so a failure needs
-	# no undo.
+	# no undo. Functional tests, including a Playwright verify command, wait
+	# for `final`.
 	# shellcheck disable=SC2086  # trial_parents is a list of change IDs
 	jj new $trial_parents "$fix" -m "trial: integrate $bug" > /dev/null 2>&1 || die "could not create the trial merge"
 	trial=$(jj --ignore-working-copy log --no-graph -r @ -T 'change_id.short()')
 	jj restore --from "$wc" devbox.json > /dev/null 2>&1
+	is_functional "$verify" || also=(--also "$verify")
 	log=$(mktemp)
-	jethro_gate --also "$verify" "$@" 2>&1 | tee "$log"
+	jethro_gate --no-functests "${also[@]}" "$@" 2>&1 | tee "$log"
 	status=${PIPESTATUS[0]}
 	summary=$(sed -n '/^Summary:/,$p' "$log")
 
@@ -182,21 +293,290 @@ $summary" > /dev/null
 		die "squash left conflicts; reverted"
 	fi
 
+	# 3. Record the merge order and the states either side, for bisect.
+	after=$(jj --ignore-working-copy log --no-graph -r @ -T commit_id)
+	seq=$(( $(last_seq "$epic") + 1 ))
+	mkdir -p "$(run_dir "$epic")"
+	printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$seq" "$bug" "$fix" "$target" "$before" "$after" \
+		"$(date -Is)" "$BEADS_ACTOR" >> "$(ledger "$epic")"
+
 	bd label remove "$bug" ready-to-integrate > /dev/null 2>&1
+	bd label remove "$bug" needs-work > /dev/null 2>&1
 	bd label add "$bug" integrated > /dev/null
-	bd comment "$bug" "Integrated: $fix squashed into $target. Gate on tip + fix:
+	bd update "$bug" --set-metadata "integration_seq=$seq" > /dev/null
+	bd comment "$bug" "Integrated as #$seq of $epic: $fix squashed into $target. Gate on tip + fix (functional tests wait for the final gate):
 $summary" > /dev/null
 	rm -f "$log"
-	echo "Integrated $bug: $fix -> $target"
+	echo "Integrated $bug as #$seq: $fix -> $target"
 }
 
 cmd_cleanup() {
 	local bug=$1 dir
 	need_env
-	dir=$(meta "$bug" workspace)
-	jj workspace forget "fix-$bug" > /dev/null 2>&1 || true
-	[[ -n $dir && -d $dir ]] && echo "Workspace forgotten; remove its directory when done: rm -rf $dir"
+	dir=$(workspace_root "fix-$bug")
+	[[ -n $dir ]] || dir=$(meta "$bug" workspace)
+	remove_workspace "$bug" "$dir" || die "fix-$bug was not removed"
 	bd update "$bug" --unset-metadata workspace > /dev/null
+}
+
+# Full gate on the tip once the fixes are integrated. The verify commands of
+# every integrated bug run too, except Playwright ones (the suite covers them).
+cmd_final() {
+	local epic=$1; shift
+	local dir wc seq log status summary bug cmd i=0 also=()
+	need_env
+	[[ $(field "$epic" issue_type) == epic ]] || die "$epic is not an epic"
+	cd "$(jj root)" || exit 1
+	dir=$(run_dir "$epic"); mkdir -p "$dir"
+	take_merge_slot
+	wc=$(clean_wc) || exit 1
+	seq=$(last_seq "$epic")
+
+	: > "$dir/final-verify.tsv"
+	while read -r bug; do
+		cmd=$(meta "$bug" verify)
+		[[ -n $cmd ]] && ! is_functional "$cmd" || continue
+		i=$((i + 1)); also+=(--also "$cmd")
+		printf '%s\t%s\t%s\n' "$i" "$bug" "$cmd" >> "$dir/final-verify.tsv"
+	done < <(cut -f2 "$(ledger "$epic")" 2>/dev/null | awk '!seen[$0]++')
+
+	log=$dir/final-$(date +%Y%m%dT%H%M%S).log
+	jethro_gate "${also[@]}" "$@" 2>&1 | tee "$log"
+	status=${PIPESTATUS[0]}
+	summary=$(sed -n '/^Summary:/,$p' "$log")
+	printf '%s\t%s\t%s\t%s\n' "$seq" "$wc" "$status" "$log" > "$dir/final.tsv"
+	rm -f "$dir/last-run.json"
+
+	if [[ $status == 0 ]]; then
+		bd update "$epic" --set-metadata "final_passed_seq=$seq" > /dev/null
+		bd comment "$epic" "Final gate PASSED on the tip after integration #$seq ($wc).
+$summary" > /dev/null
+		echo "Final gate passed: bugs integrated up to #$seq may be closed."
+		return 0
+	fi
+	bd comment "$epic" "Final gate FAILED on the tip after integration #$seq ($wc); log $log.
+$summary" > /dev/null
+	if gate_failures "$log" | grep -qx functests; then
+		cp tests/functional/test-results/.last-run.json "$dir/last-run.json" 2>/dev/null
+	fi
+	run_bisect "$epic"
+	exit 1
+}
+
+cmd_bisect() {
+	local epic=$1
+	need_env
+	cd "$(jj root)" || exit 1
+	take_merge_slot
+	run_bisect "$epic"
+}
+
+# Binary-search the ledger since the last passing final gate for the first
+# integration after which the final gate's failures appear: its failed
+# Playwright tests (--last-failed) and failed verify commands (each only once
+# its bug is integrated, as it fails before). Each probe restores a recorded
+# tree into a throwaway child of the working copy; old commits are only read,
+# never checked out, so no rewritten commit becomes visible again. The culprit
+# goes back to its fixer: needs-work, fix_change cleared, evidence commented.
+run_bisect() {
+	local epic=$1 dir wc final_seq final_wc final_status final_log failed tests=0 good bdir
+	local seq bug fix target before after rest i cmd others prev n lo hi mid
+	local states=() labels=() sbugs=() sseqs=() vbugs=() vcmds=()
+	local -A first_seq=()
+	dir=$(run_dir "$epic")
+	[[ -s $dir/final.tsv ]] || die "no final gate recorded for $epic; run review_loop final $epic"
+	IFS=$'\t' read -r final_seq final_wc final_status final_log < "$dir/final.tsv"
+	[[ $final_status != 0 ]] || die "the last final gate passed; nothing to bisect"
+	wc=$(clean_wc) || exit 1
+	failed=$(gate_failures "$final_log")
+
+	if grep -qx functests <<< "$failed"; then
+		if [[ -s $dir/last-run.json ]] && python3 -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("failedTests") else 1)' "$dir/last-run.json"; then
+			tests=1
+		else
+			echo "functests failed without recording failing tests (setup error?); they are not bisected"
+		fi
+	fi
+	others=$(grep -vx functests <<< "$failed")
+	while IFS=$'\t' read -r i bug cmd; do
+		grep -qx "also-$i" <<< "$failed" || continue
+		vbugs+=("$bug"); vcmds+=("$cmd")
+		others=$(grep -vx "also-$i" <<< "$others")
+	done < "$dir/final-verify.tsv"
+	[[ -z $others ]] || echo "Not bisected (passed at every integration, or not from a ledger entry): $(echo "$others" | tr '\n' ' ')"
+	(( tests || ${#vcmds[@]} )) || die "nothing to bisect"
+
+	good=$(meta "$epic" final_passed_seq); good=${good:-0}
+	prev=
+	while IFS=$'\t' read -r seq bug fix target before after rest; do
+		[[ -n ${first_seq[$bug]:-} ]] || first_seq[$bug]=$seq
+		(( seq > good && seq <= final_seq )) || continue
+		if [[ -z $prev ]]; then
+			states+=("$before"); labels+=("before #$seq"); sbugs+=(""); sseqs+=($((seq - 1)))
+		elif [[ -n $(jj --ignore-working-copy diff --from "$prev" --to "$before" --name-only 'all() & ~devbox.json') ]]; then
+			states+=("$before"); labels+=("changes outside review_loop before #$seq"); sbugs+=(""); sseqs+=($((seq - 1)))
+		fi
+		states+=("$after"); labels+=("#$seq $bug"); sbugs+=("$bug"); sseqs+=("$seq")
+		prev=$after
+	done < "$(ledger "$epic")"
+	[[ -n $prev ]] || die "no integrations between #$good (last passing final gate) and #$final_seq"
+	if [[ -n $(jj --ignore-working-copy diff --from "$prev" --to "$final_wc" --name-only 'all() & ~devbox.json') ]]; then
+		states+=("$final_wc"); labels+=("changes outside review_loop after #$final_seq"); sbugs+=(""); sseqs+=("$final_seq")
+	fi
+
+	bdir=$dir/bisect-$(date +%Y%m%dT%H%M%S); mkdir -p "$bdir"
+	n=$(( ${#states[@]} - 1 ))
+	echo "Bisecting $((n + 1)) states of $epic; logs in $bdir"
+	probe "$n" && { bisect_inconclusive "$epic" "the failures do not reproduce on ${labels[$n]} when rerun alone (flaky or order-dependent)"; return 1; }
+	probe 0 || { bisect_inconclusive "$epic" "the failures already occur at ${labels[0]}: not caused by these integrations"; return 1; }
+	lo=0 hi=$n
+	while (( hi - lo > 1 )); do
+		mid=$(( (lo + hi) / 2 ))
+		if probe "$mid"; then lo=$mid; else hi=$mid; fi
+	done
+	blame "$epic" "$lo" "$hi"
+	return 1
+}
+
+# probe K: run the failing checks on state K (run_bisect's locals); 0 = pass.
+probe() {
+	local k=$1 plog=$bdir/state-$1.log rc=0 p tmp j
+	jj new "$wc" -m "bisect: $epic state $k" > /dev/null 2>&1 || die "could not create the bisect probe"
+	p=$(jj --ignore-working-copy log --no-graph -r @ -T 'change_id.short()')
+	if jj restore --from "${states[$k]}" > /dev/null 2>&1 && jj restore --from "$wc" devbox.json > /dev/null 2>&1; then
+		{
+			echo "state $k: ${labels[$k]} (${states[$k]})"
+			if (( tests )); then
+				tmp=$(mktemp); cp "$dir/last-run.json" "$tmp"
+				(cd tests/functional && FUNCTEST_LOCK_WAIT=${FUNCTEST_LOCK_WAIT:-1800} bun run ./node_modules/.bin/playwright test \
+					--reporter=line --last-failed --last-failed-file "$tmp" --pass-with-no-tests) || rc=1
+				rm -f "$tmp"
+			fi
+			for j in "${!vcmds[@]}"; do
+				(( ${first_seq[${vbugs[$j]}]} <= ${sseqs[$k]} )) || continue
+				echo "verify ${vbugs[$j]}: ${vcmds[$j]}"
+				bash -c "${vcmds[$j]}" || rc=1
+			done
+		} > "$plog" 2>&1
+	else
+		rc=2
+	fi
+	jj edit "$wc" > /dev/null 2>&1 && jj abandon "$p" > /dev/null 2>&1 \
+		|| die "could not return to working copy $wc / abandon probe $p; check jj log"
+	[[ $rc != 2 ]] || die "could not restore state $k (${states[$k]})"
+	printf '  state %-3s %-4s %s\n' "$k" "$( ((rc)) && echo FAIL || echo PASS)" "${labels[$k]}"
+	return $rc
+}
+
+bisect_inconclusive() {
+	echo "Bisect inconclusive: $2"
+	bd comment "$1" "Bisect inconclusive: $2. Probe logs: $bdir" > /dev/null
+}
+
+# blame EPIC GOOD BAD: report the first failing state; send its bug back.
+blame() {
+	local epic=$1 lo=$2 hi=$3 bug evidence holder
+	evidence="State ${labels[$lo]} (${states[$lo]}) passed; ${labels[$hi]} (${states[$hi]}) failed.
+$(grep -E '^ +[0-9]+\) \[' "$bdir/state-$hi.log" | sed 's/^ *//' | sort -u)
+Probe logs: $bdir"
+	bug=${sbugs[$hi]}
+	if [[ -z $bug ]]; then
+		echo "First failing state: ${labels[$hi]}; no fixer to send it to."
+		bd comment "$epic" "Bisect: the final gate's failures start with ${labels[$hi]}, not a review_loop integration; the supervisor must investigate.
+$evidence" > /dev/null
+		return
+	fi
+	bd label remove "$bug" integrated > /dev/null 2>&1
+	bd label add "$bug" needs-work > /dev/null
+	bd update "$bug" --unset-metadata fix_change > /dev/null
+	# Release the finished fix's claim so the rework can claim it again; only
+	# while the same fixer still holds it.
+	holder=$(field "$bug" assignee)
+	[[ -z $holder ]] || bd unclaim "$bug" --if-assignee "$holder" --reason "bisect sent the fix back" > /dev/null 2>&1 \
+		|| echo "review_loop: could not release $holder's claim on $bug"
+	bd comment "$bug" "Final gate failed and bisect blames integration ${labels[$hi]}; back to its fixer. Your earlier fix is already in its target; run 'review_loop workspace $bug' from the main checkout for a fresh workspace and fix on top.
+$evidence" > /dev/null
+	bd comment "$epic" "Bisect: the final gate's failures start with integration ${labels[$hi]}; $bug is needs-work.
+$evidence" > /dev/null
+	echo "Culprit: ${labels[$hi]}; $bug labelled needs-work for its fixer."
+}
+
+# Last phase: remove every fixer workspace of the epic (fix-EPIC.*) and its
+# directory, then leftover commits the loop made for the epic ("local:
+# fix-EPIC.N ports", "trial: integrate EPIC.N", "bisect: EPIC state K") that
+# no working copy uses and that change nothing beyond devbox.json, then check
+# that none remain. A stale fixer workspace keeps the pre-rewrite copies of the
+# stack it was built on visible, as divergent changes; the check confirms those
+# are gone. Work not yet integrated is kept and reported.
+cmd_finish() {
+	local epic=$1 dry=${2:-0} root name dir bug c first fail=0 ws=() cand=() keep=() set div=
+	need_env
+	root=$(jj root) || exit 1
+	cd "$root" || exit 1
+	jj status > /dev/null || exit 1
+
+	while read -r name; do
+		[[ $name == "fix-$epic."* ]] && ws+=("\"$name\"@")
+	done < <(jj --ignore-working-copy workspace list -T 'self.name() ++ "\n"')
+	if (( ${#ws[@]} )); then
+		div=$(IFS='|'; jj --ignore-working-copy log --no-graph -r "divergent() & (::(${ws[*]}) ~ ::(visible_heads() ~ (${ws[*]})))" -T 'commit_id ++ "|"')
+	fi
+
+	echo "Workspaces:"
+	while IFS=$'\t' read -r name dir; do
+		[[ $name == "fix-$epic."* ]] || continue
+		remove_workspace "${name#fix-}" "$dir" "$dry" || fail=1
+	done < <(jj --ignore-working-copy workspace list -T 'self.name() ++ "\t" ++ self.root() ++ "\n"')
+	# Directories of workspaces forgotten without being deleted.
+	for dir in "$root-$epic".*; do
+		[[ -d $dir && $dir =~ -$epic(\.[0-9]+)+$ ]] || continue
+		bug=${dir#"$root"-}
+		[[ -z $(workspace_root "fix-$bug") ]] || continue
+		remove_workspace "$bug" "$dir" "$dry" || fail=1
+	done
+
+	echo "Leftover loop commits:"
+	while read -r c; do
+		first=$(jj --ignore-working-copy log --no-graph -r "$c" -T 'description.first_line()')
+		[[ $first == "local: fix-$epic."*" ports" || $first == "trial: integrate $epic."* || $first == "bisect: $epic state "* ]] \
+			&& cand+=("$c")
+	done < <(jj --ignore-working-copy log --no-graph \
+		-r "(description(substring:\"fix-$epic.\") | description(substring:\"integrate $epic.\") | description(substring:\"bisect: $epic \")) ~ immutable() ~ working_copies()" \
+		-T 'commit_id ++ "\n"')
+	if (( ${#cand[@]} )); then
+		set=$(IFS='|'; echo "${cand[*]}")
+		for c in "${cand[@]}"; do
+			if [[ -n $(jj --ignore-working-copy log --no-graph -r "children($c) ~ ($set)" -T 'commit_id') \
+				|| -n $(jj --ignore-working-copy diff -r "$c" --name-only 'all() & ~devbox.json') ]]; then
+				echo "  ${c:0:12} '$(jj --ignore-working-copy log --no-graph -r "$c" -T 'description.first_line()')': kept (has children, or changes beyond devbox.json)"
+				fail=1
+			else
+				keep+=("$c")
+			fi
+		done
+		if (( ${#keep[@]} )); then
+			if [[ $dry == 1 ]]; then echo "  would abandon ${keep[*]}"
+			elif jj abandon "${keep[@]}" > /dev/null 2>&1; then echo "  abandoned ${#keep[@]}"
+			else echo "  abandon failed"; fail=1
+			fi
+		fi
+	else
+		echo "  none"
+	fi
+
+	[[ $dry == 0 ]] || return 0
+	echo "Check:"
+	c=$(jj --ignore-working-copy workspace list -T 'self.name() ++ "\n"' | grep -F "fix-$epic." | tr '\n' ' ')
+	[[ -z $c ]] || { echo "  workspaces remain: $c"; fail=1; }
+	c=$(compgen -G "$root-$epic.*" | tr '\n' ' ')
+	[[ -z $c ]] || { echo "  directories remain: $c"; fail=1; }
+	if [[ -n $div ]]; then
+		c=$(jj --ignore-working-copy log --no-graph -r "divergent() & (${div%|})" -T 'change_id.short() ++ " " ++ description.first_line() ++ "\n"')
+		[[ -z $c ]] || { echo "  divergent changes the workspaces held remain:"; echo "$c" | sed 's/^/    /'; fail=1; }
+	fi
+	c=$(jj --ignore-working-copy log --no-graph -r "description(substring:\"Fix $epic.\") ~ immutable()" -T 'change_id.short() ++ " " ++ description.first_line() ++ "\n"')
+	[[ -z $c ]] || { echo "  unintegrated fix changes (kept):"; echo "$c" | sed 's/^/    /'; }
+	if [[ $fail == 0 ]]; then echo "  clean"; else return 1; fi
 }
 
 # One free TCP port in the range, for the scratch web server.
@@ -274,7 +654,8 @@ cmd_scratch() {
 	fi
 }
 
-[[ $# -ge 1 ]] || { sed -n '2,19s/^# \?//p' "$0"; exit 2; }
+usage() { sed -n '2,/^$/{/^$/d; s/^# \?//p}' "$0"; }
+[[ $# -ge 1 ]] || { usage; exit 2; }
 sub=$1; shift
 case "$sub" in
 	init) cmd_init "$@" ;;
@@ -282,7 +663,12 @@ case "$sub" in
 	submit) [[ $# -eq 1 ]] || die "usage: review_loop submit BUG"; cmd_submit "$1" ;;
 	integrate) [[ $# -ge 1 ]] || die "usage: review_loop integrate BUG [GATE-ARGS...]"; cmd_integrate "$@" ;;
 	cleanup) [[ $# -eq 1 ]] || die "usage: review_loop cleanup BUG"; cmd_cleanup "$1" ;;
+	final) [[ $# -ge 1 ]] || die "usage: review_loop final EPIC [GATE-ARGS...]"; cmd_final "$@" ;;
+	bisect) [[ $# -eq 1 ]] || die "usage: review_loop bisect EPIC"; cmd_bisect "$1" ;;
+	finish)
+		[[ $# -eq 1 || ( $# -eq 2 && $2 == --dry-run ) ]] || die "usage: review_loop finish EPIC [--dry-run]"
+		cmd_finish "$1" "$([[ ${2:-} == --dry-run ]] && echo 1 || echo 0)" ;;
 	scratch) cmd_scratch "$@" ;;
-	-h|--help|help) sed -n '2,19s/^# \?//p' "$0" ;;
+	-h|--help|help) usage ;;
 	*) die "unknown command $sub" ;;
 esac

@@ -9,8 +9,11 @@ every jj workspace; the error-prone jj steps are scripted in `bin/review_loop`.
 supervisor ─ epic ─┬─ reviewers (parallel) ── file bug beads
                    ├─ cross-review (parallel) ── comment, dedupe, close invalid
                    ├─ fixers (parallel, one jj workspace each) ── failing test, fix, submit
-                   ├─ integrator (one at a time, merge slot) ── gate tip+fix, squash
-                   └─ closer (not author, not fixer) ── check test + gate, close
+                   ├─ integrator (one at a time, merge slot) ── fast gate tip+fix, squash, ledger
+                   ├─ final gate (integrator, once per round) ── full suite; on failure bisect,
+                   │                                             culprit back to its fixer
+                   ├─ closer (not author, not fixer) ── check test + final gate, close
+                   └─ finish (supervisor, last) ── remove fixer workspaces and leftover commits
 ```
 
 ## Hard rules
@@ -20,12 +23,16 @@ supervisor ─ epic ─┬─ reviewers (parallel) ── file bug beads
    `jj op restore` on commits outside their own fix workspace.
 2. **A fix starts with a test that fails.** The bug's `verify` command must
    fail on the target commit before the fix and pass after it.
-3. **One integration at a time.** `review_loop integrate` holds the beads merge
-   slot; a second integrator waits or retries.
-4. **A bug is closed only on evidence**: integrated (label `integrated`), the
-   gate summary in a comment, and a closer who neither filed nor fixed it.
+3. **One integration at a time.** `review_loop integrate`, `final` and
+   `bisect` hold the beads merge slot; a second integrator waits or retries.
+4. **A bug is closed only on evidence**: integrated (label `integrated`), its
+   integration covered by a passing final gate (`integration_seq` ≤ the epic's
+   `final_passed_seq`), and a closer who neither filed nor fixed it.
 5. **Invariants in the epic win.** If a fix would break one, comment on the bug
    and stop; the supervisor decides.
+6. **Cleanup is part of done.** `review_loop finish EPIC` must report `clean`.
+   A fixer workspace left behind goes stale when its fix is squashed, and keeps
+   the pre-rewrite copies of the stack visible as divergent changes.
 
 ## Setup (supervisor, once)
 
@@ -48,9 +55,31 @@ goes in) and test commands before starting reviewers. Every agent gets
 | Discuss | cross-reviewers | `bd comment BUG ...` | agree, dispute, `bd duplicate BUG --of OTHER`, or group under a root-cause parent |
 | Triage | author | `bd close BUG --reason invalid` if disputed successfully | |
 | Fix | fixer | `review_loop workspace BUG` → test, fix → `review_loop submit BUG` | label `ready-to-integrate` |
-| Integrate | integrator | `review_loop integrate BUG` | label `integrated` or `needs-work`, gate summary comment |
+| Integrate | integrator | `review_loop integrate BUG` | label `integrated` (ledger entry `#N`) or `needs-work`, gate summary comment |
+| Final gate | integrator | `review_loop final EPIC`, once every ready fix of the round is integrated | epic `final_passed_seq`, or bisect: culprit `needs-work` |
 | Close | closer | checks, then `bd close BUG --reason "..."` | closed |
-| Clean up | fixer | `review_loop cleanup BUG` | workspace forgotten |
+| Clean up | supervisor | `review_loop finish EPIC`, after the last round | workspaces and leftover commits gone |
+
+## Integration, final gate and bisect
+
+Integration runs no functional tests: each fix gets the fast checks
+(conflicts, markers, `php -l`, unit, upgrades) plus its `verify` command
+unless that runs Playwright. The full suite runs once, in `review_loop final`,
+on the tip after the round's last integration. Every integration is appended
+to a ledger (`runs/EPIC/integrations.tsv` beside the beads database) with the
+tip's commit before and after it, so the merge order and every intermediate
+state stay reproducible after later squashes rewrite the stack.
+
+When the final gate fails, `final` bisects the ledger entries since the last
+passing final gate: it reruns only the failed Playwright tests
+(`--last-failed`) and failed verify commands on restored intermediate states,
+finds the first integration after which they fail, labels that bug
+`needs-work`, clears its `fix_change` and comments the evidence. Its fixer runs
+`review_loop workspace BUG` again (a fresh workspace on the target, which
+already holds the earlier fix), fixes on top and submits; the integrator
+integrates it and reruns `final`. A failure that does not reproduce alone, or
+already occurs before the first integration, is reported on the epic instead.
+`review_loop bisect EPIC` redoes the bisect of the last failed final gate.
 
 ## What the scripts guarantee
 
@@ -58,14 +87,26 @@ goes in) and test commands before starting reviewers. Every agent gets
   two changes: the **fix change** on the bug's target commit, and a **local
   change** on top holding that workspace's own web ports (from 8500 up, never a
   port another workspace uses or anything listens on). Separate checkouts
-  already have separate functest databases (DEVELOPMENT_FUNCTESTS.md).
+  already have separate functest databases (DEVELOPMENT_FUNCTESTS.md). For a
+  fix sent back by bisect it first removes the bug's stale old workspace.
 - `review_loop submit` moves every edit except `devbox.json` into the fix
   change, so port settings never reach the stack.
 - `review_loop integrate` takes the merge slot, builds a **trial** working
-  copy (tip + fix), runs `jethro_gate --also VERIFY` on it, and only if it
-  passes squashes the fix into its target. A failed gate rewrites nothing. A
-  squash that leaves conflicts is undone with `jj op revert` of that one
-  operation, never `jj op restore`, which would roll back other agents' work.
+  copy (tip + fix), runs `jethro_gate --no-functests` (plus the `verify`
+  command unless it runs Playwright) on it, and only if it passes squashes the
+  fix into its target and records it in the ledger. A failed gate rewrites
+  nothing. A squash that leaves conflicts is undone with `jj op revert` of that
+  one operation, never `jj op restore`, which would roll back other agents' work.
+- `review_loop final` runs the full `jethro_gate` on the tip, with the
+  non-Playwright verify commands of every integrated bug; bisect probes restore
+  recorded trees into a throwaway child of the working copy and never check out
+  old commits, so rewritten commits never become visible (divergent) again.
+- `review_loop finish` forgets every `fix-EPIC.*` workspace, deletes its
+  directory, abandons leftover `local: fix-…`, `trial: integrate …` and
+  `bisect: …` commits that change nothing beyond `devbox.json`, and checks that
+  none remain, including divergent copies those workspaces held. It keeps and
+  reports anything holding other changes: unintegrated work. `--dry-run` shows
+  the plan.
 - `jethro_gate` (devbox.d/bin) is the single definition of "acceptable":
   conflicts, markers, `php -l`, unit tests, upgrade idempotence, functional
   suite, plus the bug's own `verify` command.
