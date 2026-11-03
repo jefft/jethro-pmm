@@ -53,6 +53,32 @@ The culprit bug gets `needs-work`, loses `integrated` and `fix_change`, and a
 comment with the passing and failing states and the failing tests. Its fixer
 runs `review_loop workspace BUG` again, which replaces the stale old workspace.
 
+## Trials, probes and interrupted runs
+
+`integrate`'s trial is `jj new <integrator working copy> <fix>`; a bisect probe
+is a child of the working copy with a state's tree restored into it. Both name
+their home (and the probe its state) in `review_loop-home:` /
+`review_loop-tree:` description trailers. Keeping the working copy a parent
+matters: jj abandons an empty, undescribed working-copy commit as soon as `@`
+moves off it, and the earlier trial (`jj new <tip parents> <fix>`) then had
+nothing to return to.
+
+An EXIT trap (with INT/TERM/HUP turned into exits) returns to the home and
+abandons the trial or probe before releasing the merge slot. A SIGKILL skips
+the trap; `recover_interrupted`, run when the next integrator command takes the
+slot, finds the `trial:`/`bisect:` commit at `@`, and returns and abandons it if
+it still matches what was created (a trial: no diff against its parents; a
+probe: its recorded tree). Otherwise it stops: in the jr-trh review a trial
+outlived its integrate run as `@`, conflicts were resolved in it, and later
+integrations took it as their home, so review edits ended up in a commit named
+"trial: integrate jr-trh.11".
+
+After the squash, only conflicts in the stack (`target:: & ::@`) revert it.
+Other bugs' pending fix changes are also descendants of the target; one that
+now conflicts is labelled `needs-work` with a comment instead of blocking the
+integration (checking all of `target::` reverted a sound fix whenever another
+pending fix edited adjacent lines of the same file).
+
 ## Stale fixer workspaces
 
 Every fixer workspace is built on its bug's target, so squashing any fix into

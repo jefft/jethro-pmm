@@ -31,6 +31,10 @@ in the main checkout, with its functest services running.
 - Never edit code yourself. A fix that does not apply is `needs-work` for its fixer.
 - Never use `jj op restore` or `jj undo`; other agents' operations may be
   interleaved. `review_loop` reverts only its own squash operation.
+- Never edit, rebase or resolve conflicts in a `trial: integrate …` or
+  `bisect: …` commit.
+  If `review_loop` reports a leftover trial holding edits, stop and tell the
+  supervisor instead of working around it.
 - Do not integrate a bug whose cross-review comments include an unresolved
   `DISPUTED`.
 

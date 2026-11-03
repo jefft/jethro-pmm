@@ -95,15 +95,26 @@ already occurs before the first integration, is reported on the epic instead.
 - `review_loop submit` moves every edit except `devbox.json` into the fix
   change, so port settings never reach the stack.
 - `review_loop integrate` takes the merge slot, builds a **trial** working
-  copy (tip + fix), runs `jethro_gate --no-functests` (plus the `verify`
-  command unless it runs Playwright) on it, and only if it passes squashes the
-  fix into its target and records it in the ledger. A failed gate rewrites
-  nothing. A squash that leaves conflicts is undone with `jj op revert` of that
-  one operation, never `jj op restore`, which would roll back other agents' work.
+  copy (a merge of the integrator's working copy and the fix), runs
+  `jethro_gate --no-functests` (plus the `verify` command unless it runs
+  Playwright) on it, returns to the working copy and abandons the trial, and
+  only if the gate passed squashes the fix into its target and records it in
+  the ledger. A failed gate rewrites nothing. A squash that leaves conflicts in
+  the stack is undone with `jj op revert` of that one operation, never
+  `jj op restore`, which would roll back other agents' work. A pending fix of
+  another bug that now conflicts does not block it: that bug gets `needs-work`
+  and a comment.
   Just before and after the squash (and after a revert) it records the edits of
   every `fix-*` workspace and updates its files to the rewritten commits, so
   fixers keep working on the current stack instead of a stale copy; a workspace
   that went stale with edits jj had not recorded keeps them (see `resync`).
+- An integrator command interrupted by an error, Ctrl-C or SIGTERM still
+  returns to the working copy, abandons its trial or probe and releases the
+  merge slot. After a SIGKILL the next `integrate`, `final` or `bisect` finds
+  the trial or probe as `@` and does the same, unless someone edited it: then
+  it stops and says so. Never work in a `trial:` or `bisect:` commit. A killed
+  run cannot release the merge slot: once its process is gone, free it with
+  `bd merge-slot release --holder ACTOR`.
 - `review_loop resync BUG`, run inside the fixer's workspace when jj reports it
   stale, runs update-stale and, if that forked the working-copy commit, keeps
   the copy holding the unrecorded edits as `@` and abandons the other.

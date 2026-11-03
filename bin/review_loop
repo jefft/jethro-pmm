@@ -56,6 +56,14 @@ v = d.get(sys.argv[1])
 print("" if v is None else v)' "$2"
 }
 
+has_label() {
+	bd show "$1" --json 2>/dev/null | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+d = d[0] if isinstance(d, list) else d
+sys.exit(0 if sys.argv[1] in (d.get("labels") or []) else 1)' "$2"
+}
+
 need_env() {
 	[[ -n ${BEADS_DIR:-} ]] || die "set BEADS_DIR (review_loop init prints it)"
 	[[ -n ${BEADS_ACTOR:-} ]] || die "set BEADS_ACTOR to your agent name"
@@ -97,10 +105,73 @@ last_seq() {
 # Verify commands that run Playwright wait for the final gate's full suite.
 is_functional() { [[ $1 == *playwright* || $1 == *functests* ]]; }
 
+# Integrator commands (integrate, final, bisect) put a throwaway commit (trial
+# merge, bisect probe) on top of the integrator's working copy. Whatever ends
+# the command (error, Ctrl-C, SIGTERM), on_exit goes back to that working copy,
+# abandons the throwaway commit and releases the merge slot. A SIGKILL skips
+# that; recover_interrupted repairs it at the start of the next such command.
+SCRATCH='' HOME_WC='' SLOT_HELD=''
+
+on_exit() {
+	leave_scratch
+	[[ -z $SLOT_HELD ]] || bd merge-slot release --holder "$BEADS_ACTOR" > /dev/null 2>&1
+}
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+
+# enter_scratch MESSAGE TREE HOME [PARENT...]: make a throwaway working-copy
+# commit on HOME (the integrator's working-copy commit, which as a parent cannot
+# be auto-abandoned) and PARENTs; with TREE, restore that commit's files into it,
+# keeping HOME's devbox.json. Its description records both for recovery.
+enter_scratch() {
+	local msg=$1 tree=$2
+	HOME_WC=$3; shift 2
+	jj new "$@" -m "$msg
+
+review_loop-home: $HOME_WC${tree:+
+review_loop-tree: $tree}" > /dev/null 2>&1 || die "could not create '$msg'"
+	SCRATCH=$(jj --ignore-working-copy log --no-graph -r @ -T change_id)
+	if [[ -n $tree ]]; then
+		jj restore --from "$tree" > /dev/null 2>&1 && jj restore --from "$HOME_WC" devbox.json > /dev/null 2>&1 \
+			|| die "could not restore $tree into '$msg'"
+	fi
+}
+
+leave_scratch() {
+	local s=$SCRATCH
+	[[ -n $s ]] || return 0
+	SCRATCH=
+	jj edit "$HOME_WC" > /dev/null 2>&1 && jj abandon "$s" > /dev/null 2>&1 && return 0
+	echo >&2 "review_loop: could not return to working copy $HOME_WC / abandon $s; check jj log"
+	return 1
+}
+
+# @ is a trial or probe left by a killed integrator command: go back to the
+# working copy it recorded and abandon it, unless it was edited since (or
+# predates the recorded home), which needs a human.
+recover_interrupted() {
+	local desc first home tree s
+	desc=$(jj --ignore-working-copy log --no-graph -r @ -T description)
+	first=${desc%%$'\n'*}
+	[[ $first == "trial: integrate "* || $first == "bisect: "* ]] || return 0
+	jj status > /dev/null || exit 1
+	home=$(sed -n 's/^review_loop-home: //p' <<< "$desc")
+	tree=$(sed -n 's/^review_loop-tree: //p' <<< "$desc")
+	if [[ -z $home ]] \
+		|| { [[ -z $tree ]] && [[ -n $(jj --ignore-working-copy diff -r @ --name-only) ]]; } \
+		|| { [[ -n $tree ]] && [[ -n $(jj --ignore-working-copy diff --from "$tree" --to @ --name-only 'all() & ~devbox.json') ]]; }; then
+		die "@ is a leftover '$first' commit from an interrupted run, and it holds edits or no recorded home: move any edits into the right change, 'jj edit' the integrator's working copy and abandon it"
+	fi
+	s=$(jj --ignore-working-copy log --no-graph -r @ -T commit_id)
+	jj edit "$home" > /dev/null 2>&1 && jj abandon "$s" > /dev/null 2>&1 || die "could not return to $home / abandon $s"
+	echo >&2 "review_loop: recovered from an interrupted run: back on $home, abandoned '$first'"
+}
+
 take_merge_slot() {
 	bd merge-slot acquire --holder "$BEADS_ACTOR" > /dev/null 2>&1 || die "merge slot is held: $(bd merge-slot check 2>&1 | tail -1)"
-	# shellcheck disable=SC2064  # expand the actor now
-	trap "bd merge-slot release --holder '$BEADS_ACTOR' > /dev/null 2>&1" EXIT
+	SLOT_HELD=1
+	recover_interrupted
 }
 
 # The integrator's working copy may differ from the tip only in devbox.json
@@ -285,7 +356,7 @@ cmd_submit() {
 
 cmd_integrate() {
 	local bug=$1; shift
-	local fix target verify epic wc before after seq trial trial_parents op_before squash_op summary status=0 log also=()
+	local fix target verify epic before after seq op_before squash_op summary status=0 log other also=()
 	need_env
 	fix=$(meta "$bug" fix_change); target=$(meta "$bug" target); verify=$(meta "$bug" verify)
 	[[ -n $fix && -n $target ]] || die "$bug needs target and fix_change metadata"
@@ -295,26 +366,19 @@ cmd_integrate() {
 
 	take_merge_slot
 	before=$(clean_wc) || exit 1
-	wc=$(jj --ignore-working-copy log --no-graph -r @ -T 'change_id.short()')
-	trial_parents=$(jj --ignore-working-copy log --no-graph -r '@-' -T 'change_id.short() ++ " "')
 
-	# 1. Trial: the current tip plus the fix, as the working copy, keeping this
-	# checkout's devbox.json ports. Nothing is rewritten yet, so a failure needs
-	# no undo. Functional tests, including a Playwright verify command, wait
-	# for `final`.
-	# shellcheck disable=SC2086  # trial_parents is a list of change IDs
-	jj new $trial_parents "$fix" -m "trial: integrate $bug" > /dev/null 2>&1 || die "could not create the trial merge"
-	trial=$(jj --ignore-working-copy log --no-graph -r @ -T 'change_id.short()')
-	jj restore --from "$wc" devbox.json > /dev/null 2>&1
+	# 1. Trial: the working copy (tip plus this checkout's devbox.json) merged
+	# with the fix. Nothing is rewritten yet, so a failure needs no undo.
+	# Functional tests, including a Playwright verify command, wait for `final`.
+	enter_scratch "trial: integrate $bug" "" "$before" "$fix"
 	is_functional "$verify" || also=(--also "$verify")
 	log=$(mktemp)
 	jethro_gate --no-functests "${also[@]}" "$@" 2>&1 | tee "$log"
 	status=${PIPESTATUS[0]}
 	summary=$(sed -n '/^Summary:/,$p' "$log")
 
-	# Back to the original working copy, whatever happened.
-	jj edit "$wc" > /dev/null 2>&1 && jj abandon "$trial" > /dev/null 2>&1 \
-		|| echo >&2 "review_loop: could not return to working copy $wc / abandon trial $trial; check jj log"
+	# Back to the working copy, whatever happened; never squash from elsewhere.
+	leave_scratch || die "not squashing: the working copy is not back on $before"
 
 	if [[ $status != 0 ]]; then
 		bd label remove "$bug" ready-to-integrate > /dev/null 2>&1
@@ -326,14 +390,14 @@ $summary" > /dev/null
 	fi
 
 	# 2. Squash the fix into its target. Revert just this operation (not
-	# other agents' concurrent ones) if it leaves conflicts. The squash rebases
-	# every fixer workspace on the target; recording their edits just before
-	# and updating them just after leaves them current instead of stale.
+	# other agents' concurrent ones) if it leaves conflicts in the stack. The
+	# squash rebases every fixer workspace on the target; recording their edits
+	# just before and updating them just after leaves them current, not stale.
 	sync_fixer_workspaces
 	op_before=$(jj op log --no-graph -n 1 -T 'id.short()')
 	jj squash --from "$fix" --into "$target" -u > /dev/null 2>&1 || die "squash of $fix into $target failed"
 	squash_op=$(jj op log --no-graph -n 1 -T 'id.short()')
-	if [[ -n $(jj --ignore-working-copy log --no-graph -r "conflicts() & ($target::)" -T 'change_id.short()') ]]; then
+	if [[ -n $(jj --ignore-working-copy log --no-graph -r "conflicts() & ($target:: & ::@)" -T 'change_id.short()') ]]; then
 		jj op revert "$squash_op" > /dev/null
 		sync_fixer_workspaces
 		bd label add "$bug" needs-work > /dev/null
@@ -342,6 +406,18 @@ $summary" > /dev/null
 		die "squash left conflicts; reverted"
 	fi
 	sync_fixer_workspaces
+	# Pending fixes of other bugs, rebased onto the new target, may now conflict
+	# with this one. That is theirs to resolve; it does not block this fix.
+	while read -r other; do
+		[[ -n $other ]] || continue
+		if has_label "$other" ready-to-integrate; then
+			bd label remove "$other" ready-to-integrate > /dev/null 2>&1
+			bd label add "$other" needs-work > /dev/null
+		fi
+		bd comment "$other" "Integrating $bug made your fix change conflict with the stack; resolve the conflict in your workspace (jj status lists it), then 'review_loop submit $other' again." > /dev/null
+		echo >&2 "review_loop: $other's pending fix now conflicts; told its fixer"
+	done < <(jj --ignore-working-copy log --no-graph -r "conflicts() & ($target:: ~ ::@)" -T 'description.first_line() ++ "\n"' \
+		| sed -n 's/^Fix \([^:]*\):.*/\1/p' | sort -u)
 
 	# 3. Record the merge order and the states either side, for bisect.
 	after=$(jj --ignore-working-copy log --no-graph -r @ -T commit_id)
@@ -501,30 +577,23 @@ run_bisect() {
 
 # probe K: run the failing checks on state K (run_bisect's locals); 0 = pass.
 probe() {
-	local k=$1 plog=$bdir/state-$1.log rc=0 p tmp j
-	jj new "$wc" -m "bisect: $epic state $k" > /dev/null 2>&1 || die "could not create the bisect probe"
-	p=$(jj --ignore-working-copy log --no-graph -r @ -T 'change_id.short()')
-	if jj restore --from "${states[$k]}" > /dev/null 2>&1 && jj restore --from "$wc" devbox.json > /dev/null 2>&1; then
-		{
-			echo "state $k: ${labels[$k]} (${states[$k]})"
-			if (( tests )); then
-				tmp=$(mktemp); cp "$dir/last-run.json" "$tmp"
-				(cd tests/functional && FUNCTEST_LOCK_WAIT=${FUNCTEST_LOCK_WAIT:-1800} bun run ./node_modules/.bin/playwright test \
-					--reporter=line --last-failed --last-failed-file "$tmp" --pass-with-no-tests) || rc=1
-				rm -f "$tmp"
-			fi
-			for j in "${!vcmds[@]}"; do
-				(( ${first_seq[${vbugs[$j]}]} <= ${sseqs[$k]} )) || continue
-				echo "verify ${vbugs[$j]}: ${vcmds[$j]}"
-				bash -c "${vcmds[$j]}" || rc=1
-			done
-		} > "$plog" 2>&1
-	else
-		rc=2
-	fi
-	jj edit "$wc" > /dev/null 2>&1 && jj abandon "$p" > /dev/null 2>&1 \
-		|| die "could not return to working copy $wc / abandon probe $p; check jj log"
-	[[ $rc != 2 ]] || die "could not restore state $k (${states[$k]})"
+	local k=$1 plog=$bdir/state-$1.log rc=0 tmp j
+	enter_scratch "bisect: $epic state $k" "${states[$k]}" "$wc"
+	{
+		echo "state $k: ${labels[$k]} (${states[$k]})"
+		if (( tests )); then
+			tmp=$(mktemp); cp "$dir/last-run.json" "$tmp"
+			(cd tests/functional && FUNCTEST_LOCK_WAIT=${FUNCTEST_LOCK_WAIT:-1800} bun run ./node_modules/.bin/playwright test \
+				--reporter=line --last-failed --last-failed-file "$tmp" --pass-with-no-tests) || rc=1
+			rm -f "$tmp"
+		fi
+		for j in "${!vcmds[@]}"; do
+			(( ${first_seq[${vbugs[$j]}]} <= ${sseqs[$k]} )) || continue
+			echo "verify ${vbugs[$j]}: ${vcmds[$j]}"
+			bash -c "${vcmds[$j]}" || rc=1
+		done
+	} > "$plog" 2>&1
+	leave_scratch || die "bisect stopped: the working copy is not back on $wc"
 	printf '  state %-3s %-4s %s\n' "$k" "$( ((rc)) && echo FAIL || echo PASS)" "${labels[$k]}"
 	return $rc
 }
