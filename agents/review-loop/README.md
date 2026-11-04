@@ -57,7 +57,7 @@ goes in) and test commands before starting reviewers. Every agent gets
 | File | reviewer | `bd create TITLE -t bug --parent EPIC --body-file BUG.md --metadata '{"target":"CHANGE","verify":"CMD"}'` | open bug |
 | Discuss | cross-reviewers | `bd comment BUG ...` | agree, dispute, `bd duplicate BUG --of OTHER`, or group under a root-cause parent |
 | Triage | author | `bd close BUG --reason invalid` if disputed successfully | |
-| Fix | fixer | `review_loop workspace BUG` → test, fix → `review_loop submit BUG` | label `ready-to-integrate` |
+| Fix | fixer | `review_loop workspace BUG` → test, fix → `review_loop submit BUG "one-line fix summary"` | label `ready-to-integrate` |
 | Integrate | integrator | `review_loop integrate BUG` | label `integrated` (ledger entry `#N`) or `needs-work`, gate summary comment |
 | Final gate | integrator | `review_loop final EPIC`, once every ready fix of the round is integrated | epic `final_passed_seq`, or bisect: culprit `needs-work` |
 | Close | closer | checks, then `bd close BUG --reason "..."` | closed |
@@ -97,14 +97,18 @@ already occurs before the first integration, is reported on the epic instead.
   otherwise land in the fix change. Separate checkouts already have separate
   functest databases (DEVELOPMENT_FUNCTESTS.md). For a fix sent back by bisect
   it first removes the bug's stale old workspace.
-- `review_loop submit` moves every edit except `devbox.json` into the fix
-  change.
+- `review_loop submit BUG SUMMARY` moves every edit except `devbox.json` into
+  the fix change and records SUMMARY (one line saying what the fix does) as the
+  bug's `fix_summary`.
 - `review_loop integrate` takes the merge slot, builds a **trial** working
   copy (a merge of the integrator's working copy and the fix), runs
   `jethro_gate --no-functests` (plus the `verify` command unless it runs
   Playwright) on it, returns to the working copy and abandons the trial, and
   only if the gate passed squashes the fix into its target and records it in
-  the ledger. A failed gate rewrites nothing. A squash that leaves conflicts in
+  the ledger. The squash keeps the target's description and appends
+  `Review: BUG — SUMMARY` to a block of such lines at its end, one per bug (a
+  rework replaces its bug's line), so each reviewed change says what review
+  changed in it. A failed gate rewrites nothing. A squash that leaves conflicts in
   the stack is undone with `jj op revert` of that one operation, never
   `jj op restore`, which would roll back other agents' work. A pending fix of
   another bug that now conflicts does not block it: that bug gets `needs-work`

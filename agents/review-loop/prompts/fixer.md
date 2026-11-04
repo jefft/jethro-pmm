@@ -17,7 +17,7 @@ Environment: `export BEADS_DIR={BEADS_DIR} BEADS_ACTOR={ACTOR}`; work inside `de
    `php tests/unit/run.php`.
 5. If the verify command changed, record it:
    `bd update {BUG} --set-metadata verify='CMD'`.
-6. `review_loop submit {BUG}`, then comment what you changed and why, with the
+6. `review_loop submit {BUG} "<one line: what the fix does>"`, then comment what you changed and why, with the
    failing-before and passing-after output:
    `bd comment {BUG} "FIXED: ... before: ... after: ..."`
 

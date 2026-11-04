@@ -53,6 +53,20 @@ The culprit bug gets `needs-work`, loses `integrated` and `fix_change`, and a
 comment with the passing and failing states and the failing tests. Its fixer
 runs `review_loop workspace BUG` again, which replaces the stale old workspace.
 
+## Review lines in commit descriptions
+
+Fixes are squashed into their target change, so they leave no commit of their
+own. To keep the change's description honest, `integrate` squashes with a
+description built from the target's own plus one line per integrated bug, at
+the end, after a blank line:
+
+    Review: jr-b1l.1 — restrict /emailmockserver/ to loopback
+
+The summary is the `fix_summary` the fixer gave `review_loop submit BUG SUMMARY`
+(first line only). A bug integrated again after a bisect replaces its line. The
+description is set in the same `jj squash` operation, so a squash reverted for
+conflicts leaves it untouched.
+
 ## Trials, probes and interrupted runs
 
 `integrate`'s trial is `jj new <integrator working copy> <fix>`; a bisect probe
