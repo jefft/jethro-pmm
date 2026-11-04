@@ -424,7 +424,7 @@ cmd_integrate() {
 		leave_scratch || true
 		bd label remove "$bug" ready-to-integrate > /dev/null 2>&1
 		bd label add "$bug" needs-work > /dev/null
-		bd comment "$bug" "Fix $fix conflicts with the tip: a later commit in the stack rewrote the same lines, so merging it onto the tip fails. Rebase the fix onto the current tip ('jj rebase -s $fix -d <tip>'), resolve keeping both changes, then 'review_loop submit $bug "<summary>"'. If the fix belongs in the later commit instead, ask the supervisor to re-target it." > /dev/null
+		bd comment "$bug" "Fix $fix conflicts with the tip: a later commit in the stack rewrote the same lines, so merging it onto the tip fails. Rebase the fix onto the current tip ('jj rebase -s $fix -d <tip>'), resolve keeping both changes, then 'review_loop submit $bug \"<summary>\"'. If the fix belongs in the later commit instead, ask the supervisor to re-target it." > /dev/null
 		die "fix $fix conflicts with the tip; $bug labelled needs-work with instructions"
 	fi
 	is_functional "$verify" || also=(--also "$verify")
@@ -474,7 +474,7 @@ $summary" > /dev/null
 			bd label remove "$other" ready-to-integrate > /dev/null 2>&1
 			bd label add "$other" needs-work > /dev/null
 		fi
-		bd comment "$other" "Integrating $bug made your fix change conflict with the stack; resolve the conflict in your workspace (jj status lists it), then 'review_loop submit $other "<summary>"' again." > /dev/null
+		bd comment "$other" "Integrating $bug made your fix change conflict with the stack; resolve the conflict in your workspace (jj status lists it), then 'review_loop submit $other \"<summary>\"' again." > /dev/null
 		echo >&2 "review_loop: $other's pending fix now conflicts; told its fixer"
 	done < <(jj --ignore-working-copy log --no-graph -r "conflicts() & ($target:: ~ ::@)" -T 'description.first_line() ++ "\n"' \
 		| sed -n 's/^Fix \([^:]*\):.*/\1/p' | sort -u)

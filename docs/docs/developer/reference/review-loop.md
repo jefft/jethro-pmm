@@ -159,3 +159,25 @@ step 1 to one bug.
 
 They need the checked-out application (templates, upgrade SQL, unit tests), so a checkout must also contain
 the Jethro tree — every real checkout does; only this branch's bare history lacks it.
+
+## Needs-work instructions
+
+When `integrate` does not squash, the bug is labelled `needs-work` and `bd comment` posts instructions:
+a trial merge that conflicts with the tip (and a pending fix of another bug that conflicts after a
+squash) tells the fixer to rebase or resolve and rerun `review_loop submit BUG "<summary>"`; a failed
+gate posts the gate summary. The instruction strings contain literal double quotes around
+`<summary>`, so they are escaped (`\"`) inside the double-quoted argument: unescaped, the inner
+quotes would end the argument and bash would parse `<summary>` as redirection, failing the comment
+with "summary: No such file or directory" (this fired on two jr-tft integrations, so the fixers of
+jr-tft.1 and jr-tft.5 ran their rework without the posted instructions).
+
+## Timing and final reports
+
+The review's timing trace is recorded outside this repository by the deepreview skill's global
+scripts: `record_event.py` appends actual UTC actor spans with dependencies to
+`runs/EPIC/events.jsonl` (unrecorded history is left out and reported as unattributed wall time,
+never inferred from issue timestamps), and `report.sh` renders those spans into the offline
+`timeline.html` (actor rows, critical chain, gate and wait segments). `meta_review.sh` creates the
+follow-up improvement task on the main tracker, assigned to a reviewer, as happened for this review.
+These scripts are not part of the repository; this section only records where the numbers come from.
+
