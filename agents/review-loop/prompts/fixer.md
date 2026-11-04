@@ -26,7 +26,7 @@ Environment: `export BEADS_DIR={BEADS_DIR} BEADS_ACTOR={ACTOR}`; work inside `de
 - Edit only inside your workspace. Never run `jj squash`, `jj rebase`,
   `jj describe` or `jj abandon` on anything but your own `@` there;
   `review_loop submit` moves your edits into the fix change for you.
-- Never commit `devbox.json`; it holds your workspace's ports.
+- Never commit `devbox.json`; `review_loop submit` leaves it out of the fix.
 - Do not change behaviour beyond the bug. Other problems you notice are new
   comments on the epic.
 - Other fixes are squashed into the stack under you while you work; the

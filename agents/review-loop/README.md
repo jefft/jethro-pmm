@@ -87,17 +87,18 @@ already occurs before the first integration, is reported on the epic instead.
 ## What the scripts guarantee
 
 - `review_loop workspace` creates a jj workspace beside the main checkout with
-  two changes: the **fix change** on the bug's target commit, and a **local
-  change** on top holding that workspace's own web ports (from 8500 up, never a
-  port another workspace uses or anything listens on). Allocation and creation
-  hold a lock, so agents starting at the same moment still get distinct ports,
-  and the new workspace's files are forced to the target's tree: a fresh git
-  worktree starts from git HEAD, and its delta would otherwise land in the fix
-  change. Separate checkouts already have separate functest databases
-  (DEVELOPMENT_FUNCTESTS.md). For a fix sent back by bisect it first removes the
-  bug's stale old workspace.
+  two changes: the **fix change** on the bug's target commit, and an empty
+  **local change** on top for the fixer to edit in. Web ports and the MailPit
+  socket directory need no per-workspace edits: devbox.json's init hook resolves `_default_` ports from
+  the workspace's own path (with explicit port overrides allowed; distinct paths
+  normally give distinct ports; a collision makes the second nginx fail to
+  bind). Creation holds a lock, and the new workspace's files are forced to the
+  target's tree: a fresh git worktree starts from git HEAD, and its delta would
+  otherwise land in the fix change. Separate checkouts already have separate
+  functest databases (DEVELOPMENT_FUNCTESTS.md). For a fix sent back by bisect
+  it first removes the bug's stale old workspace.
 - `review_loop submit` moves every edit except `devbox.json` into the fix
-  change, so port settings never reach the stack.
+  change.
 - `review_loop integrate` takes the merge slot, builds a **trial** working
   copy (a merge of the integrator's working copy and the fix), runs
   `jethro_gate --no-functests` (plus the `verify` command unless it runs
@@ -160,8 +161,8 @@ Reviewer-created DB fixtures are allowed; do not edit tracked files.
 Only one full deepreview should run per repository and reviewed range at a
 time. The merge slot serializes integration only; it does not prevent duplicate
 review/fixer work or collisions in shared workspaces and test services. For
-different repositories, use separate `DEEPREVIEW_BEADS` directories and
-non-overlapping web ports.
+different repositories, use separate `DEEPREVIEW_BEADS` directories; web ports
+already differ per checkout path (`devbox.d/bin/jethro_utils`).
 
 For a bug with no existing test, `verify` may name the test the fixer must add;
 the reviewer must still reproduce the behavior and document the exact steps.

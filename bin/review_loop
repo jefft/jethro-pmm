@@ -296,22 +296,6 @@ remove_workspace() {
 	echo "  $name: removed${dir:+ ($dir)}"
 }
 
-# A pair of TCP ports (web, functest) that nothing listens on and no other
-# workspace of this repo has claimed in its devbox.json.
-free_ports() {
-	local root used n web ft
-	used=$(jj --ignore-working-copy workspace list -T 'self.root() ++ "\n"' 2>/dev/null | while read -r root; do
-		grep -hoE '"(NGINX|FUNCTEST)_WEB_PORT":\s*"[0-9]+"' "$root/devbox.json" 2>/dev/null | grep -oE '[0-9]+'
-	done)
-	for n in $(seq 0 49); do
-		web=$((8500 + 2 * n)); ft=$((web + 1))
-		if ss -ltnH "( sport = :$web or sport = :$ft )" 2>/dev/null | grep -q .; then continue; fi
-		if grep -qxE "$web|$ft" <<< "$used"; then continue; fi
-		echo "$web $ft"; return 0
-	done
-	return 1
-}
-
 cmd_init() {
 	local dir=${1:-$HOME/beads/jethro-review}
 	mkdir -p "$dir"
@@ -328,7 +312,7 @@ cmd_init() {
 }
 
 cmd_workspace() {
-	local bug=$1 target title fix local_change dir old ports web ft name
+	local bug=$1 target title fix local_change dir old web ft name
 	need_env
 	target=$(meta "$bug" target); [[ -n $target ]] || die "$bug has no target metadata"
 	change_exists "$target" || die "target $target of $bug does not exist"
@@ -342,15 +326,13 @@ cmd_workspace() {
 		# the stack and its workspace is stale, so start from a fresh one.
 		remove_workspace "$bug" "${old:-$dir}" || die "could not replace $name's old workspace"
 	fi
-	# Two agents starting at once must not pick the same ports, and a new git
-	# worktree starts from git HEAD rather than the target commit: hold a lock
-	# while allocating and creating, then put the target's files in place before
-	# anything can be snapshotted into the fix change.
+	# Two agents starting at once must not collide, and a new git worktree
+	# starts from git HEAD rather than the target commit: hold a lock while
+	# creating, then put the target's files in place before anything can be
+	# snapshotted into the fix change.
 	mkdir -p "$(jj root)/.devbox/run"
 	exec 9> "$(jj root)/.devbox/run/review_loop-workspace.lock"
 	flock 9 || die "could not lock $(jj root)/.devbox/run/review_loop-workspace.lock"
-	ports=$(free_ports) || die "no free port pair in 8500-8599"
-	read -r web ft <<< "$ports"
 
 	jj workspace add --name "$name" -r "$target" "$dir" > /dev/null || die "jj workspace add failed"
 	cd "$dir" || exit 1
@@ -360,12 +342,14 @@ cmd_workspace() {
 	[[ -z $(jj --ignore-working-copy diff -r @ --name-only) ]] \
 		|| die "$dir did not check out $target cleanly; remove it and retry"
 	fix=$(jj log --no-graph -r @ -T 'change_id.short()')
-	# Workspace-only port settings live in a separate change on top, so they
-	# never reach the fix (see submit).
+	# The fixer works in a local change on top, so stray edits reach the fix only
+	# via submit. Ports and MailPit's socket directory need no edits: devbox.json
+	# supplies workspace-specific defaults while preserving configured ports.
 	jj new "$fix" -m "local: $name ports" > /dev/null
-	sed -i -E "s/(\"NGINX_WEB_PORT\":\s*)\"[0-9]+\"/\1\"$web\"/; s/(\"FUNCTEST_WEB_PORT\":\s*)\"[0-9]+\"/\1\"$ft\"/" devbox.json
 	local_change=$(jj log --no-graph -r @ -T 'change_id.short()')
 	exec 9>&-
+	web=$(./devbox run -- printenv NGINX_WEB_PORT) && ft=$(./devbox run -- printenv FUNCTEST_WEB_PORT) \
+		|| die "could not resolve configured ports in $dir"
 
 	bd update "$bug" --claim --set-metadata "fix_change=$fix" --set-metadata "workspace=$dir" \
 		--set-metadata "ports=$web/$ft" > /dev/null || die "could not claim $bug and record its workspace"
