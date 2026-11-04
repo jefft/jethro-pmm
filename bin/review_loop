@@ -218,15 +218,27 @@ heal_workspace() {
 	echo "recovered unrecorded edits in $dir: @ is now ${others:0:12}; abandoned ${wc:0:12}"
 }
 
-# Record every fixer workspace's edits before the integrator rewrites the
-# stack, and update them right after, so none is left stale for its fixer to
-# trip over.
-sync_fixer_workspaces() {
-	local name dir
-	while IFS=$'\t' read -r name dir; do
-		[[ $name == fix-* && -d $dir ]] || continue
+# Names of the workspaces whose working copy is REV or built on it: the ones a
+# squash into REV rewrites (fixers on that target, and anyone else's).
+workspaces_on() {
+	jj --ignore-working-copy log --no-graph -r "working_copies() & ($1::)" -T 'working_copies ++ "\n"' \
+		| tr ' ' '\n' | sed -n 's/@$//p' | sort -u
+}
+
+# sync_workspaces NAME...: record each other workspace's edits before the
+# integrator rewrites the commits under it, and update its files right after,
+# so none is left stale for its owner to trip over. Recording edits of a
+# workspace whose working copy is a commit inside the stack rewrites the stack,
+# which leaves this checkout stale, so heal it last (it holds no edits).
+sync_workspaces() {
+	local name dir here
+	here=$(readlink -f "$(jj root)")
+	for name in "$@"; do
+		dir=$(workspace_root "$name")
+		[[ -n $dir && -d $dir && $(readlink -f "$dir") != "$here" ]] || continue
 		heal_workspace "$dir" | sed "s/^/review_loop: $name: /" >&2
-	done < <(jj --ignore-working-copy workspace list -T 'self.name() ++ "\t" ++ self.root() ++ "\n"')
+	done
+	heal_workspace "$here" | sed "s/^/review_loop: this checkout: /" >&2
 }
 
 # remove_workspace BUG DIR [DRY]: forget jj workspace fix-BUG, abandon the
@@ -356,7 +368,7 @@ cmd_submit() {
 
 cmd_integrate() {
 	local bug=$1; shift
-	local fix target verify epic before after seq op_before squash_op summary status=0 log other also=()
+	local fix target verify epic before after seq op_before squash_op summary status=0 log other onstack=() also=()
 	need_env
 	fix=$(meta "$bug" fix_change); target=$(meta "$bug" target); verify=$(meta "$bug" verify)
 	[[ -n $fix && -n $target ]] || die "$bug needs target and fix_change metadata"
@@ -391,21 +403,23 @@ $summary" > /dev/null
 
 	# 2. Squash the fix into its target. Revert just this operation (not
 	# other agents' concurrent ones) if it leaves conflicts in the stack. The
-	# squash rebases every fixer workspace on the target; recording their edits
-	# just before and updating them just after leaves them current, not stale.
-	sync_fixer_workspaces
+	# squash rewrites every workspace on the target (fixers', anyone's);
+	# recording their edits just before and updating them just after leaves
+	# them current, not stale.
+	mapfile -t onstack < <(workspaces_on "$target")
+	sync_workspaces "${onstack[@]}"
 	op_before=$(jj op log --no-graph -n 1 -T 'id.short()')
 	jj squash --from "$fix" --into "$target" -u > /dev/null 2>&1 || die "squash of $fix into $target failed"
 	squash_op=$(jj op log --no-graph -n 1 -T 'id.short()')
 	if [[ -n $(jj --ignore-working-copy log --no-graph -r "conflicts() & ($target:: & ::@)" -T 'change_id.short()') ]]; then
 		jj op revert "$squash_op" > /dev/null
-		sync_fixer_workspaces
+		sync_workspaces "${onstack[@]}"
 		bd label add "$bug" needs-work > /dev/null
 		bd comment "$bug" "Gate passed but squashing $fix into $target left conflicts; reverted operation $squash_op (previous $op_before)." > /dev/null
 		rm -f "$log"
 		die "squash left conflicts; reverted"
 	fi
-	sync_fixer_workspaces
+	sync_workspaces "${onstack[@]}"
 	# Pending fixes of other bugs, rebased onto the new target, may now conflict
 	# with this one. That is theirs to resolve; it does not block this fix.
 	while read -r other; do

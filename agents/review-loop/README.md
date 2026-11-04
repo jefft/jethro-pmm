@@ -105,9 +105,12 @@ already occurs before the first integration, is reported on the epic instead.
   another bug that now conflicts does not block it: that bug gets `needs-work`
   and a comment.
   Just before and after the squash (and after a revert) it records the edits of
-  every `fix-*` workspace and updates its files to the rewritten commits, so
-  fixers keep working on the current stack instead of a stale copy; a workspace
-  that went stale with edits jj had not recorded keeps them (see `resync`).
+  every other workspace whose working copy sits on the target or a later commit
+  (fixers', and any person's) and updates its files to the rewritten commits,
+  so they keep working on the current stack instead of a stale copy; a
+  workspace that went stale with edits jj had not recorded keeps them (see
+  `resync`). Do not keep your own working copy *inside* a reviewed commit
+  during a run: integrations rewrite it, so start a new commit on top instead.
 - An integrator command interrupted by an error, Ctrl-C or SIGTERM still
   returns to the working copy, abandons its trial or probe and releases the
   merge slot. After a SIGKILL the next `integrate`, `final` or `bisect` finds

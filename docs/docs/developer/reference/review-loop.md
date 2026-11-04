@@ -93,8 +93,10 @@ vanish from disk (observed with jj 0.46).
 `heal_workspace` in `bin/review_loop` avoids both: it runs `jj status` (records
 edits; works while current), or update-stale and then, if the commit forked,
 `jj edit`s the copy with the edits and abandons the other. `integrate` heals
-every `fix-*` workspace just before the squash and again just after it (or
-after reverting it), so fixers keep working on the current stack; only edits
+every other workspace whose working copy is the target or built on it
+(`working_copies() & target::`: fixers on that target, and anyone else's) just
+before the squash and again just after it (or after reverting it), so they
+keep working on the current stack; only edits
 made in the sub-second gap between the two can still fork, and that heal
 repairs them. `review_loop resync BUG` runs the same heal for a fixer whose
 workspace went stale another way.
