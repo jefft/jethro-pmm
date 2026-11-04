@@ -70,6 +70,22 @@ Reviewers label bugs liberally by theme (`security`, `permissions`,
 labels, so bugs from many reviews can later be tackled by theme
 (`bd list -l security`). Cross-reviewers can correct them with a `LABELS` verdict.
 
+## Re-review fast path
+
+When `setup.sh` printed `PRIOR_REVIEWS`, this is a re-review: the prior epics'
+fixes are already in the stack and their verify commands are known. Keep it
+light:
+- 1–2 reviewers, focused on the interdiff since the prior epic's close
+  (`jj log`/`evolog` against the commits recorded there) and on the carried
+  bugs, not a fresh full review.
+- The baseline gate may run `jethro_gate --no-functests` plus the affected
+  Playwright projects, when the only change since the prior close is rebase
+  churn (record that decision in the epic). Any new file change needs the full
+  suite.
+- One cross-reviewer covering all bugs, and one fixer per root cause as usual.
+The full gate (`review_loop final`) still runs once before closing; that bar
+does not drop.
+
 ## Findings outside the reviewed range
 
 Every bug records its origin (metadata `origin`): `introduced` (the range

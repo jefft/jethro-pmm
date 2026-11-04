@@ -22,6 +22,11 @@ Focus for this round: {FOCUS}
   run the code. For your own functest runs, set `FUNCTEST_LOCK_WAIT=1800`.
 - Reproduce every finding. Inference without reproduction is a comment on the
   epic, not a bug.
+- Verification budget: the checkout's functest run lock serialises every agent,
+  so wall time is dominated by queued suite runs. Reproduce cheaply first (read
+  the diff, run the one command that proves it). Run only the Playwright
+  projects your focus needs, once each; check the epic for results other
+  reviewers already posted and reuse them. Never run the full suite.
 - Classify every finding by origin, checking the range's base commit
   (`jj log -r 'roots({REVIEW_RANGE})-'`, the parent of the first reviewed change):
   - `introduced`: the reviewed range causes it; absent on the base.
