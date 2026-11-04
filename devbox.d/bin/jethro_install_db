@@ -1,0 +1,74 @@
+#!/usr/bin/env php
+<?php
+/**
+ * Usage: jethro_install_db DB
+ * Run Jethro's web installer from the command line into the existing, empty
+ * database DB (create it with mariadb_recreate_db). Used to check that a fresh
+ * install works and that this version's upgrade scripts are no-ops on it
+ * (see jethro_check_upgrades). Exits non-zero if the installer does not finish.
+ *
+ * Connects through $MYSQL_UNIX_PORT as the shared 'jethro' user, so run it
+ * inside devbox (devbox run -- jethro_install_db DB).
+ */
+
+if ($argc !== 2 || $argv[1] === '-h' || $argv[1] === '--help') {
+	fwrite(STDERR, "Usage: jethro_install_db DB\n");
+	exit(2);
+}
+$dbName = $argv[1]; // not $db: init.php sets that global to the connection
+$socket = getenv('MYSQL_UNIX_PORT');
+if (!$socket) {
+	fwrite(STDERR, "MYSQL_UNIX_PORT is not set; run inside devbox.\n");
+	exit(2);
+}
+$root = dirname(__DIR__, 2);
+
+// Jethro's error handling can end the script with status 0 on a fatal error,
+// so only the success line below counts as success.
+$installed = FALSE;
+register_shutdown_function(function () use (&$installed) {
+	if (!$installed) exit(1);
+});
+
+$_SERVER['SCRIPT_FILENAME'] = $root.'/index.php';
+$_SERVER['REQUEST_METHOD'] = 'POST';
+$_SERVER['HTTP_HOST'] = 'localhost';
+define('JETHRO_ROOT', $root);
+define('TEMPLATE_DIR', JETHRO_ROOT.'/templates/');
+define('DB_DSN', 'mysql:unix_socket='.$socket.';dbname='.$dbName);
+define('DB_DATABASE', $dbName);
+define('DB_USERNAME', 'jethro');
+define('DB_PASSWORD', 'jethro');
+define('DB_MODE', 'PRIVATE');
+chdir($root);
+
+// The installer's form fields (Installer::printBody()).
+$password = 'Install-check-'.bin2hex(random_bytes(6));
+$_POST = $_REQUEST = Array(
+	'congregation_name' => Array('Morning'),
+	'system_name' => 'Install check',
+	'install_first_name' => 'Install',
+	'install_last_name' => 'Check',
+	'install_gender' => 'male',
+	'install_email' => 'install-check@example.org',
+	'install_user_un' => 'admin',
+	'install_user_pw1' => $password,
+	'install_user_pw2' => $password,
+);
+
+require_once JETHRO_ROOT.'/include/init.php';
+require_once JETHRO_ROOT.'/include/user_system.class.php';
+require_once JETHRO_ROOT.'/include/system_controller.class.php';
+$GLOBALS['user_system'] = new User_System();
+require_once JETHRO_ROOT.'/include/installer.class.php';
+
+ob_start();
+(new Installer())->printBody();
+$output = trim(preg_replace('/\s+/', ' ', strip_tags(ob_get_clean())));
+
+if (strpos($output, 'Installation Complete') === FALSE) {
+	fwrite(STDERR, "Installation did not complete:\n".$output."\n");
+	exit(1);
+}
+$installed = TRUE;
+echo "Installed Jethro into '$dbName'.\n";

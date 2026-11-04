@@ -121,3 +121,17 @@ visible as divergent changes. `review_loop finish EPIC`:
 `--dry-run` prints the plan without healing or abandoning anything (it still
 records edits of current working copies). `review_loop cleanup BUG` applies
 step 1 to one bug.
+
+## Helper scripts
+
+`devbox.d/bin/` on this branch carries the gate the review loop calls:
+
+- `jethro_gate [--from REV] [--no-functests] [--functests-args ARGS] [--also CMD]...` — conflicts, conflict
+  markers, `php -l` on changed files, unit tests, `jethro_check_upgrades`, the functional suite and each
+  `--also` command; it keeps going after a failure, logs under `.devbox/run/gate/` and prints a summary.
+- `jethro_check_upgrades [--from VERSION]` — applies the upgrade scripts to the previous release's demo data
+  and to a fresh install, each twice, failing if a script errors or a second pass changes anything.
+- `jethro_install_db DB` — runs the web installer from the command line into an empty database.
+
+They need the checked-out application (templates, upgrade SQL, unit tests), so a checkout must also contain
+the Jethro tree — every real checkout does; only this branch's bare history lacks it.

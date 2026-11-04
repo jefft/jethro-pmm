@@ -1,0 +1,104 @@
+#!/bin/bash -eu
+# Usage: jethro_check_upgrades [--from VERSION]
+# Check the upgrade scripts the way a real site meets them, in scratch databases:
+#  1. Upgrade path: load tests/functional/testdata/demodata-VERSION.sql.gz (default:
+#     the newest released one), apply every later upgrades/*.sql in order, then
+#     apply them all again. The second pass must not error and must leave the
+#     schema, settings and staff permissions unchanged (AGENTS.md: upgrade SQL
+#     must be idempotent).
+#  2. Fresh install: run the installer (jethro_install_db), then apply this
+#     version's upgrade scripts twice. Both passes must succeed and the second
+#     must change nothing.
+# Exits non-zero on the first failure. Uses databases jethro_check_upgrade and
+# jethro_check_fresh, which it recreates.
+
+set -o pipefail
+cd "$(dirname "$(readlink -f "$0")")/../.."
+
+from=""
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		--from) from="$2"; shift 2 ;;
+		--from=*) from="${1#*=}"; shift ;;
+		-h|--help) sed -n '2,14s/^# \?//p' "$0"; exit 0 ;;
+		*) echo >&2 "Unknown argument: $1"; exit 2 ;;
+	esac
+done
+
+if [[ -z $from ]]; then
+	# Newest released demo data, e.g. demodata-2.39.0.sql.gz (not a -DEV dump).
+	from=$(for f in tests/functional/testdata/demodata-[0-9]*.sql.gz; do
+		if [[ $f =~ demodata-([0-9]+\.[0-9]+\.[0-9]+)\.sql\.gz$ ]]; then echo "${BASH_REMATCH[1]}"; fi
+	done | sort --version-sort | tail -1)
+fi
+dump=tests/functional/testdata/demodata-$from.sql.gz
+[[ -f $dump ]] || { echo >&2 "No demo data for $from ($dump)"; exit 2; }
+
+# Upgrade scripts newer than release X.Y: everything after upgrade-to-X.Y.sql.
+from_minor=$(echo "$from" | cut -d. -f1-2)
+mapfile -t later < <(ls upgrades/*.sql | sort --version-sort | sed "0,/upgrade-to-${from_minor//./\\.}\\.sql/ d")
+[[ ${#later[@]} -gt 0 ]] || { echo >&2 "No upgrade scripts after $from_minor"; exit 2; }
+
+# This version's scripts, e.g. 2.40.0-DEV -> *-upgrade-to-2.40*.sql
+current_minor=$(echo "$JETHRO_VERSION" | cut -d. -f1-2)
+mapfile -t current < <(ls upgrades/*-upgrade-to-"$current_minor"*.sql | sort --version-sort)
+
+# Schema, settings and staff permissions, as a comparable fingerprint.
+fingerprint() {
+	mariadb "$1" -sNB <<-'SQL'
+	SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+	  FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() ORDER BY 1, 2;
+	SELECT TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX, COLUMN_NAME, NON_UNIQUE
+	  FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() ORDER BY 1, 2, 3;
+	SELECT TABLE_NAME, CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME
+	  FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() ORDER BY 1, 2, 3;
+	SELECT TABLE_NAME, VIEW_DEFINITION FROM information_schema.VIEWS WHERE TABLE_SCHEMA = DATABASE() ORDER BY 1;
+	SELECT ROUTINE_NAME, ROUTINE_DEFINITION FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = DATABASE() ORDER BY 1;
+	SELECT symbol, `value` FROM setting ORDER BY symbol;
+	SELECT id, permissions FROM staff_member ORDER BY id;
+	SQL
+	# data_permissions only exists from 2.40; compare it when present.
+	mariadb "$1" -sNBe "SELECT id, data_permissions FROM staff_member ORDER BY id" 2>/dev/null || true
+}
+
+apply() {
+	local db=$1; shift
+	local sql
+	for sql in "$@"; do
+		# stdout is the scripts' bookkeeping SELECTs; errors go to stderr.
+		mariadb "$db" < "$sql" > /dev/null || { echo "FAIL: $sql errored on $db"; return 1; }
+	done
+}
+
+check_second_pass() {
+	local db=$1 label=$2; shift 2
+	local before after
+	before=$(mktemp); after=$(mktemp)
+	fingerprint "$db" > "$before"
+	apply "$db" "$@"
+	fingerprint "$db" > "$after"
+	if ! diff -u "$before" "$after" > "$after.diff"; then
+		echo "FAIL: re-applying the upgrades changed the $label database:"
+		head -40 "$after.diff"
+		rm -f "$before" "$after" "$after.diff"
+		return 1
+	fi
+	rm -f "$before" "$after" "$after.diff"
+	echo "OK: $label - second pass changed nothing"
+}
+
+echo "== Upgrade path: $from + ${#later[@]} later script(s)"
+db=jethro_check_upgrade
+mariadb_recreate_db "$db" > /dev/null
+zcat "$dump" | mariadb_rename --database "$db" | mariadb "$db"
+apply "$db" "${later[@]}"
+echo "OK: upgrades applied to $from demo data"
+check_second_pass "$db" "upgraded $from" "${later[@]}"
+
+echo "== Fresh install + ${#current[@]} script(s) for $current_minor"
+db=jethro_check_fresh
+mariadb_recreate_db "$db" > /dev/null
+jethro_install_db "$db" > /dev/null
+apply "$db" "${current[@]}"
+echo "OK: $current_minor upgrades applied to a fresh install"
+check_second_pass "$db" "fresh install" "${current[@]}"
