@@ -13,6 +13,7 @@ For every open bug under the epic that you created:
    - `DUPLICATE of X` that holds → `bd duplicate BUG --of X`.
    - `SEVERITY` / `TARGET` you agree with → `bd update BUG -p N` or
      `bd update BUG --set-metadata target=CHANGE`.
+   - `LABELS` you agree with → `bd label add BUG L` / `bd label remove BUG L`.
    - `ORIGIN` you agree with → `bd update BUG --set-metadata origin=VALUE`;
      for pre-existing also `--unset-metadata target` and `bd label add BUG
      pre-existing`, and the reverse when it turns out introduced or exposed.

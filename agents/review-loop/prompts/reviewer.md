@@ -43,13 +43,23 @@ Focus for this round: {FOCUS}
 
   ```sh
   cp agents/review-loop/templates/bug.md /tmp/bug-$$.md   # fill it in
-  bd create "<component>: <what is wrong>" -t bug --parent {EPIC} -p <0-3> -l round-{ROUND} \
+  bd create "<component>: <what is wrong>" -t bug --parent {EPIC} -p <0-3> -l round-{ROUND},<themes>,area:<name> \
       --body-file /tmp/bug-$$.md \
       --metadata '{"origin":"introduced|exposed","target":"<change from commit map>","verify":"<command that fails now>"}'
   # pre-existing: -l round-{ROUND},pre-existing --metadata '{"origin":"pre-existing","verify":"<command>"}'
   bd lint <new id>
   ```
 
+- Label every bug by theme, liberally: as many as apply, so bugs can later be
+  picked up by theme across reviews. Lowercase, hyphenated. Reuse labels that
+  exist (`bd label list-all`, and the same in the main tracker,
+  `BEADS_DIR=~/.beads/jethro bd label list-all`) before inventing one.
+  Common themes: `security`, `privacy`, `permissions`, `xss`, `csrf`,
+  `sql-injection`, `data-integrity`, `data-loss`, `upgrade`, `performance`,
+  `concurrency`, `ux`, `accessibility`, `i18n`, `docs`, `tests`, `flaky-test`,
+  `devtools`, `config`, `error-handling`. Add the feature area as `area:<name>`
+  (e.g. `area:attachments`, `area:sms`, `area:email`, `area:reports`,
+  `area:members`). These go with `-l` on `bd create`, alongside `round-N`.
 - One bug per root cause. If a finding is a facet of an existing bug, comment
   on that bug instead.
 

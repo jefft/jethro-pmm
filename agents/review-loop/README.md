@@ -63,6 +63,13 @@ goes in) and test commands before starting reviewers. Every agent gets
 | Close | closer | checks, then `bd close BUG --reason "..."` | closed |
 | Clean up | supervisor | `review_loop finish EPIC`, after the last round | workspaces and leftover commits gone |
 
+## Theme labels
+
+Reviewers label bugs liberally by theme (`security`, `permissions`,
+`data-integrity`, `docs`, …) and feature area (`area:<name>`), reusing existing
+labels, so bugs from many reviews can later be tackled by theme
+(`bd list -l security`). Cross-reviewers can correct them with a `LABELS` verdict.
+
 ## Findings outside the reviewed range
 
 Every bug records its origin (metadata `origin`): `introduced` (the range
