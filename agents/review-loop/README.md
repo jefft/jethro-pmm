@@ -89,9 +89,13 @@ already occurs before the first integration, is reported on the epic instead.
 - `review_loop workspace` creates a jj workspace beside the main checkout with
   two changes: the **fix change** on the bug's target commit, and a **local
   change** on top holding that workspace's own web ports (from 8500 up, never a
-  port another workspace uses or anything listens on). Separate checkouts
-  already have separate functest databases (DEVELOPMENT_FUNCTESTS.md). For a
-  fix sent back by bisect it first removes the bug's stale old workspace.
+  port another workspace uses or anything listens on). Allocation and creation
+  hold a lock, so agents starting at the same moment still get distinct ports,
+  and the new workspace's files are forced to the target's tree: a fresh git
+  worktree starts from git HEAD, and its delta would otherwise land in the fix
+  change. Separate checkouts already have separate functest databases
+  (DEVELOPMENT_FUNCTESTS.md). For a fix sent back by bisect it first removes the
+  bug's stale old workspace.
 - `review_loop submit` moves every edit except `devbox.json` into the fix
   change, so port settings never reach the stack.
 - `review_loop integrate` takes the merge slot, builds a **trial** working
@@ -103,7 +107,9 @@ already occurs before the first integration, is reported on the epic instead.
   the stack is undone with `jj op revert` of that one operation, never
   `jj op restore`, which would roll back other agents' work. A pending fix of
   another bug that now conflicts does not block it: that bug gets `needs-work`
-  and a comment.
+  and a comment. A fix that conflicts with the tip itself (a later commit
+  rewrote the same lines) is reported as such, not as a failed gate, with the
+  rebase the fixer needs to do.
   Just before and after the squash (and after a revert) it records the edits of
   every other workspace whose working copy sits on the target or a later commit
   (fixers', and any person's) and updates its files to the rewritten commits,
@@ -127,10 +133,13 @@ already occurs before the first integration, is reported on the epic instead.
   old commits, so rewritten commits never become visible (divergent) again.
 - `review_loop finish` forgets every `fix-EPIC.*` workspace, deletes its
   directory, abandons leftover `local: fix-…`, `trial: integrate …` and
-  `bisect: …` commits that change nothing beyond `devbox.json`, and checks that
-  none remain, including divergent copies those workspaces held. It keeps and
-  reports anything holding other changes: unintegrated work. `--dry-run` shows
-  the plan.
+  `bisect: …` commits that change nothing beyond `devbox.json`, abandons empty
+  `Fix EPIC.N` changes left behind by squashes, and checks that none remain,
+  including divergent copies those workspaces held. It keeps and reports
+  anything holding other changes: unintegrated work. `--dry-run` shows the plan.
+- `integrate`, `final` and `bisect` refuse to start unless `devbox.d/bin/jethro_gate`
+  exists in the checkout and is on PATH: without it every gate check silently
+  passes, and the bug is then rejected for the wrong reason.
 - `jethro_gate` (devbox.d/bin) is the single definition of "acceptable":
   conflicts, markers, `php -l`, unit tests, upgrade idempotence, functional
   suite, plus the bug's own `verify` command.

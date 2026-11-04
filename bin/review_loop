@@ -73,6 +73,18 @@ change_exists() {
 	jj --ignore-working-copy log --no-graph -r "$1" -T 'change_id.short()' > /dev/null 2>&1
 }
 
+# The gate is a devbox script in this checkout. Without it every check silently
+# passes and an integration is rejected for the wrong reason (seen in the jr-b1l
+# run), so refuse to start.
+need_gate_tools() {
+	local root
+	root=$(jj root) || die "not inside a jj repository"
+	[[ -x $root/devbox.d/bin/jethro_gate ]] \
+		|| die "$root has no devbox.d/bin/jethro_gate: this checkout is not on a commit with the review tooling"
+	command -v jethro_gate > /dev/null \
+		|| die "jethro_gate is not on PATH: run review_loop inside devbox (devbox run -- bin/review_loop ...)"
+}
+
 # The epic a bug belongs to: its parent, or a grandparent when cross-review
 # grouped the bug under a root-cause bug.
 epic_of() {
@@ -330,18 +342,30 @@ cmd_workspace() {
 		# the stack and its workspace is stale, so start from a fresh one.
 		remove_workspace "$bug" "${old:-$dir}" || die "could not replace $name's old workspace"
 	fi
+	# Two agents starting at once must not pick the same ports, and a new git
+	# worktree starts from git HEAD rather than the target commit: hold a lock
+	# while allocating and creating, then put the target's files in place before
+	# anything can be snapshotted into the fix change.
+	mkdir -p "$(jj root)/.devbox/run"
+	exec 9> "$(jj root)/.devbox/run/review_loop-workspace.lock"
+	flock 9 || die "could not lock $(jj root)/.devbox/run/review_loop-workspace.lock"
 	ports=$(free_ports) || die "no free port pair in 8500-8599"
 	read -r web ft <<< "$ports"
 
 	jj workspace add --name "$name" -r "$target" "$dir" > /dev/null || die "jj workspace add failed"
 	cd "$dir" || exit 1
 	jj new "$target" -m "Fix $bug: $title" > /dev/null
+	jj status > /dev/null 2>&1 || true
+	jj restore --from "$target" > /dev/null 2>&1
+	[[ -z $(jj --ignore-working-copy diff -r @ --name-only) ]] \
+		|| die "$dir did not check out $target cleanly; remove it and retry"
 	fix=$(jj log --no-graph -r @ -T 'change_id.short()')
 	# Workspace-only port settings live in a separate change on top, so they
 	# never reach the fix (see submit).
 	jj new "$fix" -m "local: $name ports" > /dev/null
 	sed -i -E "s/(\"NGINX_WEB_PORT\":\s*)\"[0-9]+\"/\1\"$web\"/; s/(\"FUNCTEST_WEB_PORT\":\s*)\"[0-9]+\"/\1\"$ft\"/" devbox.json
 	local_change=$(jj log --no-graph -r @ -T 'change_id.short()')
+	exec 9>&-
 
 	bd update "$bug" --claim --set-metadata "fix_change=$fix" --set-metadata "workspace=$dir" \
 		--set-metadata "ports=$web/$ft" > /dev/null || die "could not claim $bug and record its workspace"
@@ -376,6 +400,7 @@ cmd_integrate() {
 	change_exists "$fix" || die "fix change $fix does not exist"
 	epic=$(epic_of "$bug") || die "$bug is not under an epic"
 
+	need_gate_tools
 	take_merge_slot
 	before=$(clean_wc) || exit 1
 
@@ -383,6 +408,15 @@ cmd_integrate() {
 	# with the fix. Nothing is rewritten yet, so a failure needs no undo.
 	# Functional tests, including a Playwright verify command, wait for `final`.
 	enter_scratch "trial: integrate $bug" "" "$before" "$fix"
+	# A fix authored against its target conflicts when a later commit rewrote the
+	# same lines. Say so instead of reporting it as a failed gate.
+	if [[ -n $(jj --ignore-working-copy log --no-graph -r "conflicts() & @" -T 'change_id.short()') ]]; then
+		leave_scratch || true
+		bd label remove "$bug" ready-to-integrate > /dev/null 2>&1
+		bd label add "$bug" needs-work > /dev/null
+		bd comment "$bug" "Fix $fix conflicts with the tip: a later commit in the stack rewrote the same lines, so merging it onto the tip fails. Rebase the fix onto the current tip ('jj rebase -s $fix -d <tip>'), resolve keeping both changes, then 'review_loop submit $bug'. If the fix belongs in the later commit instead, ask the supervisor to re-target it." > /dev/null
+		die "fix $fix conflicts with the tip; $bug labelled needs-work with instructions"
+	fi
 	is_functional "$verify" || also=(--also "$verify")
 	log=$(mktemp)
 	jethro_gate --no-functests "${also[@]}" "$@" 2>&1 | tee "$log"
@@ -479,6 +513,7 @@ cmd_final() {
 	[[ $(field "$epic" issue_type) == epic ]] || die "$epic is not an epic"
 	cd "$(jj root)" || exit 1
 	dir=$(run_dir "$epic"); mkdir -p "$dir"
+	need_gate_tools
 	take_merge_slot
 	wc=$(clean_wc) || exit 1
 	seq=$(last_seq "$epic")
@@ -518,6 +553,7 @@ cmd_bisect() {
 	local epic=$1
 	need_env
 	cd "$(jj root)" || exit 1
+	need_gate_tools
 	take_merge_slot
 	run_bisect "$epic"
 }
@@ -679,6 +715,16 @@ cmd_finish() {
 		remove_workspace "$bug" "$dir" "$dry" || fail=1
 	done
 
+	echo "Leftover fix changes:"
+	while read -r c; do
+		first=$(jj --ignore-working-copy log --no-graph -r "$c" -T 'description.first_line()')
+		if [[ $first == "Fix $epic."* ]]; then
+			if [[ $dry == 1 ]]; then echo "  would abandon empty ${c:0:12} '$first'"
+			elif jj abandon "$c" > /dev/null 2>&1; then echo "  abandoned empty ${c:0:12} '$first'"
+			else echo "  could not abandon empty ${c:0:12}"; fail=1
+			fi
+		fi
+	done < <(jj --ignore-working-copy log --no-graph -r "empty() & description(substring:\"Fix $epic.\") ~ immutable() ~ working_copies()" -T 'commit_id ++ "\n"')
 	echo "Leftover loop commits:"
 	while read -r c; do
 		first=$(jj --ignore-working-copy log --no-graph -r "$c" -T 'description.first_line()')
