@@ -22,6 +22,15 @@ Focus for this round: {FOCUS}
   run the code. For your own functest runs, set `FUNCTEST_LOCK_WAIT=1800`.
 - Reproduce every finding. Inference without reproduction is a comment on the
   epic, not a bug.
+- Classify every finding by origin, checking the range's base commit
+  (`jj log -r 'roots({REVIEW_RANGE})-'`, the parent of the first reviewed change):
+  - `introduced`: the reviewed range causes it; absent on the base.
+  - `exposed`: present on the base, but the range makes it newly reachable or
+    worse (e.g. a new caller of an old bug). Fixed here, like introduced bugs.
+  - `pre-existing`: present on the base and unaffected by the range. File it
+    so it is not lost, but it is **not fixed in this review**: no `target`,
+    label `pre-existing`. The supervisor copies it to the main tracker.
+  When unsure between exposed and pre-existing, say why in the bug.
 - `verify` should be an existing command that fails before and passes after the
   fix. If no test exists, name the test the fixer should add and give exact
   reproduction steps; docs-only fixes may use a narrowly scoped docs check.
@@ -36,7 +45,8 @@ Focus for this round: {FOCUS}
   cp agents/review-loop/templates/bug.md /tmp/bug-$$.md   # fill it in
   bd create "<component>: <what is wrong>" -t bug --parent {EPIC} -p <0-3> -l round-{ROUND} \
       --body-file /tmp/bug-$$.md \
-      --metadata '{"target":"<change from commit map>","verify":"<command that fails now>"}'
+      --metadata '{"origin":"introduced|exposed","target":"<change from commit map>","verify":"<command that fails now>"}'
+  # pre-existing: -l round-{ROUND},pre-existing --metadata '{"origin":"pre-existing","verify":"<command>"}'
   bd lint <new id>
   ```
 

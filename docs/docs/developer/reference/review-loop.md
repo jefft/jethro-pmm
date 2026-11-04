@@ -67,6 +67,16 @@ The summary is the `fix_summary` the fixer gave `review_loop submit BUG SUMMARY`
 description is set in the same `jj squash` operation, so a squash reverted for
 conflicts leaves it untouched.
 
+## Finding origin
+
+Bugs carry metadata `origin`: `introduced`, `exposed` or `pre-existing`,
+judged against the reviewed range's base commit (the parent of its first
+change, named in the epic). Only introduced and exposed bugs get fixers and a
+`target`; pre-existing ones (label `pre-existing`) are exported to the main
+tracker at the end by the deepreview skill's `export_preexisting.sh`, so a
+review never squashes an unrelated fix into a reviewed change. `review_loop
+init` makes `Origin` a required section of bug reports (`bd lint`).
+
 ## Trials, probes and interrupted runs
 
 `integrate`'s trial is `jj new <integrator working copy> <fix>`; a bisect probe

@@ -18,6 +18,8 @@ For every open bug under the epic that you did not create
    - `DUPLICATE of <ID>` — same root cause.
    - `SEVERITY <P0-P3>` — reproduced but mis-rated; say why.
    - `TARGET <change>` — the fix belongs in a different commit per the commit map.
+   - `ORIGIN <introduced|exposed|pre-existing>` — the bug's origin is wrong;
+     show what you saw on the range's base commit.
 3. If several bugs share one root cause, say so on each and propose one parent
    bug for the systemic fix.
 

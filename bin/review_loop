@@ -330,7 +330,7 @@ cmd_init() {
 	fi
 	export BEADS_DIR=$dir/.beads
 	# Bug reports must say where the fix goes and how to prove it.
-	bd config set lint.sections.bug "Target commit, Verify" > /dev/null
+	bd config set lint.sections.bug "Origin, Target commit, Verify" > /dev/null
 	# Idempotent; 'bd merge-slot check' exits 0 even when there is no slot.
 	bd merge-slot create > /dev/null || die "could not create the merge slot"
 	echo "export BEADS_DIR=$BEADS_DIR"

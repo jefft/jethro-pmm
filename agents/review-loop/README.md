@@ -63,6 +63,18 @@ goes in) and test commands before starting reviewers. Every agent gets
 | Close | closer | checks, then `bd close BUG --reason "..."` | closed |
 | Clean up | supervisor | `review_loop finish EPIC`, after the last round | workspaces and leftover commits gone |
 
+## Findings outside the reviewed range
+
+Every bug records its origin (metadata `origin`): `introduced` (the range
+causes it), `exposed` (an old bug the range makes newly reachable or worse) or
+`pre-existing` (present on the range's base commit, unaffected by the range).
+Introduced and exposed bugs are fixed here. Pre-existing bugs are filed with
+label `pre-existing` and no `target`, never fixed in the review (squashing an
+unrelated fix into a reviewed change would misdescribe it), do not count
+towards the round's stop condition, and are copied to the main tracker at the
+end with the deepreview skill's `export_preexisting.sh EPIC`, which closes each
+review bug as exported, pointing at its new ID.
+
 ## Integration, final gate and bisect
 
 Integration runs no functional tests: each fix gets the fast checks
