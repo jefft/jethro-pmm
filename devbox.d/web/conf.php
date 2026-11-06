@@ -19,6 +19,24 @@ define('PREFILL_MEMBER_PASSWORD', 'qfntt7eYuwHs123');  # This qfntt7eYuwHs123 pa
 define('SMS_INTERNATIONAL_PREFIX', '61');
 define('SMS_LOCAL_PREFIX', '0');
 
+# Define settings for all supported providers, but don't hardcode any so the choice is left to the user on the system config page.
+#define('SMS_PROVIDER', '5centsmsv5');
+define('SMS_5CENTSMS_URL', '/smsmockserver/5centsms');
+define('SMS_5CENTSMS_APIKEY_ID', 'test-mock-key-id');
+define('SMS_5CENTSMS_APIKEY', 'test-mock-secret');
+
+define('SMS_CELLCAST_URL', '/smsmockserver/cellcast');
+define('SMS_CELLCAST_APIKEY', 'test-mock-secret');
+
+define('SMS_MOBILEMESSAGE_URL', '/smsmockserver/mobilemessage');
+define('SMS_MOBILEMESSAGE_APIKEY_USERNAME', 'test-mock-username');
+define('SMS_MOBILEMESSAGE_APIKEY_PASSWORD', 'test-mock-secret');
+
+// The demo mock accounts already have this sender registered. MobileMessage
+// does not expose ACMA approval in its sender list, so name it explicitly for
+// pre-login sends.
+define('2FA_SENDER_ID', 'StDemos');
+
 // Email capture: send all mail into this checkout's MailPit unix socket
 // (process-compose service `mailpit`), mirroring how SMS is faked via the
 // smsmockserver above. php-fpm is given MAILPIT_SOCKET_DIR by
