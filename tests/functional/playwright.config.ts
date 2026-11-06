@@ -68,6 +68,9 @@ const SMS_SCENARIOS = [
   "sms-delivered-status",
   // The SMS status panel reports the provider's credit balance.
   "sms-status-panel",
+  // Members-area edit step-up: SMS code required before the Edit form loads;
+  // contacts masked pre-verification.
+  "members-edit-2fa",
 ];
 
 // Provider-sensitive scenarios (schedule/cancel, cool-off, status lifecycle,
@@ -133,11 +136,14 @@ export default defineConfig({
     { name: "import", testMatch: ["import/import.spec.ts"] },
     {
       // Members-area regressions (#1173, #1433) and the post-login redirect.
-      // The members area lives at /members/ under the shared functest webroot
-      // and reads the standard demo database, so no scenario .conf is needed.
+      // The Edit view sits behind the SMS step-up gate, so this project serves
+      // the members area under its own scenario prefix: that loads
+      // tests/functional/members/members.conf (the mock SMS provider) and keeps
+      // the captured codes on the members-edit-gate mock profile, separate from
+      // the members-edit-2fa scenario running in the same suite.
       name: "members",
       testMatch: ["members/members.spec.ts"],
-      use: { baseURL: `${HOST}/members/` },
+      use: { baseURL: `${HOST}/tests/functional/members/members/` },
     },
     {
       // Staff self-service credential recovery: forgot-password (emailed

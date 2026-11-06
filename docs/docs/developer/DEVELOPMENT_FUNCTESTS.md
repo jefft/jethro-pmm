@@ -120,6 +120,18 @@ at the mock proxy (below). `common.conf` deliberately avoids hardcoding
 the whole test run instead of just narrowing SMS-testing scope — let it come
 from the `setting` table like a real instance would.
 
+Non-SMS projects can take a scenario prefix too: `walkthrough` serves its own
+prefix to reach an empty database, and `members` serves the members area at
+`/tests/functional/members/members/` so its `members/members.conf` can point the
+Edit view's SMS step-up gate at the mock provider. That gate is mandatory for
+members-area edits (`members/include/member_user_system.class.php`); specs
+complete it with `completeEditGate()` from `tests/functional/member-edit-gate.ts`,
+which reads the code from the scenario's own mock profile. A save consumes the
+proof, and a challenge carries a per-person 60-second send cooldown
+(`_person.membereditsmsent`) and a five-attempt limit — so tests that gate the
+same shared persona must not run in parallel: keep each shared persona's gated
+coverage in one project (the #1173 and staff-contact tests live in `members`).
+
 ### 6. `playwright.config.ts` — wiring scenarios to Playwright projects
 
 `SMS_SCENARIOS` is a plain array of scenario names; each becomes a Playwright

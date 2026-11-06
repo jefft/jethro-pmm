@@ -5,7 +5,8 @@ class View__Edit_Me extends View
 	private $persons = Array();
 	private $hasAdult = FALSE;
 	private $hasHidden = FALSE;
-	private $person_fields = Array('gender', 'age_bracketid', 'email', 'mobile_tel', 'work_tel', 'photo');
+	private $person_fields = Array('gender', 'age_bracketid', 'email', 'work_tel', 'photo');
+	private $liveMember = NULL;
 
 	public function __construct()
 	{
@@ -22,16 +23,30 @@ class View__Edit_Me extends View
 	
 	function canEditFamily()
 	{
-		// Non-adults can only edit if there are no adults in the family
+		// Non-adults can only edit if there are no adults in the family.
+		// Uses the live member row where available: a family move or age-bracket
+		// change after login must not be honoured from the stale session snapshot.
+		$ageBracketId = $this->liveMember ? $this->liveMember['age_bracketid']
+			: $GLOBALS['user_system']->getCurrentMember('age_bracketid');
 		return
-			in_array($GLOBALS['user_system']->getCurrentMember('age_bracketid'), Age_Bracket::getAdults())
+			in_array($ageBracketId, Age_Bracket::getAdults())
 			|| !$this->hasAdult
 		;
 	}
-	
+
 	function processView()
 	{
-		$this->family = $GLOBALS['system']->getDBOBject('family', $GLOBALS['user_system']->getCurrentMember('familyid'));
+		if (!$GLOBALS['user_system']->requireVerifiedMemberEdit()) {
+			// SMS gate handled the request; the edit form must not load or save.
+			return;
+		}
+		// Edit authority is bound to the live family: reload it, not the
+		// login-time session snapshot, so a family move invalidates stale access.
+		$liveRow = NULL;
+		$db = $GLOBALS['db'];
+		$liveRow = $db->queryRow('SELECT * FROM _person WHERE id = '.(int)$_SESSION['member']['id']);
+		$this->liveMember = $liveRow;
+		$this->family = $GLOBALS['system']->getDBOBject('family', $liveRow ? (int)$liveRow['familyid'] : $GLOBALS['user_system']->getCurrentMember('familyid'));
 		foreach ($this->family->getMemberData() as $id => $member) {
 			$p = $GLOBALS['system']->getDBObject('person', $id);
 			if ($p) {
@@ -47,32 +62,42 @@ class View__Edit_Me extends View
 		}
 		
 		if (array_get($_POST, 'family_details_submitted')) {
+			if (!$GLOBALS['user_system']->hasVerifiedMemberEdit()) {
+				// Proof expired or bindings changed mid-form: refuse the save.
+				add_message('Your verification has expired. Please verify again.', 'error');
+				return;
+			}
 			if ($this->canEditFamily()) {
 				$this->family->processForm();
 				$this->family->save();
 				$this->family->releaseLock();
 			}
-			$fields = Array('gender', 'age_bracket', 'email', 'mobile_tel', 'work_tel');
 			foreach ($this->persons as $person) {
-				$sm = new Staff_Member($person->id);
-				if ($sm && $sm->requires2FA()) {
+				$fields = $this->editablePersonFields($person);
+				if (!$fields) {
 					// People with 2FA control-centre accounts can't be edited via members area, so skip
 				} else if ($this->canEditFamily() || $this->isMe($person)) {
-					$person->processForm('person_'.$person->id, $this->person_fields);
+					$person->processForm('person_'.$person->id, $fields);
 					$person->save(FALSE);
 					$person->releaseLock();
 				}
 			}
-			
+
+			$GLOBALS['user_system']->consumeMemberEditVerification();
 			add_message("Details saved");
 			redirect('home');
-			
+
 		}
 		
 	}
 	
 	function printView()
 	{
+		if (!$GLOBALS['user_system']->hasVerifiedMemberEdit()) {
+			// No lock, no family/person rendering, no contact values.
+			$GLOBALS['user_system']->printMemberEditVerification();
+			return;
+		}
 		$ok = true;
 
 		if ($this->canEditFamily()) {
@@ -120,11 +145,15 @@ class View__Edit_Me extends View
 			foreach ($this->persons as $person) {
 				echo '<h3>'.$person->getValue('first_name').' '.$person->getValue('last_name').'</h3>';
 
-				$sm = new Staff_Member($person->id);
-				if ($sm && $sm->requires2FA()) {
+				$fields = $this->editablePersonFields($person);
+				if (!$fields) {
 					echo '<p><i>This person has a control centre account, so their details can only be edited via the <a href="?view=persons&personid='.(int)$person->id.'">control centre</a></i></p>';
+					$this->printReadOnlyStaffContacts($person);
 				} else if ($this->canEditFamily() || $this->isMe($person)) {
-					$person->printForm('person_'.$person->id, $this->person_fields);
+					$person->printForm('person_'.$person->id, $fields);
+					if (!in_array('email', $fields)) {
+						$this->printReadOnlyStaffContacts($person);
+					}
 				}
 			}
 				
@@ -135,6 +164,63 @@ class View__Edit_Me extends View
 			<?php
 		}
 
+	}
+
+	/**
+	 * Display staff recovery contacts without granting member-area edit access.
+	 * The inputs are unnamed, so they are never submitted; values and sizes match
+	 * the editable widgets from print_widget().
+	 * @see docs/docs/developer/reference/members-contact-protection.mdx
+	 * @param Person $person
+	 * @return void
+	 */
+	private function printReadOnlyStaffContacts(Person $person): void
+	{
+		$reason = 'For security, staff email addresses and mobile numbers can only be changed in the control centre.';
+		$helpID = 'staff-contact-help-'.$person->id;
+		$contacts = Array(
+			'email' => Array(
+				'value' => $person->getValue('email'),
+				'size' => $person->fields['email']['width'],
+			),
+			'mobile_tel' => Array(
+				'value' => $person->getFormattedValue('mobile_tel'),
+				'size' => max(get_phone_format_lengths($person->fields['mobile_tel']['formats'])) + 3,
+			),
+		);
+		?>
+		<div class="form-horizontal">
+			<?php foreach ($contacts as $field => $contact) {
+				$inputID = 'person_'.$person->id.$field;
+				?>
+				<div class="control-group">
+					<label class="control-label" for="<?php echo ents($inputID); ?>"><?php echo ents($person->getFieldLabel($field)); ?></label>
+					<div class="controls">
+						<input type="text" id="<?php echo ents($inputID); ?>" size="<?php echo (int)$contact['size']; ?>" value="<?php echo ents($contact['value']); ?>" readonly title="<?php echo ents($reason); ?>" aria-describedby="<?php echo ents($helpID); ?>" />
+					</div>
+				</div>
+			<?php } ?>
+			<p id="<?php echo ents($helpID); ?>"><i><?php echo ents($reason); ?></i></p>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Member-editable fields; staff recovery contacts are control-centre-only.
+	 * Staff requiring 2FA retain the full member-area edit prohibition.
+	 * Mobile numbers are never member-editable (administrator-managed: the
+	 * members SMS gate sends to the stored mobile).
+	 *
+	 * @see docs/docs/developer/reference/members-contact-protection.mdx
+	 * @param Person $person
+	 * @return array<int, string>
+	 */
+	private function editablePersonFields(Person $person): array
+	{
+		$staff = new Staff_Member($person->id);
+		if (!$staff->id) return $this->person_fields;
+		if ($staff->requires2FA()) return Array();
+		return array_diff($this->person_fields, Array('email'));
 	}
 
 	private function isMe($person)
