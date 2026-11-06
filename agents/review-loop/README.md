@@ -7,7 +7,7 @@ every jj workspace; the error-prone jj steps are scripted in `bin/review_loop`.
 
 ```
 supervisor ─ epic ─┬─ reviewers (parallel) ── file bug beads
-                   ├─ cross-review (parallel) ── comment, dedupe, close invalid
+                   ├─ cross-review (parallel, one confirmation per bug) ── comment, dedupe
                    ├─ fixers (parallel, one jj workspace each) ── failing test, fix, submit
                    ├─ integrator (one at a time, merge slot) ── fast gate tip+fix, squash, ledger
                    ├─ final gate (integrator, once per round) ── full suite; on failure bisect,
@@ -36,6 +36,11 @@ supervisor ─ epic ─┬─ reviewers (parallel) ── file bug beads
    the files without them. `review_loop resync BUG` recovers instead.
 7. **Cleanup is part of done.** `review_loop finish EPIC` must report `clean`;
    leftover workspaces and their commits otherwise clutter the repository.
+8. **Confirm each bug once, and carry the fix.** The first cross-reviewer to
+   reproduce a bug posts `CONFIRMED` with its evidence and a proposed fix.
+   Later agents read that comment: they neither re-run the reproduction nor
+   post another `CONFIRMED`, and a bug gets a further look only on a real
+   disagreement (a `DISPUTED` verdict or conflicting severity/target/origin).
 
 ## Setup (supervisor, once)
 
@@ -55,13 +60,58 @@ goes in) and test commands before starting reviewers. Every agent gets
 | Step | Who | Command | Result |
 |---|---|---|---|
 | File | reviewer | `bd create TITLE -t bug --parent EPIC --body-file BUG.md --metadata '{"target":"CHANGE","verify":"CMD"}'` | open bug |
-| Discuss | cross-reviewers | `bd comment BUG ...` | agree, dispute, `bd duplicate BUG --of OTHER`, or group under a root-cause parent |
+| Discuss | cross-reviewers | `bd comment BUG ...` | one `CONFIRMED` per bug carrying a fix proposal (see Cross-review), dispute, `bd duplicate BUG --of OTHER`, or group under a root-cause parent |
 | Triage | author | `bd close BUG --reason invalid` if disputed successfully | |
 | Fix | fixer | `review_loop workspace BUG` → test, fix → `review_loop submit BUG "one-line fix summary"` | label `ready-to-integrate` |
 | Integrate | integrator | `review_loop integrate BUG` | label `integrated` (ledger entry `#N`) or `needs-work`, gate summary comment |
 | Final gate | integrator | `review_loop final EPIC`, once every ready fix of the round is integrated | epic `final_passed_seq`, or bisect: culprit `needs-work` |
 | Close | closer | checks, then `bd close BUG --reason "..."` | closed |
 | Clean up | supervisor | `review_loop finish EPIC`, after the last round | workspaces and leftover commits gone |
+
+## Cross-review
+
+Cross-review is a check, not a second review. Each bug needs one confirmation
+across the whole pool, not one per cross-reviewer:
+
+- The first cross-reviewer to reproduce a bug comments `CONFIRMED` with the
+  command it ran, the observed result, and a proposed fix where one is clear:
+  the file/function, the change, and the test that should pin it.
+- Every other cross-reviewer reads that comment and stops there. It does not
+  re-run the reproduction or the Playwright project, and does not post a
+  second `CONFIRMED`.
+- A bug is revalidated only on a real disagreement: a `DISPUTED` verdict on
+  it, conflicting severities/targets/origins, or evidence the posted
+  reproduction is stale or wrong (a different tip, an edited test). That one
+  agent names the confirmation it disputes and gives new evidence; it does not
+  restate the original run.
+- `DUPLICATE`, `SEVERITY`, `TARGET`, `LABELS` and `ORIGIN` verdicts answer
+  different questions and need no repeat run: judge them from the posted
+  evidence, and origin against the range's base commit, which is static.
+- Author triage acts on the recorded verdicts too; it re-runs only across a
+  conflict between verdicts.
+
+The checkout's functest run lock serialises every agent, so duplicate
+reproductions queue behind each other and dominate cross-review wall time. A
+confirmation that carries the fix also saves a triage exchange and gives the
+fixer its starting point.
+
+## Finishing a run (supervisor)
+
+1. `review_loop finish EPIC` first (see hard rule 7).
+2. **Remove the supervisor's auxiliary gate workspaces** once every final gate
+   has passed and before closing the epic: the tip checkout and any sibling
+   branch checkout the review created (e.g. `deepreview-tip`,
+   `deepreview-rego`). Each must have an empty working copy — check `jj
+   status`/`jj log -r @` shows nothing unrecorded; if it holds work, report it
+   instead of deleting. Then `jj workspace forget NAME` and delete the
+   directory. The reviewed stack's own commits are unaffected: they live in the
+   repository, not in those checkouts.
+3. **Land the meta-review change on `_devtools`.** The process improvement
+   edits the review-loop kit, which lives on the `_devtools` branch, not the
+   reviewed stack. Make the change an ancestor of the `_devtools` bookmark —
+   `jj rebase -r <meta change> -B _devtools`, or move `_devtools` to a new head
+   above it. Never leave it dangling off the reviewed stack's branch point, and
+   never squash it into a reviewed commit.
 
 ## Theme labels
 

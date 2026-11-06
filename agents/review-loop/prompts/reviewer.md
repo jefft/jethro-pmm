@@ -27,6 +27,9 @@ Focus for this round: {FOCUS}
   the diff, run the one command that proves it). Run only the Playwright
   projects your focus needs, once each; check the epic for results other
   reviewers already posted and reuse them. Never run the full suite.
+- Record the exact command and the observed result in the bug. Cross-reviewers
+  reuse that evidence and must not re-run it, so one precise record is what
+  keeps the pool from repeating your run.
 - Classify every finding by origin, checking the range's base commit
   (`jj log -r 'roots({REVIEW_RANGE})-'`, the parent of the first reviewed change):
   - `introduced`: the reviewed range causes it; absent on the base.
