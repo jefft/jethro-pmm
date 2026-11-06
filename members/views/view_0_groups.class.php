@@ -20,6 +20,7 @@ class View__Groups extends View
 			return;
 		}
 
+		$GLOBALS['system']->includeDBClass('member');
 		$persons = $this->group->getMembers(Array('!(status' => Person_Status::getArchivedIDs()));
 		// The mailto is only rendered to a verified viewer, and it must carry
 		// real addresses; masking is a display concern (the member list masks

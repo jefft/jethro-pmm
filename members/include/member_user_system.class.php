@@ -455,11 +455,12 @@ If you didn't request an account, you can just ignore this email";
 		$code = generate_random_string(6, range(0, 9));
 		$codeHash = jethro_password_hash($code);
 		$reserved = $db->exec('UPDATE _person
-			SET membereditsmshash = '.$db->quote($codeHash).', membereditsmssent = NOW()
-			WHERE '.$where.' AND membereditsmsattempts < 5
+			SET membereditsmshash = '.$db->quote($codeHash).', membereditsmssent = NOW(),
+				membereditsmsattempts = 0
+			WHERE '.$where.'
 				AND (membereditsmssent IS NULL OR membereditsmssent <= NOW() - INTERVAL 60 SECOND)');
 		if (!$reserved) {
-			$this->_error = 'A code was recently requested, or no verification attempts remain. Wait at least 60 seconds before requesting another code.';
+			$this->_error = 'A code was recently requested. Wait at least 60 seconds before requesting another code.';
 			return;
 		}
 		// A resend replaces the challenge: invalidate any proof bound to the old one.
@@ -622,7 +623,7 @@ If you didn't request an account, you can just ignore this email";
 		$mobileMasked = $challenge['mobile_tel'] ?? (string)$row['mobile_tel'];
 		$digits = preg_replace('/\D/', '', $mobileMasked);
 		$masked = strlen($digits) >= 2
-			? '**** *** '.substr($digits, -2)
+			? '•••• ••• '.substr($digits, -2)
 			: 'no mobile number on your account';
 		require TEMPLATE_DIR.'/edit_verification.template.php';
 	}

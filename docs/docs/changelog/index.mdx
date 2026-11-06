@@ -91,7 +91,8 @@ open that link and explicitly request and verify an SMS code before choosing
 their new password. Requesting a link or following it never sends an SMS, preventing
 username-only requests and email-link scanners from triggering texts. Sends are
 limited to one per minute per reset. The login page also has a "Forgot your username?" form that emails the
-username(s) registered to a given address. Administrators can still set a password
+username(s) registered to a given address. Reminders include the login URL and
+bold usernames in HTML, with a plain-text alternative. Administrators can still set a password
 from the command line with `bin/jethro_resetpassword`. Set `PASSWORD_RESET_ENABLED`
 to false in `conf.php` to hide both links and disable all reset handling. Set an
 absolute `BASE_URL` (or list your hostnames in `ALLOWED_HOSTS`) in `conf.php` so
@@ -122,13 +123,21 @@ sent by SMS to the mobile number on the member's account. Editing is refused
 (or a clear error is shown) when the account has no mobile number or the SMS
 gateway is unavailable; a system administrator can change the number. Codes
 expire after ten minutes, can be requested once a minute, and allow five
-attempts. A successful save ends the verification, so the next edit needs a
-fresh code.
+attempts per code. Requesting a new code restores all five attempts; succeeding
+on the fifth attempt no longer blocks future verification requests. A successful
+save ends the verification, so the next edit needs a fresh code.
 
-Until a member has verified, email addresses and mobile numbers shown in the
-members area are masked, and mobile numbers can no longer be changed there at
-all — only through the control centre. Members can still log in without a
-code, so emailed account recovery continues to work.
+Until a member has verified, their own family's email addresses and mobile
+numbers shown in the members area are masked. Mobile numbers can no longer be
+changed there at all — only through the control centre. Members can still log
+in without a code, so emailed account recovery continues to work.
+
+Own-family home phone numbers are also masked outside the edit form. Their
+street addresses show only the leading number and first letter (for example,
+`123 E…`), or just `…` when that prefix is unavailable. Map links are hidden
+outside edit mode. The verified edit form still shows the complete address
+and home phone number. Other families' details shared through groups remain
+unmasked; sharing does not grant permission to edit them.
 
 ### 5CentSMS v5 Support
 

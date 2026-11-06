@@ -40,7 +40,7 @@ $code_sent = !empty($reset_user['resetsmshash']) && !empty($reset_user['reset_sm
 						<p class="help-inline" id="reset_sms_help">Enter the six-digit code sent to your mobile. Codes expire after 10 minutes.</p>
 					</div>
 				</div>
-				<div class="control-group">
+				<div class="control-group text-right">
 					<input type="hidden" name="reset_sms_verify" value="1" />
 					<input type="submit" class="btn" value="Verify code" />
 					<button type="submit" class="btn" name="reset_sms_send" value="1" formnovalidate>Resend code</button>
@@ -57,7 +57,7 @@ $code_sent = !empty($reset_user['resetsmshash']) && !empty($reset_user['reset_sm
 			$sm = new Staff_Member();
 			$sm->printFieldInterface('password', 'new_');
 			?>
-			<div class="control-group text-right">
+			<div class="control-group">
 				<input type="hidden" name="reset_password_submitted" value="1" />
 				<input type="submit" class="btn" value="Set new password" />
 			</div>
