@@ -37,7 +37,7 @@ scripts and the fake SMS history (`tests/functional/testdata/fakesmses.sql.gz`)
 specs must scope assertions to data unique to their own run (e.g. a
 timestamped message body — see `sms-send-single.spec.ts`) rather than
 asserting "the most recent X", since other scenarios' tests may run
-concurrently (`fullyParallel: true`, 4 workers).
+concurrently (`fullyParallel: true`, 8 workers).
 
 The same service recreates two more empty databases:
 `jethro_functest_walkthrough` (the setup-wizard test starts from nothing) and
@@ -229,7 +229,8 @@ Two sides:
   project (`tests/functional/members/member-rego.spec.ts`, the member activation
   round-trip) and the `password-reset` project
   (`tests/functional/email/password-reset.spec.ts`, the staff forgot-password and
-  forgot-username flows).
+  flows; and the `sms-2fa-password-reset` SMS scenario, covering a reset that
+  also needs an SMS code for an account whose login needs 2FA.
 
 Notes:
 
@@ -252,6 +253,12 @@ Notes:
   `notBefore` timestamp; the unknown-email notification shares one mailbox and
   subject across workers, so that assertion scans message bodies created after
   `notBefore` for the address this run submitted.
+- `password-reset.spec.ts` creates a transient staff login (`pwreset-fixture`,
+  permissions 0) for an otherwise-ordinary demo person and deletes the
+  `staff_member` row in `finally` (using `mariadb`, like `walkthrough.spec.ts`).
+  Every demo staff account — including `noperms` — is logged in by `lookaround`
+  (and the restricted personas by the `sms-*` projects) in parallel against this
+  database, so the spec must never change a shared credential.
 
 ## Running
 
