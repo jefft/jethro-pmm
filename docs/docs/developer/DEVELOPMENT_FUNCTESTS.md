@@ -263,6 +263,12 @@ Notes:
   this machine's own LAN address, and to DNS-rebinding requests. Without nginx:
   `curl --unix-socket "$MAILPIT_SOCKET_DIR/http.sock" http://localhost/emailmockserver/api/v1/messages`
   (inside `devbox shell`).
+- Preserve the browser's **full Host, including its port**, when proxying to MailPit:
+  `proxy_set_header Host $http_host;` in the `/emailmockserver/` location.
+  MailPit compares `Origin` against that host; nginx's default upstream Host causes
+  same-origin UI operations such as Delete to fail with HTTP 403 / a CORS violation.
+  Keep the Origin header and CORS checks intact rather than allowing all origins.
+  See [MailPit's proxy requirements](https://mailpit.axllent.org/docs/configuration/proxy/).
 - Every member-rego email assertion scopes by recipient and subject and passes a
   `notBefore` timestamp; the unknown-email notification shares one mailbox and
   subject across workers, so that assertion scans message bodies created after

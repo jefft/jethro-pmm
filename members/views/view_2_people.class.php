@@ -67,7 +67,8 @@ class View_People extends View
 					<div class="member-family-details">
 							<?php
 							if ($showAddress) {
-								echo nl2br(ents($member['address_street'])).'<br />';
+								$dummy->printFieldValue('address_street');
+								echo '<br />';
 								echo ents($member['address_suburb'].' '.$member['address_state'].' '.$member['address_postcode']);
 								echo '<br />';
 							}
