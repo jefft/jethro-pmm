@@ -213,6 +213,11 @@ function getSmsProvider(bool $logToDb = true): \Result
 	// user-initiated: system sends (2FA, CLI scripts such as roster
 	// reminders) skip the cooloff undo window even though they are logged.
 	// userMobile is what the _USER_MOBILE_ sender token resolves to.
+	//
+	// OTP secrecy note: SMS_VERBOSE wraps the provider's HTTP client in
+	// LoggingHttpClient, which writes request bodies — including 2FA OTPs —
+	// to error_log. Suppressing that requires editing vendored provider code,
+	// so production systems that send 2FA codes must not enable SMS_VERBOSE.
 	$provider = new \Sms\OverridingSmsProvider($provider, userInitiated: $logToDb && PHP_SAPI !== 'cli', userMobile: getCurrentUserMobileNumber());
 
 	// Not memoized — takes ~50 µs and called ~8 times in a worst-case page load.

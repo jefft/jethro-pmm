@@ -33,7 +33,10 @@ if (str_starts_with($path, '/tests/functional/')) {
         // baseurl_relative() (and hence build_url(), redirects and resource
         // links) puts every generated URL under the prefix.  The functional
         // Caddyfile maps prefixed /resources/ requests back to the real files.
-        if (!defined('BASE_URL')) define('BASE_URL', $path);
+        // A members/public area served under a scenario prefix (see the nginx
+        // rewrite) gets its area segment from get_url_pathprefix() again, so
+        // BASE_URL must hold only the scenario part of the prefix.
+        if (!defined('BASE_URL')) define('BASE_URL', preg_replace('#/(members|public)/$#', '/', $path));
         define('LOGIN_NOTE', "Config: ".substr($testConf, strlen(realpath(JETHRO_ROOT.'/../..'))));
     } elseif (!str_ends_with($path, "/resources/less/")) {
         // Missing tests/functional/something.conf or tests/functional/something/something.conf
