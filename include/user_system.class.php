@@ -734,25 +734,34 @@ If you didn't request this, you can ignore this email - your password will not c
 	}
 
 	/**
-	 * Email the username(s) registered to an address. Text-only; From-address
-	 * convention mirrors _notifySysadmins().
+	 * Email the username(s) registered to an address as HTML with a plain-text
+	 * alternative. From-address convention mirrors _notifySysadmins().
+	 * @see docs/docs/developer/reference/password-reset.mdx
 	 * @param string $email
-	 * @param array $rows	username/first_name rows for the address
+	 * @param list<array<string, mixed>> $rows Account rows with username and first_name.
 	 * @return boolean TRUE on success
 	 */
 	private function _sendUsernameEmail($email, $rows)
 	{
 		$usernames = Array();
-		foreach ($rows as $row) $usernames[] = '- '.$row['username'];
+		$htmlUsernames = Array();
+		foreach ($rows as $row) {
+			$usernames[] = $row['username'];
+			$htmlUsernames[] = '<b>'.ents($row['username']).'</b>';
+		}
 		$greeting = (count($rows) == 1) ? 'Hi '.$rows[0]['first_name'].',' : 'Hi,';
 		$body = "%s
 
-The following username(s) for user accounts at %s are registered to this email address:
+Your username to log in to %s is: %s
 
-%s
-
-If you didn't request this, you can ignore this email - no passwords have been changed.";
-		$text = sprintf($body, $greeting, SYSTEM_NAME, implode("\n", $usernames));
+If you didn't request this reminder, you can ignore this email - no passwords have been changed.";
+		$text = sprintf($body, $greeting, BASE_URL_ABSOLUTE, implode(', ', $usernames));
+		$html = sprintf(
+			nl2br($body),
+			ents($greeting),
+			'<a href="'.ents(BASE_URL_ABSOLUTE).'">'.ents(BASE_URL_ABSOLUTE).'</a>',
+			implode(', ', $htmlUsernames)
+		);
 
 		$from_address = $this->_systemEmailFromAddress();
 		if (!strlen($from_address)) return FALSE;
@@ -761,7 +770,8 @@ If you didn't request this, you can ignore this email - no passwords have been c
 			->setSubject('Username reminder for '.SYSTEM_NAME)
 			->setFrom(array($from_address => SYSTEM_NAME.' Jethro System'))
 			->setTo($email)
-			->text($text);
+			->text($text)
+			->html($html);
 		return Emailer::send($message);
 	}
 

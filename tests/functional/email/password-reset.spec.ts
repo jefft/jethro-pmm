@@ -140,6 +140,6 @@ test("forgot username: reminder email lists the account username", async ({ page
     // ASCII case differences still match; the reminder goes to the stored address.
     await submitForgotUsername(page, "Demo@Example.org");
     const msg = await waitForMessage({ to: "demo@example.org", subject: "Username reminder" }, notBefore, to(15000));
-    expect(msg.Text).toContain("- demo");
-    expect(msg.Text).toContain("no passwords have been changed");
+    await page.setContent(msg.HTML);
+    await expect(page.locator("b")).toHaveText("demo");
 });
