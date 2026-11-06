@@ -82,6 +82,29 @@ Provider configuration, balance, sender IDs and registered numbers are shown in 
 
 The legacy `SMS_SEND_LOGFILE` log file is **not** imported. Recent sends that were never recorded as notes (e.g. roster reminders sent by cron) can be pulled from your SMS provider with the new **Synchronize History** action in Admin → System Configuration → SMS Gateway (5CentSMS v5, Cellcast and MobileMessage). See [Recovering history from your SMS provider](../administration/config/sms.mdx#recovering-history-from-your-sms-provider).
 
+### Self-service password reset
+
+Staff who have forgotten their password can now choose a new one themselves, via a
+"Forgot your password?" link on the login page. Jethro emails a single-use link to the
+address on the staff account. Choosing a new password also requires a code sent by SMS
+to the mobile number on the account — for every account, even one that does not use
+two-factor authentication at login, because a compromised mailbox alone must not be
+enough. Requesting a link or following it never sends an SMS, preventing
+username-only requests and email-link scanners from triggering texts. Sends are
+limited to one per minute per reset, and a code is valid for ten minutes with two
+guesses. If SMS is not configured, or the account has no mobile number, the reset
+cannot be completed and an administrator must reset the password. The login page also
+has a "Forgot your username?" form that emails the username(s) registered to a given
+address. Administrators can still set a password from the command line with
+`bin/jethro_resetpassword`. Set `PASSWORD_RESET_ENABLED` to false in `conf.php` to
+hide both links and disable all reset handling — do this on installs that cannot send
+SMS. Set an absolute `BASE_URL` (or list your hostnames in `ALLOWED_HOSTS`) in
+`conf.php` so emailed reset links always point at your own site. See the
+[developer reference](../developer/reference/password-reset.mdx) for details.
+
+Successful reset SMS verification also satisfies the next password login in that
+browser once, within five minutes, without trusting the browser for future logins.
+
 ### 5CentSMS v5 Support
 
 Jethro has historically used the 5CentSMS v4 API, which is so old its very existence has been scrubbed from the internet.

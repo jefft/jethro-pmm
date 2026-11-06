@@ -1057,6 +1057,19 @@ function request_server_string(string $key): string
 }
 
 /**
+ * Strip control characters (including CR/LF) and non-ASCII bytes from a value
+ * before it is written to error_log(), so attacker-controlled usernames and
+ * addresses cannot forge extra log lines.
+ *
+ * @param mixed $str
+ * @return string
+ */
+function log_safe_string($str): string
+{
+    return preg_replace('/[^ -~]/', '', (string)$str);
+}
+
+/**
  * Log a login POST refused by request_origin_is_proven_current().
  *
  * @param string $area 'staff' or 'members'

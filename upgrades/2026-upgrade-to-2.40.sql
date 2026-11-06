@@ -346,6 +346,50 @@ VALUES ('SMS_VIEWSMS_GRANTED', 'hidden', '1',
 -- Idempotent: DELETE WHERE returns 0 rows if already deleted.
 DELETE FROM setting WHERE symbol = 'SMS_SEND_LOGFILE';
 
+
+-- =========================================================================
+-- Self-service staff password reset (see docs/docs/developer/reference/password-reset.mdx)
+--
+-- Per-account reset request and username-reminder state on staff_member, written
+-- by raw SQL in User_System (kept out of the ORM like _person.resethash for member resets):
+--   resethash         bcrypt hash of the single-use emailed token (never the token itself)
+--   resetexpires      when the request stops being usable (24h after it was armed)
+--   resetsmshash      bcrypt hash of the current SMS code (never the code itself)
+--   resetsmssent      last reserved SMS send, used for the 60s cooldown and 10m code expiry
+--   resetsmsattempts  total SMS codes tried against the current request (2 allowed)
+--   usernamereminded  when a "forgot username" reminder last went out (1 per hour)
+-- Every reset request requires an SMS code, so there is no separate requirement flag.
+-- Column definitions must match db_objects/staff_member.class.php getInitSQL().
+--
+-- Idempotent on both MariaDB and MySQL: MySQL has no "ADD COLUMN IF NOT EXISTS"
+-- (MariaDB-only), so build one ALTER from whichever of the columns
+-- information_schema reports as missing. CONCAT_WS skips the NULL entries, and
+-- an empty list is a no-op. Same approach as the collation ALTER above.
+SET @staff_reset_missing = CONCAT_WS(', ',
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resethash') = 0,
+		'ADD COLUMN `resethash` VARCHAR(255) DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetexpires') = 0,
+		'ADD COLUMN `resetexpires` DATETIME DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetsmshash') = 0,
+		'ADD COLUMN `resetsmshash` VARCHAR(255) DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetsmssent') = 0,
+		'ADD COLUMN `resetsmssent` DATETIME DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetsmsattempts') = 0,
+		'ADD COLUMN `resetsmsattempts` TINYINT UNSIGNED NOT NULL DEFAULT 0', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'usernamereminded') = 0,
+		'ADD COLUMN `usernamereminded` DATETIME DEFAULT NULL', NULL)
+);
+SET @staff_reset_sql = IF(@staff_reset_missing = '', 'DO 0', CONCAT('ALTER TABLE staff_member ', @staff_reset_missing));
+PREPARE staff_reset_stmt FROM @staff_reset_sql;
+EXECUTE staff_reset_stmt;
+DEALLOCATE PREPARE staff_reset_stmt;
+
 -- Expose the sendmail transport alternative on the System Configuration page.
 -- Synced with include/installer.class.php and include/config_manager.class.php
 -- (isFileOnlySetting). Idempotent.
