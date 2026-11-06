@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<?php include 'head.template.php' ?>
+	<?php
+	$GLOBALS['datastarNeeded'] = FALSE; // High-traffic page with no Datastar markup; see docs/docs/developer/reference/datastar.md
+	include 'head.template.php';
+	?>
 </head>
 <body id="login">
 	<form method="post" id="login-box" class="well">
@@ -43,7 +46,7 @@
 			<div class="control-group">
 				<div class="controls">
 					<input type="submit" value="Log In" class="btn" />
-					<input type="hidden" name="login_key" value="<?php echo $login_key; ?>" /><br />
+					<br />
 				</div>
 			</div>
 		<?php

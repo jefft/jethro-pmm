@@ -1,0 +1,17 @@
+---
+requires_db_upgrade: false
+---
+
+### SMS: shorter alternative wording
+
+A message to many people that runs just over a segment boundary costs twice as much as one that fits. When you write an SMS to several people that is longer than one segment, the composer can now suggest a [shorter alternative](../user-manual/sms.mdx#shorter-alternative): a rewording that keeps your voice and uses one segment fewer. Pause typing for 3 seconds and it fades in beside the message, headed by what it saves:
+
+> **Shorter alternative** (Reduces cost from $2.40 to $1.20):<br/>
+> Hi %firstname%, working bee Sat 8am-noon at the hall. Bring gloves, hat & water.<br/>
+> <u>Use instead?</u> (shorter | longer)
+
+Click **Use instead?** to replace your message with the suggestion, which you can then edit; keep typing and the suggestion disappears. **(shorter | longer)** asks for a new wording one segment shorter or longer. Suggestions keep `%tokens%`, URLs and phone numbers, but they are written by an AI model, so read one before sending it.
+
+A suggestion is only offered when it saves at least $1 across all recipients. Administrators can change that with [`SMS_SHORTEN_MESSAGE_MINSAVINGS`](../administration/config/sms.mdx#cost-and-url-shortening), and use [`SMS_SHORTEN_MESSAGE_LIMIT`](../administration/config/sms.mdx#cost-and-url-shortening) to offer suggestions only for messages a little over a segment boundary.
+
+<details><summary>Turning on SMS shortening</summary>SMS shortening is free but off by default. An administrator turns it on in the 'jethro.au Services' section of the configuration page by agreeing to its [privacy terms](https://jethro.au/sms-shortener/privacy): the text of qualifying messages (not recipients' names or numbers) is sent to jethro.au and processed by Cloudflare Workers AI, and neither keeps it. Consider leaving it off if your SMSes carry sensitive pastoral information. Its source code is at https://github.com/jethro-chms/jethro-sms-shortener (Apache-2.0), and Jethro installs its client with Composer as `jethro/jethro-sms-shortener`.</details>

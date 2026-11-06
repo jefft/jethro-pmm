@@ -1,4 +1,9 @@
 <?php
+// \Result comes from jethro/jethro-utils, shared with jethro/jethro-sms.
+// Loaded directly: this file runs before (and often without) the Composer
+// autoloader.
+require_once __DIR__ . '/../vendor/jethro/jethro-utils/src/Result.php';
+
 function array_get($array, $index, $alt=NULL)
 {
 	if (array_key_exists($index, $array)) {
@@ -233,6 +238,10 @@ function print_message($msg, $class='success', $html=FALSE)
 
 function print_widget($name, $params, $value)
 {
+	if (!\is_array($params)) {
+		trigger_error('$params is ' . \gettype($params) . ' for widget "' . $name . '"', E_USER_WARNING);
+		return;
+	}
 	$classes = array_get($params, 'class', '');
 	if (!array_get($params, 'allow_empty', 1)) {
 		$classes .= ' compulsory';
@@ -249,6 +258,10 @@ function print_widget($name, $params, $value)
 			?>
 			<input name="<?php echo $name; ?>" type="tel" size="<?php echo $width+3; ?>" value="<?php echo format_phone_number($value, $params['formats']); ?>" class="phone-number" validlengths="<?php echo implode(',', $lengths); ?>" <?php echo $attrs; ?> />
 			<?php
+			break;
+		case 'person':
+			require_once JETHRO_ROOT . '/db_objects/person.class.php';
+			Person::printSingleFinder((string) $name, $value ? (int) $value : null);
 			break;
 		case 'bibleref':
 			require_once 'bible_ref.class.php';
@@ -402,7 +415,7 @@ function print_widget($name, $params, $value)
 				<?php
 			} else {
 				// Some JS needs to know this
-				$attrs .= ' data-allow-empty='.(int)array_get($params, 'allow_empty');
+				$attrs .= ' data-allow-empty="'.(int)array_get($params, 'allow_empty').'"';
 				?>
 				<select name="<?php echo $name; ?>" class="<?php echo $classes;?>" <?php echo $attrs; ?> >
 					<?php
@@ -944,7 +957,7 @@ function urls_have_same_origin(string $a, string $b): bool
  * TRUE  - same-origin, per Sec-Fetch-Site, or a matching Origin/Referer fallback.
  * FALSE - explicitly same-site, cross-site, none, or a mismatched fallback.
  * NULL  - no provenance signal; callers should preserve legacy behaviour
- *         (SameSite=Lax plus any per-form token).
+ *         (rely on the session cookie's SameSite=Lax).
  *
  * Sec-Fetch-Site is authoritative when present. 'same-site' is rejected because
  * Jethro tenants can share a registrable domain, so a sibling subdomain is not
@@ -980,14 +993,79 @@ function request_origin_verdict(?string $sec_fetch_site, string $origin, string 
  */
 function request_origin_verdict_current(): ?bool
 {
-    $origin = isset($_SERVER['HTTP_ORIGIN']) && is_string($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
-    $referer = isset($_SERVER['HTTP_REFERER']) && is_string($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
     return request_origin_verdict(
         request_sec_fetch_site(),
-        $origin,
-        $referer,
+        request_server_string('HTTP_ORIGIN'),
+        request_server_string('HTTP_REFERER'),
         request_scheme_and_host()
     );
+}
+
+/**
+ * Whether the browser positively vouches that a request is same-origin.
+ *
+ * Stricter than request_origin_verdict(): TRUE only for
+ * `Sec-Fetch-Site: same-origin`, or, when that header is absent, a matching
+ * Origin header. Referer is not accepted (clients forge same-host Referers), and
+ * a request with no signal is FALSE. Current browsers send Sec-Fetch-Site or
+ * Origin on every form POST; scanners and scripts usually send neither.
+ *
+ * Used to gate login POSTs so they reach the password check only when sent by a
+ * browser from a Jethro page.
+ *
+ * @see docs/docs/developer/reference/request-origin-protection.mdx
+ * @param string|null $sec_fetch_site Value from request_sec_fetch_site()
+ * @param string $origin Value of the HTTP Origin header, if any
+ * @param string $expected_origin The current request's scheme://host[:port]
+ * @return bool
+ */
+function request_origin_is_proven(?string $sec_fetch_site, string $origin, string $expected_origin): bool
+{
+    if ($sec_fetch_site !== NULL) {
+        return $sec_fetch_site === 'same-origin';
+    }
+    return $origin !== '' && urls_have_same_origin($origin, $expected_origin);
+}
+
+/**
+ * request_origin_is_proven() for the current request.
+ *
+ * @see docs/docs/developer/reference/request-origin-protection.mdx
+ * @return bool
+ */
+function request_origin_is_proven_current(): bool
+{
+    return request_origin_is_proven(
+        request_sec_fetch_site(),
+        request_server_string('HTTP_ORIGIN'),
+        request_scheme_and_host()
+    );
+}
+
+/**
+ * A $_SERVER entry as a string, '' when absent or not a string. Used for
+ * request headers (e.g. 'HTTP_ORIGIN') and for request metadata such as
+ * 'REQUEST_URI'.
+ *
+ * @param string $key $_SERVER key
+ * @return string
+ */
+function request_server_string(string $key): string
+{
+    $value = $_SERVER[$key] ?? '';
+    return is_string($value) ? $value : '';
+}
+
+/**
+ * Log a login POST refused by request_origin_is_proven_current().
+ *
+ * @param string $area 'staff' or 'members'
+ * @return void
+ */
+function log_unproven_login_origin(string $area): void
+{
+    error_log('Refused '.$area.' login: browser did not confirm a same-origin request (Sec-Fetch-Site='
+        .(request_sec_fetch_site() ?? 'absent').', Origin='.str_replace(["\r", "\n"], '', request_server_string('HTTP_ORIGIN') ?: 'absent').')');
 }
 
 /**
@@ -996,7 +1074,7 @@ function request_origin_verdict_current(): ?bool
  * Called from include/init.php for every web request, before the database and
  * session are set up. Safe methods are ignored. Requests with no provenance
  * signal are allowed, preserving compatibility with CLI/curl clients and older
- * browsers; those keep SameSite=Lax and per-form token protection.
+ * browsers; those rely on the session cookie's SameSite=Lax.
  *
  * A rejection is a plain 403 and an error_log line. It is not an application
  * error, so it must not produce a stacktrace, a 500 response, or an email.
@@ -1014,7 +1092,7 @@ function enforce_request_origin(): void
     if (request_origin_verdict_current() !== FALSE) return;
 
     $site = request_sec_fetch_site() ?? 'absent';
-    $uri = isset($_SERVER['REQUEST_URI']) && is_string($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+    $uri = request_server_string('REQUEST_URI');
     $uri = str_replace(["\r", "\n"], '', $uri);
     error_log('Blocked '.$method.' '.$uri.': request came from another origin (Sec-Fetch-Site='.$site.')');
 
@@ -1343,97 +1421,3 @@ function safe_subdirectory($base, $path) {
             ? false
             : substr($realpath, strlen($base) + 1);
 }
-
-// ---------------------------------------------------------------------------
-// Result monad
-// ---------------------------------------------------------------------------
-
-/**
- * Result monad — a value that is either Success(T) or Failure(E).
- *
- * Failures carry an informational error payload (typically a string)
- * describing what went wrong, so callers can present a meaningful
- * message to the user without a separate error channel.
- *
- * Transform the value inside a Result with {@see map()}, which applies
- * a function to the success value while automatically propagating
- * failures.  Branch on success or failure with {@see isSuccess()} /
- * {@see isFailure()}, then extract the inner value with
- * {@see getValue()} or the error with {@see getError()}.
- *
- * @template T  The type of the success value.
- * @template E  The type of the error payload (usually string).
- *
- */
-final class Result
-{
-	private function __construct(
-		private readonly mixed $value,
-		private readonly mixed $error,
-		private readonly bool $isSuccess,
-	) {
-	}
-
-	/**
-	 * @param T $value
-	 *
-	 * @return self<T, E>
-	 */
-	public static function success(mixed $value): self
-	{
-		return new self($value, null, true);
-	}
-
-	/**
-	 * @param E $error
-	 *
-	 * @return self<T, E>
-	 */
-	public static function failure(mixed $error): self
-	{
-		return new self(null, $error, false);
-	}
-
-	public function isSuccess(): bool
-	{
-		return $this->isSuccess;
-	}
-
-	public function isFailure(): bool
-	{
-		return !$this->isSuccess;
-	}
-
-	/**
-	 * @return T
-	 */
-	public function getValue(): mixed
-	{
-		return $this->value;
-	}
-
-	/**
-	 * @return E
-	 */
-	public function getError(): mixed
-	{
-		return $this->error;
-	}
-
-	/**
-	 * If success, apply $fn to the value and return a new Result.
-	 * If failure, propagate the error unchanged.
-	 *
-	 * @template U
-	 * @param callable(T): U $fn
-	 * @return Result<U, E>
-	 */
-	public function map(callable $fn): self
-	{
-		if ($this->isFailure()) {
-			return $this;
-		}
-		return self::success($fn($this->value));
-	}
-}
-
