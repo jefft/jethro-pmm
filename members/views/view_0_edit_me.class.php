@@ -5,7 +5,8 @@ class View__Edit_Me extends View
 	private $persons = Array();
 	private $hasAdult = FALSE;
 	private $hasHidden = FALSE;
-	private $person_fields = Array('gender', 'age_bracketid', 'email', 'mobile_tel', 'work_tel', 'photo');
+	private $person_fields = Array('gender', 'age_bracketid', 'email', 'work_tel', 'photo');
+	private $liveMember = NULL;
 
 	public function __construct()
 	{
@@ -22,16 +23,30 @@ class View__Edit_Me extends View
 	
 	function canEditFamily()
 	{
-		// Non-adults can only edit if there are no adults in the family
+		// Non-adults can only edit if there are no adults in the family.
+		// Uses the live member row where available: a family move or age-bracket
+		// change after login must not be honoured from the stale session snapshot.
+		$ageBracketId = $this->liveMember ? $this->liveMember['age_bracketid']
+			: $GLOBALS['user_system']->getCurrentMember('age_bracketid');
 		return
-			in_array($GLOBALS['user_system']->getCurrentMember('age_bracketid'), Age_Bracket::getAdults())
+			in_array($ageBracketId, Age_Bracket::getAdults())
 			|| !$this->hasAdult
 		;
 	}
-	
+
 	function processView()
 	{
-		$this->family = $GLOBALS['system']->getDBOBject('family', $GLOBALS['user_system']->getCurrentMember('familyid'));
+		if (!$GLOBALS['user_system']->requireVerifiedMemberEdit()) {
+			// SMS gate handled the request; the edit form must not load or save.
+			return;
+		}
+		// Edit authority is bound to the live family: reload it, not the
+		// login-time session snapshot, so a family move invalidates stale access.
+		$liveRow = NULL;
+		$db = $GLOBALS['db'];
+		$liveRow = $db->queryRow('SELECT * FROM _person WHERE id = '.(int)$_SESSION['member']['id']);
+		$this->liveMember = $liveRow;
+		$this->family = $GLOBALS['system']->getDBOBject('family', $liveRow ? (int)$liveRow['familyid'] : $GLOBALS['user_system']->getCurrentMember('familyid'));
 		foreach ($this->family->getMemberData() as $id => $member) {
 			$p = $GLOBALS['system']->getDBObject('person', $id);
 			if ($p) {
@@ -47,6 +62,11 @@ class View__Edit_Me extends View
 		}
 		
 		if (array_get($_POST, 'family_details_submitted')) {
+			if (!$GLOBALS['user_system']->hasVerifiedMemberEdit()) {
+				// Proof expired or bindings changed mid-form: refuse the save.
+				add_message('Your verification has expired. Please verify again.', 'error');
+				return;
+			}
 			if ($this->canEditFamily()) {
 				$this->family->processForm();
 				$this->family->save();
@@ -62,16 +82,22 @@ class View__Edit_Me extends View
 					$person->releaseLock();
 				}
 			}
-			
+
+			$GLOBALS['user_system']->consumeMemberEditVerification();
 			add_message("Details saved");
 			redirect('home');
-			
+
 		}
 		
 	}
 	
 	function printView()
 	{
+		if (!$GLOBALS['user_system']->hasVerifiedMemberEdit()) {
+			// No lock, no family/person rendering, no contact values.
+			$GLOBALS['user_system']->printMemberEditVerification();
+			return;
+		}
 		$ok = true;
 
 		if ($this->canEditFamily()) {
@@ -182,6 +208,8 @@ class View__Edit_Me extends View
 	/**
 	 * Member-editable fields; staff recovery contacts are control-centre-only.
 	 * Staff requiring 2FA retain the full member-area edit prohibition.
+	 * Mobile numbers are never member-editable (administrator-managed: the
+	 * members SMS gate sends to the stored mobile).
 	 *
 	 * @see docs/docs/developer/reference/members-contact-protection.mdx
 	 * @param Person $person
@@ -192,7 +220,7 @@ class View__Edit_Me extends View
 		$staff = new Staff_Member($person->id);
 		if (!$staff->id) return $this->person_fields;
 		if ($staff->requires2FA()) return Array();
-		return array_diff($this->person_fields, Array('email', 'mobile_tel'));
+		return array_diff($this->person_fields, Array('email'));
 	}
 
 	private function isMe($person)

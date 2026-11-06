@@ -36,6 +36,67 @@ class Member extends DB_Object
 
 	}
 
+	/**
+	 * Mask a contact value for display before member-edit SMS verification:
+	 * email "x***@domain", mobile "**** *** nn" (final two digits). Empty
+	 * stays empty. Called for member-area sessions only.
+	 * @param string $field 'email' or 'mobile_tel'
+	 * @param string $value
+	 * @return string
+	 */
+	public static function maskContact($field, $value)
+	{
+		$value = (string)$value;
+		if ($value === '') return '';
+		if ($field == 'email') {
+			$at = strpos($value, '@');
+			if ($at === FALSE) return '***';
+			return substr($value, 0, 1).'***@'.substr($value, $at + 1);
+		}
+		$digits = preg_replace('/\D/', '', $value);
+		return strlen($digits) >= 2 ? '**** *** '.substr($digits, -2) : '****';
+	}
+
+	/**
+	 * True when member-area contact values may be shown unmasked: a verified
+	 * member edit session. Outside the members area (no Member_User_System),
+	 * values are never masked here.
+	 * @return bool
+	 */
+	private static function contactsRevealed()
+	{
+		$us = $GLOBALS['user_system'] ?? NULL;
+		if (!$us instanceof Member_User_System) return TRUE;
+		return $us->hasVerifiedMemberEdit();
+	}
+
+	public function getFormattedValue($name, $value = NULL)
+	{
+		if (!$this->contactsRevealed() && in_array($name, Array('email', 'mobile_tel'))) {
+			return self::maskContact($name, array_get($this->values, $name));
+		}
+		return parent::getFormattedValue($name, $value);
+	}
+
+	public function printFieldValue($name, $value = NULL)
+	{
+		if (!$this->contactsRevealed() && in_array($name, Array('email', 'mobile_tel'))) {
+			// Plain text mask: no tel:/mailto link that could carry the real value.
+			echo ents(self::maskContact($name, array_get($this->values, $name)));
+			return;
+		}
+		parent::printFieldValue($name, $value);
+	}
+
+	public function printFieldInterface($name, $prefix = '')
+	{
+		if (!$this->contactsRevealed() && in_array($name, Array('email', 'mobile_tel'))) {
+			echo ents(self::maskContact($name, array_get($this->values, $name)));
+			return;
+		}
+		parent::printFieldInterface($name, $prefix);
+	}
+
 	static function getList($search=NULL, $congregationid=NULL)
 	{
 		$t = new Member();

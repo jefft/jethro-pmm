@@ -286,6 +286,7 @@ If you didn't request an account, you can just ignore this email";
 	 * Set the session as not having any member logged in
 	 */
 	private function _clearAuthMember() {
+		unset($_SESSION['member_edit_verified'], $_SESSION['member_edit_challenge']);
 		$_SESSION['member'] = NULL;
 		$_SESSION['login_time'] = NULL;
 		$_SESSION['last_activity_time'] = NULL;
@@ -390,6 +391,250 @@ If you didn't request an account, you can just ignore this email";
 		if ($staff_member->requires2FA()) {
 			throw new \RuntimeException("Attempt to change 2FA user's mobile number via the members interface");
 		}
+	}
+
+	//-- Member-area edit SMS step-up ------------------------------------------
+
+	/**
+	 * Live person row for the signed-in member, read from _person at call time
+	 * (not the login-time session snapshot). Null when the account is archived.
+	 * @return array|null
+	 */
+	private function _loadLiveMember()
+	{
+		$memberId = (int)$_SESSION['member']['id'];
+		if (!$memberId) return NULL;
+		$db = $GLOBALS['db'];
+		return $db->queryRow('SELECT p.*, ps.is_archived
+				FROM _person p
+				JOIN person_status ps ON ps.id = p.status
+				WHERE p.id = '.$memberId);
+	}
+
+	/**
+	 * Why a member-edit verification code cannot be sent right now, or null.
+	 * Unlike the staff login preflight this is unconditional: the member-area
+	 * edit gate is mandatory and staff 2FA settings (2FA_ENABLED etc.) do not
+	 * exempt members. SMS_2FA_BLOCK_MESSAGES still blocks, for demo installs.
+	 * @return string|null
+	 */
+	private function _memberEditSmsBlocked()
+	{
+		if (Jethro\Sms\legacyTfaGatewayConstantsDefined()) {
+			return 'conf.php still defines 2FA_SMS_* settings for a dedicated 2FA SMS gateway, which Jethro no longer supports';
+		}
+		if (!Jethro\Sms\isConfigured()) {
+			return 'no SMS gateway is configured';
+		}
+		list($sender, $problem) = $this->_twoFASender();
+		if ($sender === null) {
+			return $problem;
+		}
+		return NULL;
+	}
+
+	/**
+	 * Send a member-edit verification code to the member's CURRENT stored
+	 * mobile. Explicit POST only (never automatic on page view); recipient is
+	 * always the live database row, never request data.
+	 *
+	 * Challenge state lives in _person: membereditsmshash/sent/attempts, raw
+	 * SQL like the staff reset fields. A database-backed 60-second cooldown
+	 * and 10-minute validity are shared across sessions; five attempts per
+	 * challenge. The code is never logged; a failed send clears only its own
+	 * hash and keeps the cooldown.
+	 * @return void
+	 */
+	private function _processMemberEditSmsSend()
+	{
+		if (!request_origin_is_proven_current()) return; // scanner POST: silently ignore
+		$row = $this->_loadLiveMember();
+		if ($row === NULL || !empty($row['is_archived'])) return;
+		$db = $GLOBALS['db'];
+		$where = 'id = '.(int)$row['id'];
+		$code = generate_random_string(6, range(0, 9));
+		$codeHash = jethro_password_hash($code);
+		$reserved = $db->exec('UPDATE _person
+			SET membereditsmshash = '.$db->quote($codeHash).', membereditsmssent = NOW()
+			WHERE '.$where.' AND membereditsmsattempts < 5
+				AND (membereditsmssent IS NULL OR membereditsmssent <= NOW() - INTERVAL 60 SECOND)');
+		if (!$reserved) {
+			$this->_error = 'A code was recently requested, or no verification attempts remain. Wait at least 60 seconds before requesting another code.';
+			return;
+		}
+		// A resend replaces the challenge: invalidate any proof bound to the old one.
+		unset($_SESSION['member_edit_verified']);
+		require_once JETHRO_ROOT.'/include/jethro_sms.php';
+		$problem = !strlen((string)$row['mobile_tel'])
+			? 'there is no mobile number on your account'
+			: $this->_memberEditSmsBlocked();
+		if ($problem === NULL && !$this->_send2FAMessage(
+				$code.' is your code to edit your details on '.SYSTEM_NAME, $row)) {
+			$problem = 'the SMS gateway could not send the code';
+		}
+		if ($problem !== NULL) {
+			// Keep the cooldown even on failure. A delayed failure must not
+			// clear a newer challenge.
+			$db->exec('UPDATE _person SET membereditsmshash = NULL
+				WHERE '.$where.' AND membereditsmshash = '.$db->quote($codeHash));
+			$this->_error = 'Cannot send a verification code because '.$problem.'. Contact your system administrator, or try again after 60 seconds.';
+			return;
+		}
+		// Bind the pending challenge to the bindings it was sent against:
+		// verification compares these against the live database, so a mobile
+		// or family change requires a new send.
+		$_SESSION['member_edit_challenge'] = Array(
+			'personid' => (int)$row['id'],
+			'familyid' => (int)$row['familyid'],
+			'mobile_tel' => (string)$row['mobile_tel'],
+			'hash' => $codeHash,
+		);
+		add_message('A verification code has been sent to the mobile number on your account. It expires after 10 minutes.', 'success');
+	}
+
+	/**
+	 * Verify a member-edit SMS code without authenticating a login. Grants a
+	 * five-minute edit authority bound to member, family, mobile and the exact
+	 * challenge hash; rechecked against the live database on every protected
+	 * request. Row lock serializes attempts like the staff reset flow.
+	 * @return void
+	 */
+	private function _processMemberEditSmsVerification()
+	{
+		if (!request_origin_is_proven_current()) return;
+		$challenge = $_SESSION['member_edit_challenge'] ?? NULL;
+		$row = $this->_loadLiveMember();
+		if ($challenge === NULL || $row === NULL || !empty($row['is_archived'])) {
+			$this->_error = 'No verification code is pending. Open Edit and request a new code.';
+			return;
+		}
+		// The code only counts for the bindings it was sent against.
+		if ((int)$challenge['personid'] !== (int)$row['id']
+				|| (int)$challenge['familyid'] !== (int)$row['familyid']
+				|| $challenge['mobile_tel'] !== (string)$row['mobile_tel']) {
+			$this->_error = 'Your account details have changed since the code was sent. Request a new code.';
+			return;
+		}
+		$db = $GLOBALS['db'];
+		$hash = (string)$challenge['hash'];
+		$match = 'id = '.(int)$row['id'].' AND membereditsmshash = '.$db->quote($hash).'
+				AND membereditsmssent > NOW() - INTERVAL 10 MINUTE';
+		$db->beginTransaction();
+		try {
+			$found = $db->queryOne('SELECT membereditsmsattempts FROM _person WHERE '.$match.' FOR UPDATE');
+			if (empty($hash) || $found === NULL) {
+				$db->rollBack();
+				$this->_error = 'That code has expired or been replaced. Request a new code.';
+				return;
+			}
+			$reserved = $db->exec('UPDATE _person SET membereditsmsattempts = membereditsmsattempts + 1
+				WHERE '.$match.' AND membereditsmsattempts < 5');
+			if (!$reserved) {
+				$db->rollBack();
+				$this->_error = 'Too many code attempts. Please request a new code.';
+				return;
+			}
+			$code = trim((string)array_get($_POST, 'member_edit_sms_code', ''));
+			$correct = strlen($code) > 0 && password_verify($code, $hash);
+			$exhausted = !$correct && ((int)$found + 1 >= 5);
+			if ($exhausted) {
+				$db->exec('UPDATE _person
+					SET membereditsmshash = NULL, membereditsmssent = NULL, membereditsmsattempts = 0
+					WHERE '.$match);
+			}
+			$db->commit();
+		} catch (\Throwable $e) {
+			$db->rollBack();
+			throw $e;
+		}
+		if (!$correct) {
+			if ($exhausted) {
+				unset($_SESSION['member_edit_challenge']);
+				error_log('MEMBER EDIT VERIFICATION ABANDONED: wrong SMS codes for id='.$row['id'].' remote='.array_get($_SERVER, 'REMOTE_ADDR', '-'));
+				$this->_error = 'Too many incorrect codes. Please request a new code.';
+			} else {
+				$this->_error = 'Incorrect code. Please try again.';
+			}
+			return;
+		}
+		session_regenerate_id(true);
+		$_SESSION['member_edit_verified'] = Array(
+			'personid' => (int)$row['id'],
+			'familyid' => (int)$row['familyid'],
+			'mobile_tel' => (string)$row['mobile_tel'],
+			'hash' => $hash,
+			'expires' => time() + 300,
+		);
+	}
+
+	/**
+	 * Whether the current session holds valid member-edit authority, rechecked
+	 * against the live database: expiry, archival, family/mobile change or a
+	 * newer challenge each void it.
+	 * @return bool
+	 */
+	public function hasVerifiedMemberEdit()
+	{
+		$proof = $_SESSION['member_edit_verified'] ?? NULL;
+		if (!is_array($proof) || $proof['expires'] < time()) return FALSE;
+		$row = $this->_loadLiveMember();
+		if ($row === NULL || !empty($row['is_archived'])) return FALSE;
+		return (int)$proof['personid'] === (int)$row['id']
+			&& (int)$proof['familyid'] === (int)$row['familyid']
+			&& $proof['mobile_tel'] === (string)$row['mobile_tel']
+			&& $proof['hash'] === (string)$row['membereditsmshash'];
+	}
+
+	/**
+	 * True when the current request may proceed into the member edit view:
+	 * already verified, or a send/verify POST has just been handled. The edit
+	 * view must recheck hasVerifiedMemberEdit() before rendering or saving.
+	 * @return bool
+	 */
+	public function requireVerifiedMemberEdit()
+	{
+		if (!empty($_SESSION['member'])) {
+			foreach (Array('member_edit_sms_send', 'member_edit_sms_verify') as $action) {
+				if (!empty($_POST[$action])) {
+					if ($action === 'member_edit_sms_send') {
+						$this->_processMemberEditSmsSend();
+					} else {
+						$this->_processMemberEditSmsVerification();
+					}
+				}
+			}
+		}
+		return $this->hasVerifiedMemberEdit();
+	}
+
+	/**
+	 * Render the SMS gate shown instead of the edit form before verification:
+	 * explicit Send and Verify forms (never an automatic send), masked
+	 * recipient, and the administrator-help fallback. No contact values beyond
+	 * the mask are exposed.
+	 * @return void
+	 */
+	public function printMemberEditVerification()
+	{
+		$row = $this->_loadLiveMember();
+		if ($row === NULL || !empty($row['is_archived'])) return;
+		$challenge = $_SESSION['member_edit_challenge'] ?? NULL;
+		$mobileMasked = $challenge['mobile_tel'] ?? (string)$row['mobile_tel'];
+		$digits = preg_replace('/\D/', '', $mobileMasked);
+		$masked = strlen($digits) >= 2
+			? '**** *** '.substr($digits, -2)
+			: 'no mobile number on your account';
+		require TEMPLATE_DIR.'/edit_verification.template.php';
+	}
+
+	/**
+	 * Consume the edit authority after a successful save; the next edit
+	 * requires a fresh verification.
+	 * @return void
+	 */
+	public function consumeMemberEditVerification()
+	{
+		unset($_SESSION['member_edit_verified']);
 	}
 
 }
