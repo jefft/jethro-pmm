@@ -13,6 +13,12 @@ class View_Home extends View
 	function printView()
 	{
 		$GLOBALS['system']->includeDBClass('member');
+		$familyID = Member::getCurrentFamilyID();
+		$family = $familyID ? $GLOBALS['system']->getDBObject('family', $familyID) : NULL;
+		if (!$family) {
+			print_message('Your family details are unavailable. Please contact your system administrator.', 'error');
+			return;
+		}
 		?>
 		<div class="member-homepage-container">
 			
@@ -94,7 +100,6 @@ class View_Home extends View
 				My Family
 			</h3>
 			<?php
-			$family = $GLOBALS['system']->getDBObject('family', $GLOBALS['user_system']->getCurrentMember('familyid'));
 			$persons = $family->getMemberData();
 			unset($family->fields['status']);
 
@@ -104,7 +109,12 @@ class View_Home extends View
 				<?php
 			}
 
-			$family->printSummary();
+			// Use member-area masking rather than Family's full-address/map renderer.
+			$summary = new Member();
+			$summary->fields = $family->fields;
+			$summary->populate($family->id, $family->values);
+			$summary->values['familyid'] = $family->id;
+			$summary->printSummary();
 			echo '<div class="member-family-members" style="clear: both">';
 			include 'templates/member_list.template.php';
 			echo '</div>';

@@ -95,12 +95,13 @@ limited to one per minute per reset, and a code is valid for ten minutes with tw
 guesses. If SMS is not configured, or the account has no mobile number, the reset
 cannot be completed and an administrator must reset the password. The login page also
 has a "Forgot your username?" form that emails the username(s) registered to a given
-address. Administrators can still set a password from the command line with
-`bin/jethro_resetpassword`. Set `PASSWORD_RESET_ENABLED` to false in `conf.php` to
-hide both links and disable all reset handling — do this on installs that cannot send
-SMS. Set an absolute `BASE_URL` (or list your hostnames in `ALLOWED_HOSTS`) in
-`conf.php` so emailed reset links always point at your own site. See the
-[developer reference](../developer/reference/password-reset.mdx) for details.
+address. Reminders include the login URL and bold usernames in HTML, with a
+plain-text alternative. Set `PASSWORD_RESET_ENABLED` to false in
+`conf.php` to hide both links and disable all reset handling — do this on installs
+that cannot send SMS. Set an absolute `BASE_URL` (or list your hostnames in
+`ALLOWED_HOSTS`) in `conf.php` so emailed reset links always point at your own
+site. See the [developer reference](../developer/reference/password-reset.mdx) for
+details.
 
 Successful reset SMS verification also satisfies the next password login in that
 browser once, within five minutes, without trusting the browser for future logins.
