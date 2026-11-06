@@ -105,6 +105,30 @@ SMS. Set an absolute `BASE_URL` (or list your hostnames in `ALLOWED_HOSTS`) in
 Successful reset SMS verification also satisfies the next password login in that
 browser once, within five minutes, without trusting the browser for future logins.
 
+### Staff contact protection in the members area
+
+Email addresses and mobile numbers for anyone with a control centre account can
+now only be changed through the control centre, not through the members area.
+This applies to both self-edits and family-member edits, including inactive
+accounts and accounts without mandatory two-factor authentication. The fields
+remain visible as read-only inputs, with a security explanation on hover.
+Other existing member-area editing permissions are unchanged.
+
+### Verification required to edit in the members area
+
+Editing family details in the members area now requires a verification code
+sent by SMS to the mobile number on the member's account. Editing is refused
+(or a clear error is shown) when the account has no mobile number or the SMS
+gateway is unavailable; a system administrator can change the number. Codes
+expire after ten minutes, can be requested once a minute, and allow five
+attempts. A successful save ends the verification, so the next edit needs a
+fresh code.
+
+Until a member has verified, email addresses and mobile numbers shown in the
+members area are masked, and mobile numbers can no longer be changed there at
+all — only through the control centre. Members can still log in without a
+code, so emailed account recovery continues to work.
+
 ### 5CentSMS v5 Support
 
 Jethro has historically used the 5CentSMS v4 API, which is so old its very existence has been scrubbed from the internet.
@@ -222,15 +246,6 @@ Refusals are written to the web server's PHP error log, as
 [Request origin protection](../developer/reference/request-origin-protection.mdx)
 for the full rules.
 ## Version 2.39 (unreleased)
-
-### Staff contact protection in the members area
-
-Email addresses and mobile numbers for anyone with a control centre account can
-only be changed through the control centre, not through the members area.
-This applies to self and family-member edits, including inactive accounts and
-accounts without mandatory two-factor authentication. Protected contacts remain
-visible as read-only inputs with a security explanation on hover. Other existing
-member-area editing permissions are unchanged.
 
 ### Service Planning
 

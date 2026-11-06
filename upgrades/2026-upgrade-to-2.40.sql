@@ -16,8 +16,69 @@ VALUES ('NEEDS_UTF8MB4_UPGRADE', 'hidden', "1", "Whether the database charset up
 DROP FUNCTION IF EXISTS getCurrentMemberID;
 CREATE FUNCTION getCurrentMemberID() RETURNS INTEGER NO SQL RETURN @current_member_id;
 
+-- =========================================================================
+-- Member-area edit SMS challenge (see docs/docs/developer/reference/password-reset.mdx)
+--
+-- Per-person step-up verification state for members-area edits ("Edit My
+-- Family"), written by raw SQL in Member_User_System (kept out of the ORM like
+-- _person.resethash for member resets):
+--   membereditsmshash     bcrypt hash of the current SMS code (never the code itself)
+--   membereditsmssent     last reserved SMS send, used for the 60s cooldown and 10m code expiry
+--   membereditsmsattempts total SMS codes tried against the current challenge (5 allowed)
+-- Column definitions must match db_objects/person.class.php getInitSQL().
+--
+-- This block runs before the `person` view is recreated below, because the view
+-- lists its columns explicitly and is therefore built from whatever _person
+-- holds at creation time: if the view were created first, a second upgrade pass
+-- would pick the new columns up and change the view definition.
+--
+-- Idempotent: portable information_schema ALTER pattern (as for staff_member below).
+SET @member_edit_missing = CONCAT_WS(', ',
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = '_person' AND column_name = 'membereditsmshash') = 0,
+		'ADD COLUMN `membereditsmshash` VARCHAR(255) DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = '_person' AND column_name = 'membereditsmssent') = 0,
+		'ADD COLUMN `membereditsmssent` DATETIME DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = '_person' AND column_name = 'membereditsmsattempts') = 0,
+		'ADD COLUMN `membereditsmsattempts` TINYINT UNSIGNED NOT NULL DEFAULT 0', NULL)
+);
+SET @member_edit_sql = IF(@member_edit_missing = '', 'DO 0', CONCAT('ALTER TABLE _person ', @member_edit_missing));
+PREPARE member_edit_stmt FROM @member_edit_sql;
+EXECUTE member_edit_stmt;
+DEALLOCATE PREPARE member_edit_stmt;
+
+-- The column list is explicit (not SELECT *) so the stored view definition is the
+-- same on every install: the 2.39 upgrade appends the memberedit columns after
+-- feed_uuid, while getInitSQL() puts them before it, and MariaDB expands SELECT *
+-- from the table's current layout. Keep in sync with Person::getViewSQL().
 CREATE OR REPLACE VIEW person AS
-SELECT * from _person p
+SELECT
+	`p`.`id`,
+	`p`.`first_name`,
+	`p`.`last_name`,
+	`p`.`gender`,
+	`p`.`age_bracketid`,
+	`p`.`email`,
+	`p`.`mobile_tel`,
+	`p`.`work_tel`,
+	`p`.`remarks`,
+	`p`.`status`,
+	`p`.`status_last_changed`,
+	`p`.`history`,
+	`p`.`creator`,
+	`p`.`created`,
+	`p`.`congregationid`,
+	`p`.`familyid`,
+	`p`.`member_password`,
+	`p`.`resethash`,
+	`p`.`resetexpires`,
+	`p`.`membereditsmshash`,
+	`p`.`membereditsmssent`,
+	`p`.`membereditsmsattempts`,
+	`p`.`feed_uuid`
+FROM _person p
 WHERE
 	/* members-area session: staff restrictions do not apply */
 	(getCurrentMemberID() IS NOT NULL)

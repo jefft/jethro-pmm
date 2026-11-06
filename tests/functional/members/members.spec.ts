@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { test, expect } from "../fixtures.js";
 import { to } from "../timeouts.js";
 import { type Page } from "@playwright/test";
+import { completeEditGate, type EditGate } from "../member-edit-gate.js";
 
 /**
  * Members-area regressions for restricted-staff visibility (#1173, #1433).
@@ -23,12 +24,30 @@ import { type Page } from "@playwright/test";
  * functest_databases_setup (process-compose.yml) seeds person 185 with the
  * standard demo password and a login email; Martin Luther is rostered as
  * Preacher in the demo data.
+ *
+ * The Edit view also sits behind the members-area SMS step-up gate, so the
+ * tests that reach it send and verify a code first (see GATE below).
  */
 
 const MEMBER_EMAIL = "magdalena.luther@example.org";
 // Same well-known password as the staff personas (staff_member id 1).
 const MEMBER_PASSWORD = "qfntt7eYuwHs123";
 const ADULT_MEMBER_EMAIL = "nathanial.adams@example.org";
+
+/**
+ * The Edit view is behind the members-area SMS step-up gate, so every test
+ * that reaches it completes the gate first, like a real member. The project
+ * serves the members area under /tests/functional/members/members/, whose
+ * scenario conf (members/members.conf) points SMS at this mock profile.
+ */
+const GATE: EditGate = {
+  profile: "tests/functional/members/members-edit-gate",
+  editUrl: "./index.php?view=_edit_me",
+};
+
+// The mock profile keeps one capture slot and the challenge has a per-person
+// 60-second send cooldown: run the file's tests one at a time.
+test.describe.configure({ mode: "serial" });
 
 async function memberLogin(page: Page, email: string = MEMBER_EMAIL): Promise<void> {
   await page.goto("./index.php");
@@ -46,9 +65,9 @@ async function memberLogin(page: Page, email: string = MEMBER_EMAIL): Promise<vo
 }
 
 test.describe("Members area with restricted staff visibility", () => {
-  test("#1173: family members outside the staff restriction appear on the edit page", async ({ page }) => {
+  test("#1173: family members outside the staff restriction appear on the edit page", async ({ page, request }) => {
     await memberLogin(page);
-    await page.goto("./?view=_edit_me");
+    await completeEditGate(page, request, GATE);
     // Martin (#4), Katharina (#5) and Hans (#6) are congregation 2.  Before
     // the fix the person view hid them from kidscare's staff account, so
     // edit_me silently skipped them (and warned about hidden members).
@@ -61,13 +80,13 @@ test.describe("Members area with restricted staff visibility", () => {
     await expect(page.locator(".alert-info")).toHaveCount(0);
   });
 
-  test("#1173: adult member can edit restricted-visibility family members", async ({ page }) => {
+  test("#1173: adult member can edit restricted-visibility family members", async ({ page, request }) => {
     // Nathanial Adams ('smallgroupleader', restricted to groups 9 and 11):
     // none of his family are in those groups, so before the fix only his own
     // form rendered.  Jong (#168), Ngoc (#171) and Harris (#172) are
     // non-archived and must now be editable.
     await memberLogin(page, ADULT_MEMBER_EMAIL);
-    await page.goto("./?view=_edit_me");
+    await completeEditGate(page, request, GATE);
     await expect(page.locator('input[name="person_168email"]')).toHaveCount(1); // Jong
     await expect(page.locator('input[name="person_171email"]')).toHaveCount(1); // Ngoc
     await expect(page.locator('input[name="person_172email"]')).toHaveCount(1); // Harris
@@ -201,16 +220,17 @@ test.describe("Staff recovery contacts are protected in the members area", () =>
 
   for (const active of [true, false]) {
     for (const self of [false, true]) {
-      test(`${self ? "self" : "family"} edits with ${active ? "active" : "inactive"} staff account`, async ({ page }) => {
+      test(`${self ? "self" : "family"} edits with ${active ? "active" : "inactive"} staff account`, async ({ page, request }) => {
         const fixture = installFixture(active);
         try {
           await memberLogin(page, self ? fixture.staffEmail : fixture.memberEmail);
-          await page.goto("./?view=_edit_me");
+          await completeEditGate(page, request, GATE);
           const memberPrefix = `person_${fixture.memberId}`;
           const staffPrefix = `person_${fixture.staffId}`;
           const updatedMemberEmail = `updated-${fixture.memberEmail}`;
           await page.locator(`input[name="${memberPrefix}email"]`).fill(updatedMemberEmail);
-          await page.locator(`input[name="${memberPrefix}mobile_tel"]`).fill("0491570103");
+          // Mobile numbers are never member-editable: no input to fill, and a
+          // forged one must be ignored.
           // Non-recovery fields remain editable for staff without required 2FA.
           await page.locator(`input[name="${staffPrefix}work_tel"]`).fill("0491570105");
           // Forge protected contact values regardless of their read-only presentation.
@@ -235,9 +255,14 @@ test.describe("Staff recovery contacts are protected in the members area", () =>
           ]);
           expect(sql(`SELECT email, REPLACE(mobile_tel, ' ', '')
             FROM _person WHERE id = ${fixture.memberId}`).split("\t")).toEqual([
-            updatedMemberEmail, "0491570103",
+            updatedMemberEmail, "0491570101",
           ]);
-          await page.goto("./?view=_edit_me");
+          // The save consumed the verification proof, so viewing the edit page
+          // asks for a fresh code.  The per-person 60-second send cooldown is
+          // still running: age it the way a real user's wait would.
+          const loggedInId = self ? fixture.staffId : fixture.memberId;
+          sql(`UPDATE _person SET membereditsmssent = NOW() - INTERVAL 61 SECOND WHERE id = ${loggedInId}`);
+          await completeEditGate(page, request, GATE);
           // Read-only contacts are unnamed, so the browser never submits them.
           const staffEmail = page.locator(`#${staffPrefix}email`);
           const staffMobile = page.locator(`#${staffPrefix}mobile_tel`);

@@ -191,6 +191,13 @@ http {
             # Assets: strip the dynamic scenario prefix so static files
             # resolve on disk under the real /resources/ or /favicon.ico.
             rewrite ^/tests/functional/.+?/(resources/.+|favicon\.ico)$ /$1 last;
+            # Members area under a scenario prefix (e.g. the members-edit-2fa
+            # SMS scenario): serve the real members front controller so its
+            # conf.php URL-prefix routing loads the scenario's <name>.conf.
+            # SCRIPT_FILENAME resolves to devbox.d/functest_jethro_server/members/index.php,
+            # whose JETHRO_ROOT/conf.php reads REQUEST_URI and picks up the
+            # scenario constants, exactly like the staff app above.
+            rewrite ^/tests/functional/.+?/members(/.*)?$ /members/index.php last;
             # Everything else: Jethro front controller.
             rewrite ^ /index.php last;
         }

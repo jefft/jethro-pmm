@@ -188,6 +188,9 @@ class Person extends DB_Object
 			  `member_password` VARCHAR(255) DEFAULT NULL,
 			  `resethash` VARCHAR(255) DEFAULT NULL,
 			  `resetexpires` DATETIME DEFAULT NULL,
+			  `membereditsmshash` VARCHAR(255) DEFAULT NULL,
+			  `membereditsmssent` DATETIME DEFAULT NULL,
+			  `membereditsmsattempts` TINYINT UNSIGNED NOT NULL DEFAULT 0,
 			  `feed_uuid` VARCHAR(255) DEFAULT NULL,
 			  INDEX `person_fn` (`first_name`),
 			  INDEX `person_ln` (`last_name`),
@@ -208,7 +211,9 @@ class Person extends DB_Object
 	 * congregation/group restrictions; members-area sessions (@current_member_id)
 	 * are not subject to staff restrictions - the members area scopes data via the
 	 * member view and family checks instead.
-	 * Keep in sync with upgrades/2026-upgrade-to-2.40.sql (person view).
+	 * Keep in sync with upgrades/2026-upgrade-to-2.40.sql (person view), which
+	 * lists the columns explicitly (an upgrade cannot rely on SELECT * there:
+	 * the memberedit columns are ALTERTed onto _person after feed_uuid).
 	 * @see docs/docs/developer/reference/db-session-identity.md
 	 * @return string The SQL to run to create any database views used by this class
 	 */
