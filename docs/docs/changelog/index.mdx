@@ -82,6 +82,29 @@ Provider configuration, balance, sender IDs and registered numbers are shown in 
 
 The legacy `SMS_SEND_LOGFILE` log file is **not** imported. Recent sends that were never recorded as notes (e.g. roster reminders sent by cron) can be pulled from your SMS provider with the new **Synchronize History** action in Admin → System Configuration → SMS Gateway (5CentSMS v5, Cellcast and MobileMessage). See [Recovering history from your SMS provider](../administration/config/sms.mdx#recovering-history-from-your-sms-provider).
 
+### Self-service password reset
+
+Staff who have forgotten their password can now choose a new one themselves, via a
+"Forgot your password?" link on the login page. Jethro emails a single-use link to the
+address on the staff account. Choosing a new password also requires a code sent by SMS
+to the mobile number on the account — for every account, even one that does not use
+two-factor authentication at login, because a compromised mailbox alone must not be
+enough. Requesting a link or following it never sends an SMS, preventing
+username-only requests and email-link scanners from triggering texts. Sends are
+limited to one per minute per reset, and a code is valid for ten minutes with two
+guesses. If SMS is not configured, or the account has no mobile number, the reset
+cannot be completed and an administrator must reset the password. The login page also
+has a "Forgot your username?" form that emails the username(s) registered to a given
+address. Administrators can still set a password from the command line with
+`bin/jethro_resetpassword`. Set `PASSWORD_RESET_ENABLED` to false in `conf.php` to
+hide both links and disable all reset handling — do this on installs that cannot send
+SMS. Set an absolute `BASE_URL` (or list your hostnames in `ALLOWED_HOSTS`) in
+`conf.php` so emailed reset links always point at your own site. See the
+[developer reference](../developer/reference/password-reset.mdx) for details.
+
+Successful reset SMS verification also satisfies the next password login in that
+browser once, within five minutes, without trusting the browser for future logins.
+
 ### 5CentSMS v5 Support
 
 Jethro has historically used the 5CentSMS v4 API, which is so old its very existence has been scrubbed from the internet.
@@ -147,6 +170,57 @@ Jethro no longer logs to the `SMS_SEND_LOGFILE` file, as a much fuller history i
 
 The existing log file is not imported or deleted. **Synchronize History** can recover everything your SMS provider still holds (roughly the last 12 months for 5CentSMS), so keep or archive the file if you need older history. See [SMS send log file](../administration/config/sms.mdx#sms-send-log-file).
 
+### Security: forms from other sites are refused (upgrade notes)
+
+Jethro now asks the browser where each form submission came from, using the
+`Sec-Fetch-Site` and `Origin` headers that browsers add themselves, and refuses
+submissions that came from another website. This replaces the hidden one-time
+tokens on the login and person-edit forms, which have been removed.
+
+What users notice:
+
+- **No more "Login form expired".** It appeared after a browser restart, with
+  several tabs open, or when the members login is shown inside another website
+  (an iframe), and pressing Log In again was the only fix.
+- **Reloading the 2-factor code page** no longer re-sends your password or
+  another SMS code.
+
+What may need attention when you upgrade:
+
+- **Scripts that log in through the login page** (curl, wget, Python, etc.)
+  must now send an `Origin` header naming your Jethro site, or
+  `Sec-Fetch-Site: same-origin`, and no longer need to scrape `login_key`. The
+  field is gone, so scripts that look for it will fail. For example:
+
+  ```bash
+  curl -c jar -b jar -L -H 'Origin: https://jethro.example.org' \
+    --data-urlencode username=... --data-urlencode password=... \
+    https://jethro.example.org/
+  ```
+
+  A login that sends neither header shows "Your browser did not confirm this
+  login came from this site".
+- **Scripts that submit other forms** keep working if they send no `Origin`,
+  `Referer` or `Sec-Fetch-Site` headers. If they send one that names a
+  different site, they now get `403 Forbidden`.
+- **Forms hosted on another website**, such as a login form copied into your
+  church website's HTML, are refused with `403 Forbidden`. This includes
+  another site on your own domain (e.g. `www.church.org` posting to
+  `jethro.church.org`). Showing Jethro's own members page in an iframe still
+  works, as does linking to it.
+- **Behind a reverse proxy or load balancer** that handles HTTPS or rewrites
+  the `Host` header, define `TRUST_X_FORWARDED_HEADERS` in `conf.php` so
+  Jethro knows its public address, and list that hostname in `ALLOWED_HOSTS`
+  if you use it. Otherwise requests that carry `Origin` but not
+  `Sec-Fetch-Site` (older browsers, and scripts like the one above) are
+  refused, because their origin doesn't match the address Jethro sees.
+
+Refusals are written to the web server's PHP error log, as
+`Blocked POST <url>: request came from another origin (Sec-Fetch-Site=...)` or
+`Refused staff login: browser did not confirm a same-origin request (...)`
+(`members login` for the members area). See
+[Request origin protection](../developer/reference/request-origin-protection.mdx)
+for the full rules.
 ## Version 2.39 (unreleased)
 
 ### Search results page: live search

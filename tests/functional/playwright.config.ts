@@ -51,6 +51,9 @@ const SMS_SCENARIOS = [
   // or when conf.php still has a legacy 2FA_SMS_* setting.
   "sms-2fa-gateway-down",
   "sms-2fa-misconfigured",
+  // Password reset: emailed link + SMS code (required for every account); wrong codes are
+  // counted on the account, not the session.
+  "sms-2fa-password-reset",
   "sms-cooloff",
   "sms-messages-page",
   // Restricted staff persona 6pmonly sees only deliveries to persons it may see.
@@ -137,6 +140,16 @@ export default defineConfig({
       name: "members",
       testMatch: ["members/members.spec.ts"],
       use: { baseURL: `${HOST}/members/` },
+    },
+    {
+      // Staff self-service credential recovery: the forgot-username reminder,
+      // and the forgot-password fail-closed path (emailed link → SMS gate →
+      // no gateway, so no email-only reset). The successful SMS reset lives in
+      // the sms-2fa-password-reset scenario. Shares the standard demo database at
+      // the root URL; captured email comes from the `mailpit` service via
+      // email/mailpit-api.ts.
+      name: "password-reset",
+      testMatch: ["email/password-reset.spec.ts"],
     },
     {
       name: "walkthrough",

@@ -118,6 +118,16 @@
       "note": "Require 2-factor auth even for accounts with group/congregation restrictions?",
       "options": "boolean"
     },
+    "PASSWORD_RESET_ENABLED": {
+      "type": "select",
+      "label": "Password Reset Enabled",
+      "description": "Offer self-service \"forgot your password\" reset and \"forgot your username\" reminder on the staff login page. Reset links are emailed to the address on the account and must be confirmed with an SMS code sent to the account's mobile number, even for accounts that do not use 2FA at login.",
+      "explanation": "",
+      "default": "1",
+      "fileOnly": true,
+      "note": "Offer self-service \"forgot your password\" reset and \"forgot your username\" reminder on the staff login page. Reset links are emailed to the address on the account and must be confirmed with an SMS code sent to the account's mobile number, even for accounts that do not use 2FA at login.",
+      "options": "boolean"
+    },
     "2FA_TRUST_DAYS": {
       "type": "number",
       "label": "2fa Trust Days",
@@ -1267,6 +1277,7 @@
         "DEFAULT_PERMISSIONS",
         "RESTRICTED_USERS_CAN_ADD",
         "PASSWORD_MIN_LENGTH",
+        "PASSWORD_RESET_ENABLED",
         "SESSION_TIMEOUT_MINS",
         "SESSION_MAXLENGTH_MINS"
       ]
