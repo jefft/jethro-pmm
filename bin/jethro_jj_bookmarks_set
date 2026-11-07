@@ -1,0 +1,53 @@
+#!/bin/bash -eu
+jj bookmark track --remote ej 'ej_*'
+jj bookmark untrack --remote tom 'ej_*'
+jj bookmark untrack --remote coastec 'ej_*'
+jj bookmark untrack --remote jeff 'ej_*'
+
+jj bookmark track --remote ej '_*'
+jj bookmark untrack --remote tom '_*'
+jj bookmark untrack --remote coastec '_*'
+jj bookmark untrack --remote jeff '_*'
+
+jj bookmark track --remote ej 'v*'
+jj bookmark untrack --remote tom 'v*'
+jj bookmark untrack --remote coastec 'v*'
+jj bookmark untrack --remote jeff 'v*'
+
+jj bookmark track --remote coastec 'coastec*'
+jj bookmark untrack --remote tom 'coastec*'
+jj bookmark untrack --remote ej 'coastec*'
+jj bookmark untrack --remote jeff 'coastec*'
+
+jj bookmark track --remote jeff 'push-*'
+jj bookmark untrack --remote tom 'push-*'
+jj bookmark untrack --remote ej 'push-*'
+jj bookmark untrack --remote coastec 'push-*'
+
+# 'master' is owned only by Tom but we never rewrite it
+jj bookmark untrack --remote tom 'master'
+jj bookmark untrack --remote ej 'master'
+jj bookmark untrack --remote coastec 'master'
+jj bookmark untrack --remote jeff 'master'
+
+jj bookmark track --remote tom push-1511-fix-upgrader-with-dsn
+jj bookmark track --remote tom push-1555-runsheetitem-error
+jj bookmark track --remote tom push-add-note-modal
+jj bookmark track --remote tom push-devbox
+jj bookmark track --remote tom push-devbox-compile
+jj bookmark track --remote tom push-docs
+jj bookmark track --remote tom push-functests
+jj bookmark untrack --remote tom push-functests-utf8mb4
+jj bookmark untrack --remote tom push-sms_base
+jj bookmark untrack --remote tom push-unittests
+jj bookmark track --remote tom push-1544-fix-missing-referer
+jj bookmark track --remote tom push-1547-broken-help-link
+jj bookmark track --remote tom push-1550-deleted-group-in-report
+jj bookmark untrack --remote tom push-ical-valid
+jj bookmark track --remote tom push-1557-runsheet-copyprevious-adhoc
+jj bookmark track --remote tom push-1542-fix-services-dropdown-viewport
+
+jj bookmark track --remote tom push-1536-hide-sms-credentials
+jj bookmark track --remote tom push-1538-fix-too-wide-notes
+jj bookmark track --remote tom push-1539-fix-narrow-report-actions
+jj bookmark track --remote tom push-1542-fix-services-dropdown-viewport

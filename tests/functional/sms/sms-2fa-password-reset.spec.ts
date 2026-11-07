@@ -37,6 +37,11 @@ function installFixture(): { id: number; email: string } {
 test("staged reset: shared SMS limits, session-bound verification and one-use login credit", async ({
     page, browser, request, baseURL,
 }) => {
+    // End-to-end across several browser contexts: two emailed reset requests,
+    // SMS cooldown/expiry manipulation, password completion and 2FA logins.
+    // That legitimately approaches the default 30s budget under the shared
+    // 8-worker php-fpm load, so give it 3x rather than racing the clock.
+    test.slow();
     const fixture = installFixture();
     const contexts: BrowserContext[] = [];
     try {

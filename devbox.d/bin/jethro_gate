@@ -1,0 +1,139 @@
+#!/bin/bash -u
+# Usage: jethro_gate [--from REV] [--no-functests] [--functests-args ARGS] [--also CMD]...
+# Integration gate: run every check a change must pass before it is accepted,
+# keep going after a failure, and print a pass/fail summary (exit 1 if any
+# check failed). Run inside devbox (devbox shell, or devbox run -- jethro_gate
+# for arguments without spaces).
+#
+# Checks, against the working copy:
+#   jj-conflicts   no conflicted commits in REV..@ (default REV: trunk())
+#   markers        no conflict markers in files changed since REV
+#   php-lint       php -l on PHP files changed since REV
+#   unit           tests/unit/run.php
+#   upgrades       jethro_check_upgrades (upgrade path + fresh install, each
+#                  applied twice)
+#   functests      the Playwright suite; queues behind another run of this
+#                  checkout for up to $FUNCTEST_LOCK_WAIT seconds (default 1800)
+#   also-N         each --also CMD, e.g. a bead's own test command
+#
+# Logs: .devbox/run/gate/<timestamp>/<check>.log
+
+cd "$(dirname "$(readlink -f "$0")")/../.." || exit 2
+
+from='trunk()'
+functests=1
+functests_args=''
+also=()
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		--from) from="$2"; shift 2 ;;
+		--from=*) from="${1#*=}"; shift ;;
+		--no-functests) functests=0; shift ;;
+		--functests-args) functests_args="$2"; shift 2 ;;
+		--functests-args=*) functests_args="${1#*=}"; shift ;;
+		--also) also+=("$2"); shift 2 ;;
+		--also=*) also+=("${1#*=}"); shift ;;
+		-h|--help) sed -n '2,19s/^# \?//p' "$0"; exit 0 ;;
+		*) echo >&2 "Unknown argument: $1"; exit 2 ;;
+	esac
+done
+
+logdir=.devbox/run/gate/$(date +%Y%m%dT%H%M%S)
+mkdir -p "$logdir"
+names=(); results=(); times=()
+
+# run NAME CMD... : run a check, log its output, record PASS/FAIL and duration.
+run() {
+	local name=$1; shift
+	local start=$SECONDS
+	printf '%-14s ... ' "$name"
+	if "$@" > "$logdir/$name.log" 2>&1; then
+		results+=(PASS); echo PASS
+	else
+		results+=(FAIL); echo FAIL
+		tail -15 "$logdir/$name.log" | sed 's/^/    | /'
+	fi
+	names+=("$name"); times+=($((SECONDS - start)))
+}
+
+changed_files() {
+	jj --ignore-working-copy diff --from "$from" --to @ --name-only
+}
+
+check_jj_conflicts() {
+	local conflicted
+	conflicted=$(jj --ignore-working-copy log --no-graph -r "conflicts() & ($from..@)" \
+		-T 'change_id.short() ++ " " ++ description.first_line() ++ "\n"')
+	[[ -z $conflicted ]] || { echo "Conflicted commits:"; echo "$conflicted"; return 1; }
+	echo "No conflicted commits in $from..@"
+}
+
+check_markers() {
+	local f found=0
+	while read -r f; do
+		[[ -f $f ]] || continue
+		if grep -nE '^(<<<<<<<|>>>>>>>|%%%%%%%|\+\+\+\+\+\+\+) ' "$f"; then
+			echo "^ in $f"; found=1
+		fi
+	done < <(changed_files)
+	return $found
+}
+
+check_php_lint() {
+	local f status=0
+	while read -r f; do
+		[[ $f == *.php && -f $f ]] || continue
+		php -l "$f" > /dev/null || { echo "Syntax error: $f"; status=1; }
+	done < <(changed_files)
+	return $status
+}
+
+check_unit() {
+	php tests/unit/run.php || return 1
+	# run.php prints "N passed, M failed, T total"
+	tail -1 "$logdir/unit.log" | grep -q ' 0 failed'
+}
+
+check_functests() (
+	# Subshell: the cd must not leak into the gate's own working directory.
+	cd tests/functional || exit 1
+	if [[ ! -e node_modules/.bin/playwright ]]; then
+		bun install && bunx playwright install chromium || exit 1
+	fi
+	# shellcheck disable=SC2086  # functests_args is a word list on purpose
+	FUNCTEST_LOCK_WAIT=${FUNCTEST_LOCK_WAIT:-1800} \
+		bun run ./node_modules/.bin/playwright test --reporter=line $functests_args
+)
+
+echo "jethro_gate: changes since $from; logs in $logdir"
+# Snapshot the working copy once, so the checks below see unrecorded edits.
+jj status > /dev/null || exit 2
+run jj-conflicts check_jj_conflicts
+run markers check_markers
+run php-lint check_php_lint
+run unit check_unit
+run upgrades jethro_check_upgrades
+if [[ $functests == 1 ]]; then
+	run functests check_functests
+fi
+i=0
+for cmd in "${also[@]}"; do
+	i=$((i + 1))
+	run "also-$i" bash -c "$cmd"
+done
+
+echo
+echo "Summary:"
+failed=0
+for i in "${!names[@]}"; do
+	printf '  %-4s %-14s %4ss\n' "${results[$i]}" "${names[$i]}" "${times[$i]}"
+	[[ ${results[$i]} == FAIL ]] && failed=1
+done
+for i in "${!also[@]}"; do
+	printf '  also-%d: %s\n' $((i + 1)) "${also[$i]}"
+done
+if [[ $failed == 1 ]]; then
+	echo "GATE FAILED"
+	exit 1
+fi
+echo "GATE PASSED"
