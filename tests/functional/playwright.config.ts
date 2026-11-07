@@ -51,6 +51,9 @@ const SMS_SCENARIOS = [
   // or when conf.php still has a legacy 2FA_SMS_* setting.
   "sms-2fa-gateway-down",
   "sms-2fa-misconfigured",
+  // Password reset for a 2FA account: emailed link + SMS code; wrong codes are
+  // counted on the account, not the session.
+  "sms-2fa-password-reset",
   "sms-cooloff",
   "sms-messages-page",
   // Restricted staff persona 6pmonly sees only deliveries to persons it may see.
@@ -118,6 +121,14 @@ export default defineConfig({
     // diffed with smsmockserver/recordings/<provider>/actual/. No browser.
     { name: "smsmock-recordings", testMatch: ["smsmock/recordings.spec.ts"] },
     { name: "lookaround", testMatch: ["lookaround/lookaround.spec.ts"] },
+    {
+      // Member self-registration: emailed activation link -> set password ->
+      // logged in. Uses the MailPit capture (email/mailpit-api.ts) and reads the
+      // standard demo database, whose settings table supplies the MEMBER_REGO_* values.
+      name: "member-rego",
+      testMatch: ["members/member-rego.spec.ts"],
+      use: { baseURL: `${HOST}/members/` },
+    },
     // CSV person importer (#1577); reads the standard demo database at the root URL.
     { name: "import", testMatch: ["import/import.spec.ts"] },
     {
@@ -127,6 +138,14 @@ export default defineConfig({
       name: "members",
       testMatch: ["members/members.spec.ts"],
       use: { baseURL: `${HOST}/members/` },
+    },
+    {
+      // Staff self-service credential recovery: forgot-password (emailed
+      // single-use link → new password → login) and the forgot-username
+      // reminder. Shares the standard demo database at the root URL; captured
+      // email comes from the `mailpit` service via email/mailpit-api.ts.
+      name: "password-reset",
+      testMatch: ["email/password-reset.spec.ts"],
     },
     {
       name: "walkthrough",

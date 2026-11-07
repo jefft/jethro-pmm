@@ -43,9 +43,17 @@
 			<div class="control-group">
 				<div class="controls">
 					<input type="submit" value="Log In" class="btn" />
-					<input type="hidden" name="login_key" value="<?php echo $login_key; ?>" /><br />
+					<br />
 				</div>
 			</div>
+			<?php if (ifdef('PASSWORD_RESET_ENABLED', TRUE)) { ?>
+			<div class="control-group">
+				<div class="controls">
+					<a class="clickable" href="<?php echo build_url(Array('forgot_password' => 1)); ?>">Forgot your password?</a><br />
+					<a class="clickable" href="<?php echo build_url(Array('forgot_username' => 1)); ?>">Forgot your username?</a>
+				</div>
+			</div>
+			<?php } ?>
 		<?php
 		if (defined('LOGIN_NOTE') && LOGIN_NOTE) {
 			?>

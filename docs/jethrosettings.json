@@ -118,6 +118,16 @@
       "note": "Require 2-factor auth even for accounts with group/congregation restrictions?",
       "options": "boolean"
     },
+    "PASSWORD_RESET_ENABLED": {
+      "type": "select",
+      "label": "Password Reset Enabled",
+      "description": "Offer self-service \"forgot your password\" reset and \"forgot your username\" reminder on the staff login page. Reset links are emailed to the address on the account; accounts that require 2FA at login must also enter an SMS code.",
+      "explanation": "",
+      "default": "1",
+      "fileOnly": true,
+      "note": "Offer self-service \"forgot your password\" reset and \"forgot your username\" reminder on the staff login page. Reset links are emailed to the address on the account; accounts that require 2FA at login must also enter an SMS code.",
+      "options": "boolean"
+    },
     "2FA_TRUST_DAYS": {
       "type": "number",
       "label": "2fa Trust Days",
@@ -1067,6 +1077,15 @@
       "fileOnly": true,
       "note": "Force the From: address on Jethro-sent emails. The user-specified From becomes Reply-To instead."
     },
+    "SENDMAIL_COMMAND": {
+      "type": "text",
+      "label": "Sendmail Command",
+      "description": "Send mail via a sendmail-compatible command instead of <code>SMTP_SERVER</code>: the message is piped to the command's stdin. Include <code>-bs</code> to speak SMTP over that pipe (recommended: proper envelope, Bcc handling, failure reporting). Symfony never forwards <code>-t</code>: recipients arrive as argv arguments (or, with <code>-bs</code>, in the SMTP dialogue).",
+      "explanation": "Takes precedence over PHP's sendmail_path ini setting, but is itself overridden by SMTP_SERVER. E.g. a wrapper binary, or an SMTP sink listening on a Unix domain socket.",
+      "default": null,
+      "fileOnly": true,
+      "note": "Send mail via a sendmail-compatible command instead of SMTP_SERVER: the message is piped to the command's stdin. Include -bs to speak SMTP over that pipe (recommended); Symfony never forwards -t: recipients arrive as argv arguments (or, with -bs, in the SMTP dialogue)."
+    },
     "MEMBER_LOGIN_NOTE": {
       "type": "text",
       "label": "Member Login Note",
@@ -1258,6 +1277,7 @@
         "DEFAULT_PERMISSIONS",
         "RESTRICTED_USERS_CAN_ADD",
         "PASSWORD_MIN_LENGTH",
+        "PASSWORD_RESET_ENABLED",
         "SESSION_TIMEOUT_MINS",
         "SESSION_MAXLENGTH_MINS"
       ]
@@ -1383,6 +1403,7 @@
       "intro": "",
       "settings": [
         "SMTP_SERVER",
+        "SENDMAIL_COMMAND",
         "SMTP_ENCRYPTION",
         "SMTP_USERNAME",
         "SMTP_PASSWORD",

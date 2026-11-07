@@ -82,6 +82,16 @@ WHERE
 	AND ((NOT selfs.is_archived) OR (mp.id = self.id))
 	/* archived persons can only see themselves, not any family members */
 ;
+
+-- Expose the sendmail transport alternative on the System Configuration page.
+-- Synced with include/installer.class.php and include/config_manager.class.php
+-- (isFileOnlySetting). Idempotent.
+INSERT IGNORE INTO setting (`rank`, heading, symbol, note, type, value)
+SELECT `rank` + 1, '', 'SENDMAIL_COMMAND',
+    'Send mail via this sendmail-compatible command instead of SMTP_SERVER. Include -bs to speak SMTP over the pipe.',
+    'text', ''
+FROM setting
+WHERE symbol = 'SMTP_SERVER';
 --
 -- SMS database tables
 -- sms:          one row per send operation (body text, sender, timing)
@@ -345,3 +355,59 @@ VALUES ('SMS_VIEWSMS_GRANTED', 'hidden', '1',
 --   HTTP_HOST=example.org php ./scripts/sms.php export-smslog
 -- Idempotent: DELETE WHERE returns 0 rows if already deleted.
 DELETE FROM setting WHERE symbol = 'SMS_SEND_LOGFILE';
+
+
+-- =========================================================================
+-- Self-service staff password reset (see docs/docs/developer/reference/password-reset.mdx)
+--
+-- Per-account reset request and username-reminder state on staff_member, written
+-- by raw SQL in User_System (kept out of the ORM like _person.resethash for member resets):
+--   resethash         bcrypt hash of the single-use emailed token (never the token itself)
+--   resetexpires      when the request stops being usable (24h after it was armed)
+--   resetsmsrequired  whether the armed request requires SMS, even before a code is sent
+--   resetsmshash      bcrypt hash of the current SMS code (never the code itself)
+--   resetsmssent      last reserved SMS send, used for the 60s cooldown and 10m code expiry
+--   resetsmsattempts  total SMS codes tried against the current request (2 allowed)
+--   usernamereminded  when a "forgot username" reminder last went out (1 per hour)
+-- Column definitions must match db_objects/staff_member.class.php getInitSQL().
+--
+-- Idempotent on both MariaDB and MySQL: MySQL has no "ADD COLUMN IF NOT EXISTS"
+-- (MariaDB-only), so build one ALTER from whichever of the columns
+-- information_schema reports as missing. CONCAT_WS skips the NULL entries, and
+-- an empty list is a no-op. Same approach as the collation ALTER above.
+SET @staff_reset_missing = CONCAT_WS(', ',
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resethash') = 0,
+		'ADD COLUMN `resethash` VARCHAR(255) DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetexpires') = 0,
+		'ADD COLUMN `resetexpires` DATETIME DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetsmsrequired') = 0,
+		'ADD COLUMN `resetsmsrequired` TINYINT UNSIGNED NOT NULL DEFAULT 0', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetsmshash') = 0,
+		'ADD COLUMN `resetsmshash` VARCHAR(255) DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetsmssent') = 0,
+		'ADD COLUMN `resetsmssent` DATETIME DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetsmsattempts') = 0,
+		'ADD COLUMN `resetsmsattempts` TINYINT UNSIGNED NOT NULL DEFAULT 0', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'usernamereminded') = 0,
+		'ADD COLUMN `usernamereminded` DATETIME DEFAULT NULL', NULL)
+);
+SET @staff_reset_sql = IF(@staff_reset_missing = '', 'DO 0', CONCAT('ALTER TABLE staff_member ', @staff_reset_missing));
+PREPARE staff_reset_stmt FROM @staff_reset_sql;
+EXECUTE staff_reset_stmt;
+DEALLOCATE PREPARE staff_reset_stmt;
+
+-- Legacy SMS-protected requests had a code hash but no separate requirement flag
+-- or send timestamp. Preserve their SMS requirement, discard the undated code,
+-- and let the user explicitly send a fresh code. Keep attempts already consumed.
+-- New requests set resetsmsrequired = 1 before sending; this predicate therefore
+-- leaves their challenges untouched if the upgrade is run again.
+UPDATE staff_member
+SET resetsmsrequired = 1, resetsmshash = NULL, resetsmssent = NULL
+WHERE resethash IS NOT NULL AND resetsmsrequired = 0 AND resetsmshash IS NOT NULL;

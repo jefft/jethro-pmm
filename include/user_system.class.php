@@ -18,16 +18,25 @@ class User_System extends Abstract_User_System
 	{
 		$this->_loadPermissionLevels();
 
+		if (empty($_SESSION['user']) && ifdef('PASSWORD_RESET_ENABLED', TRUE)) {
+			// Self-service "forgot password" flow (see docs/docs/developer/reference/password-reset.mdx)
+			$this->_processPasswordReset();
+		}
+
 		if (!empty($_REQUEST['logout'])) {
 			$this->_logOut();
 		} else if (empty($_SESSION['user']) && !empty($_POST['username'])) {
 			// process the login form
-			if (array_get($_SESSION, 'login_key', NULL) != $_POST['login_key']) {
-				$this->_error = 'Login form expired.  Please try again.';
+			if (!request_origin_is_proven_current()) {
+				// Not a browser POST from a Jethro page (typically a scanner): refuse
+				// before the password check. See docs/docs/developer/reference/request-origin-protection.mdx
+				log_unproven_login_origin('staff');
+				$this->_error = 'Your browser did not confirm this login came from this site. Please try again.';
 				return;
 			}
 			$user_details = $this->_findUser($_POST['username'], $_POST['password']);
 			if (empty($user_details)) {
+				unset($_SESSION['2fa_verified']);
 				// No user found matching those credentials.
 				$this->_error = 'Incorrect username or password';
 				// Waste scammers' time with a randomised delay to slow down brute force attempts
@@ -52,12 +61,18 @@ class User_System extends Abstract_User_System
 				if ($go_ahead) {
 					// Found a user, nothing further required, so do the business to make them the logged-in user.
 					$this->_logUserIn($user_details);
+				} else {
+					// The 2FA or password-upgrade form comes next (or an error message, from
+					// add_message()). Redirect so the browser's history holds a GET, not a
+					// POST that would re-send the password and another SMS code on reload.
+					session_write_close();
+					header('Location: '.build_url(Array()), true, 303);
+					exit;
 				}
 			}
-		} else if (!empty($_SESSION['2fa']['pending_user'])) {
-			// Form-submission checks — only when the 2FA form was actually POSTed.
-			// A request carrying the session cookie but no POST data must not
-			// trigger expiry/key/code checks.
+		} else if (!empty($_SESSION['2fa']['pending_user']) && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+			// We are processing a 2FA code. GETs (including the redirect after the
+			// login POST) fall through to printLogin(), which shows the 2FA form.
 			if (!empty($_POST)) {
 				if ($_SESSION['2fa']['expiry'] < time()) {
 					add_message('SMS-code form has expired. Please try again.', 'warning');
@@ -87,8 +102,9 @@ class User_System extends Abstract_User_System
 				}
 			}
 
-		} else if (!empty($_SESSION['user_requiring_password_upgrade'])) {
-			// We are processing a password upgrade.
+		} else if (!empty($_SESSION['user_requiring_password_upgrade']) && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+			// We are processing a password upgrade. GETs fall through to
+			// printLogin(), which shows the password-upgrade form.
 			if ($_SESSION['password_upgrade_expiry'] < time()) {
 				unset($_SESSION['user_requiring_password_upgrade']);
 				return;
@@ -156,6 +172,7 @@ class User_System extends Abstract_User_System
 		if (!empty($_SESSION['user'])) {
 			DB_Object::releaseAllLocks($_SESSION['user']['id']);
 		}
+		unset($_SESSION['2fa_verified'], $_SESSION['password_reset']);
 		$_SESSION['user'] = NULL;
 		$_SESSION['login_time'] = NULL;
 		$_SESSION['last_activity_time'] = NULL;
@@ -163,8 +180,11 @@ class User_System extends Abstract_User_System
 
 	private function _setUserPassword($userid, $hashed) {
 		$db = $GLOBALS['db'];
+		// Also voids any outstanding self-service reset request (see _processResetCompletion()).
 		$SQL = 'UPDATE staff_member
-				SET password = '.$db->quote($hashed).'
+				SET password = '.$db->quote($hashed).',
+					resethash = NULL, resetexpires = NULL, resetsmshash = NULL,
+					resetsmsrequired = 0, resetsmssent = NULL, resetsmsattempts = 0
 				WHERE id = '.(int)$userid;
 		return $db->exec($SQL);
 	}
@@ -255,6 +275,23 @@ class User_System extends Abstract_User_System
 			exit;
 		}
 
+		if (ifdef('PASSWORD_RESET_ENABLED', TRUE)) {
+			if (!empty($_SESSION['password_reset']) && ($reset_user = $this->_loadPasswordResetUser()) !== null) {
+				$reset_state = $_SESSION['password_reset'];
+				$reset_sms_verified = $this->_resetSmsVerified($reset_user);
+				require TEMPLATE_DIR.'/reset_password_form.template.php';
+				exit;
+			}
+			if (!empty($_REQUEST['forgot_password'])) {
+				require TEMPLATE_DIR.'/forgot_password_form.template.php';
+				exit;
+			}
+			if (!empty($_REQUEST['forgot_username'])) {
+				require TEMPLATE_DIR.'/forgot_username_form.template.php';
+				exit;
+			}
+		}
+
 		if (!empty($_SESSION['2fa']['pending_user'])) {
 			// Print the 2fa form
 			if ($_SESSION['2fa']['expiry'] < time()) {
@@ -281,7 +318,6 @@ class User_System extends Abstract_User_System
 			}
 		}
 
-		$_SESSION['login_key'] = $login_key = generate_random_string(32);
 		require TEMPLATE_DIR.'/login_form.template.php';
 
 	}//end printLogin()
@@ -308,15 +344,93 @@ class User_System extends Abstract_User_System
 	}
 
 	/**
-	 * @param array $user_details	Details of the person who has entered their password correctly
-	 * @return boolean TRUE if this person needs to do 2-factor auth before being logged in.
+	 * Does this user's login need a 2FA code, once trust-cookie and policy checks are done?
+	 *
+	 * Policy decision only: no trust-cookie lookup and no sendability check (those stay
+	 * in _require2FA()). Also used by the password reset, which must never be weaker
+	 * than the account's login (see docs/docs/developer/reference/password-reset.mdx).
+	 *
+	 * @param array $user_details
+	 * @return boolean
 	 */
-
-	private function _require2FA($user_details)
+	private function _accountRequires2FA($user_details)
 	{
 		// Allow 2FA to be forcibly turned off regardless of admin settings e.g. for dev environments
 		if (defined('2FA_ENABLED') && constant('2FA_ENABLED')==False) return FALSE;
 
+		$req_perms = ifdef('2FA_REQUIRED_PERMS', '');
+		if (!strlen($req_perms)) return FALSE;
+		if (!empty($user_details['congregation_restrictions']) && !ifdef('2FA_EVEN_FOR_RESTRICTED_ACCTS', true)) {
+			$this->_2faLog($user_details['username'].' (with cong restrictions) does not require 2FA');
+			return FALSE;
+		}
+		if (!empty($user_details['group_restrictions']) && !ifdef('2FA_EVEN_FOR_RESTRICTED_ACCTS', true)) {
+			$this->_2faLog($user_details['username'].' (with group restrictions) does not require 2FA');
+			return FALSE;
+		}
+
+		list($required, $matchedPerm, $unknownPerm) = self::resolve2FARequired($req_perms, $user_details['permissions'], $this->getPermissionLevels());
+		if ($unknownPerm !== NULL) {
+			$this->_2faLog("ERROR: Unknown permission level ".$unknownPerm." in system setting 2FA_REQUIRED_PERMS");
+			trigger_error("Unknown permission level ".$unknownPerm." in system setting 2FA_REQUIRED_PERMS", E_USER_WARNING);
+		}
+		if ($matchedPerm !== NULL) {
+			$this->_2faLog($user_details['username'].' requires 2FA because they hold permission "'.$this->getPermissionLevels()[$matchedPerm].'"');
+		}
+		if (!$required) {
+			$this->_2faLog($user_details['username'].' does not require 2FA');
+		}
+		return $required;
+	}
+
+	/**
+	 * Pure 2FA-policy decision over the 2FA_REQUIRED_PERMS setting, so it can be
+	 * unit-tested and shared by the password reset.
+	 *
+	 * @param string $req_perms		Value of 2FA_REQUIRED_PERMS ('' = policy disabled)
+	 * @param int $permissions		The user's permission bits
+	 * @param array $levels			Permission levels from getPermissionLevels()
+	 * @return array				[required(bool), matched_perm(?int), unknown_perm(?string)];
+	 *								unknown_perm is set (and required forced TRUE) when the
+	 *								policy names an unknown permission level - error on the
+	 *								side of requiring 2FA.
+	 */
+	public static function resolve2FARequired($req_perms, $permissions, $levels)
+	{
+		if (!strlen((string)$req_perms)) return Array(FALSE, NULL, NULL);
+		$required = FALSE;
+		$matchedPerm = NULL;
+		$unknownPerm = NULL;
+		foreach (explode(',', $req_perms) as $perm) {
+			if (!isset($levels[$perm])) {
+				$unknownPerm = $perm;
+				$required = TRUE; // error on the side of requiring 2FA
+				break;
+			}
+
+			if (((int)$permissions & (int)$perm) == (int)$perm) {
+				$matchedPerm = (int)$perm;
+				$required = TRUE;
+				break;
+			}
+		}
+		return Array($required, $matchedPerm, $unknownPerm);
+	}
+
+	private function _require2FA($user_details)
+	{
+		$verified = $_SESSION['2fa_verified'] ?? null;
+		unset($_SESSION['2fa_verified']);
+		if (!$this->_accountRequires2FA($user_details)) return FALSE;
+		if ($verified !== null
+			&& $verified['userid'] === (int)$user_details['id']
+			&& $verified['expires'] > time()) {
+			return FALSE;
+		}
+
+		// The trust-cookie lookup runs after the policy check (it moved there when
+		// the policy was extracted for the password reset): outcomes are identical,
+		// and logins that don't need 2FA skip the cookie query entirely.
 		if (!empty($_COOKIE['Jethro2FATrust'])) {
 			$db = $GLOBALS['db'];
 			$SQL = 'SELECT * FROM 2fa_trust
@@ -339,39 +453,6 @@ class User_System extends Abstract_User_System
 
 		require_once __DIR__ . '/jethro_sms.php';
 
-		$req_perms = ifdef('2FA_REQUIRED_PERMS', '');
-		if (!strlen($req_perms)) return FALSE;
-		if (!empty($user_details['congregation_restrictions']) && !ifdef('2FA_EVEN_FOR_RESTRICTED_ACCTS', true)) {
-			$this->_2faLog($user_details['username'].' (with cong restrictions) does not require 2FA');
-			return FALSE;
-		}
-		if (!empty($user_details['group_restrictions']) && !ifdef('2FA_EVEN_FOR_RESTRICTED_ACCTS', true)) {
-			$this->_2faLog($user_details['username'].' (with group restrictions) does not require 2FA');
-			return FALSE;
-		}
-
-		$required = FALSE;
-		foreach (explode(',', $req_perms) as $perm) {
-			$levels = $this->getPermissionLevels();
-			if (!isset($levels[$perm])) {
-				$this->_2faLog("ERROR: Unknown permission level ".$perm." in system setting 2FA_REQUIRED_PERMS");
-				trigger_error("Unknown permission level ".$perm." in system setting 2FA_REQUIRED_PERMS", E_USER_WARNING);
-				$required = TRUE; // error on the side of requiring 2FA
-				break;
-			}
-
-			if (((int)$user_details['permissions'] & (int)$perm) == (int)$perm) {
-				$permName = $this->getPermissionLevels()[$perm];
-				$this->_2faLog($user_details['username'].' requires 2FA because they hold permission "'.$permName.'"');
-				$required = TRUE;
-				break;
-			}
-		}
-		if (!$required) {
-			$this->_2faLog($user_details['username'].' does not require 2FA');
-			return FALSE;
-		}
-
 		// This user's login needs 2FA. If no code can be sent, stop the login
 		// rather than silently letting it through without a second factor.
 		$blocked = $this->_2faBlockedReason();
@@ -381,6 +462,551 @@ class User_System extends Abstract_User_System
 			$this->_2faBlockedReason = $blocked;
 		}
 		return TRUE;
+	}
+
+	/**
+	 * Handle the self-service "forgot password" flow for staff accounts.
+	 *
+	 * Entry points, all pre-login:
+	 *  - POST of the forgot-password form: arms a reset and emails a link;
+	 *  - POST of the forgot-username form: emails registered usernames;
+	 *  - GET of the emailed link: validates the token, but never sends SMS;
+	 *  - POSTs to send and verify the reset's SMS challenge;
+	 *  - POST of the new-password form: completes the reset.
+	 *
+	 * Accounts whose permission set requires 2FA at login (2FA_REQUIRED_PERMS) must
+	 * also enter an SMS code, so the reset is never weaker than the account's login.
+	 * See docs/docs/developer/reference/password-reset.mdx.
+	 *
+	 * @return void
+	 */
+	private function _processPasswordReset()
+	{
+		if (!empty($_POST['forgot_password_username'])) {
+			$this->_processResetRequest();
+		} else if (!empty($_POST['forgot_username_email'])) {
+			$this->_processForgotUsername();
+		} else if (isset($_POST['reset_sms_send'])) {
+			$this->_processResetSmsSend();
+		} else if (isset($_POST['reset_sms_verify'])) {
+			$this->_processResetSmsVerification();
+		} else if (isset($_POST['reset_password_submitted'])) {
+			$this->_processResetCompletion();
+		} else if (!empty($_GET['reset_password'])) {
+			$this->_validateResetToken();
+		} else if (!empty($_REQUEST['reset_cancel'])) {
+			// "Cancel and return to login" from the mid-reset form.
+			unset($_SESSION['password_reset'], $_SESSION['2fa_verified']);
+			session_write_close();
+			header('Location: '.build_url(Array('*' => NULL)), true, 303);
+			exit;
+		}
+	}
+
+	/**
+	 * Find an active staff account by username, with the person fields and
+	 * restriction summaries the reset and 2FA-policy code need.
+	 * @param string $username
+	 * @return array|NULL
+	 */
+	private function _findResetUser($username)
+	{
+		$db =& $GLOBALS['db'];
+		$sql = 'SELECT sm.id, sm.username, sm.permissions, sm.resethash, sm.resetsmshash,
+					sm.resetsmsrequired, sm.resetsmsattempts, sm.resetsmssent,
+					(sm.resetexpires > NOW()) AS reset_valid,
+					(sm.resetsmssent > NOW() - INTERVAL 10 MINUTE) AS reset_sms_valid,
+					(sm.resetsmssent > NOW() - INTERVAL 60 SECOND) AS reset_sms_cooldown,
+					p.first_name, p.last_name, p.email, p.mobile_tel,
+					GROUP_CONCAT(cr.congregationid) as congregation_restrictions, GROUP_CONCAT(gr.groupid) as group_restrictions
+				FROM staff_member sm
+					JOIN _person p ON sm.id = p.id
+					LEFT JOIN account_congregation_restriction cr ON cr.personid = sm.id
+					LEFT JOIN account_group_restriction gr ON gr.personid = sm.id
+				WHERE sm.username = '.$db->quote($username).'
+					AND sm.active = 1
+				GROUP BY p.id';
+		$row = $db->queryRow($sql);
+		if (empty($row)) return NULL;
+		$row['congregation_restrictions'] = empty($row['congregation_restrictions']) ? Array() : explode(',', $row['congregation_restrictions']);
+		$row['group_restrictions'] = empty($row['group_restrictions']) ? Array() : explode(',', $row['group_restrictions']);
+		return $row;
+	}
+
+	/**
+	 * Arm and email a reset without contacting the SMS gateway.
+	 *
+	 * The persisted SMS requirement is independent of code generation. A username
+	 * alone can trigger only the hourly-throttled email, never an SMS send.
+	 * See docs/docs/developer/reference/password-reset.mdx.
+	 *
+	 * @return void
+	 */
+	private function _processResetRequest()
+	{
+		$username = trim((string)$_POST['forgot_password_username']);
+		if (!request_origin_is_proven_current()) {
+			log_unproven_login_origin('staff');
+			add_message('Your browser did not confirm this request came from this site. Please try again.', 'error');
+			return;
+		}
+
+		$db = $GLOBALS['db'];
+		$user = $this->_findResetUser($username);
+		if (empty($user)) {
+			password_verify($username, jethro_password_hash($username));
+		} else {
+			$token = generate_random_string(32);
+			$tokenHash = jethro_password_hash($token);
+			$requiresSms = $this->_accountRequires2FA($user);
+			$armed = $db->exec('UPDATE staff_member
+								SET resethash = '.$db->quote($tokenHash).',
+									resetexpires = NOW() + INTERVAL 24 HOUR,
+									resetsmsrequired = '.(int)$requiresSms.',
+									resetsmshash = NULL, resetsmssent = NULL,
+									resetsmsattempts = 0
+								WHERE id = '.(int)$user['id'].'
+									AND (resethash IS NULL OR resetexpires IS NULL OR resetexpires <= NOW() + INTERVAL 23 HOUR)');
+			if (!$armed) {
+				$this->_2faLog($user['username'].' re-requested a password reset within an hour; not re-sending');
+			} else if (!$this->_sendResetEmail($user, $token, $requiresSms)) {
+				$db->exec('UPDATE staff_member
+							SET resethash = NULL, resetexpires = NULL, resetsmsrequired = 0,
+								resetsmshash = NULL, resetsmssent = NULL, resetsmsattempts = 0
+							WHERE id = '.(int)$user['id'].' AND resethash = '.$db->quote($tokenHash));
+				error_log('PASSWORD RESET FAILED (staff): username="'.log_safe_string($username).'" id='.$user['id'].' reset email could not be sent remote='.array_get($_SERVER, 'REMOTE_ADDR', '-'));
+			} else {
+				error_log('PASSWORD RESET REQUESTED (staff): username="'.log_safe_string($username).'" id='.$user['id'].' remote='.array_get($_SERVER, 'REMOTE_ADDR', '-'));
+			}
+		}
+
+		add_message('If that username matches a user account, an email has been sent to the address on that account with a link for choosing a new password. The link expires after 24 hours.', 'success');
+		session_write_close();
+		header('Location: '.build_url(Array('*' => NULL)), true, 303);
+		exit;
+	}
+
+	/**
+	 * Why a password-reset SMS code must not (or cannot) be sent right now, or null
+	 * when it can. Includes the SMS_2FA_BLOCK_MESSAGES kill switch, which login 2FA
+	 * honours and the reset must not bypass.
+	 * @return string|null
+	 */
+	private function _resetSmsBlocked()
+	{
+		if (ifdef('SMS_2FA_BLOCK_MESSAGES', ifdef('2FA_BLOCK_MESSAGES', false))) {
+			return 'SMS_2FA_BLOCK_MESSAGES is in effect';
+		}
+		return $this->_2faBlockedReason();
+	}
+
+	/**
+	 * Email the password-reset link to the address on a staff account.
+	 * From-address convention mirrors _notifySysadmins().
+	 * @param array $user
+	 * @param string $token
+	 * @param bool $needsSmsCode
+	 * @return boolean TRUE on success
+	 */
+	private function _sendResetEmail($user, $token, $needsSmsCode)
+	{
+		require_once 'include/emailer.class.php';
+		// A malformed stored address would otherwise throw from setTo() (outside
+		// Emailer::send()'s catch) and turn the generic response into an error page.
+		if (!Emailer::validateAddress((string)$user['email'])) return FALSE;
+		// BASE_URL_ABSOLUTE honours an absolute BASE_URL from conf.php, so a forged
+		// Host header cannot point the emailed link (and its token) at another host.
+		$url = BASE_URL_ABSOLUTE.'/?reset_password='.rawurlencode($token).'&username='.rawurlencode($user['username']);
+		$extra = $needsSmsCode
+			? "\n\nAfter opening the link, request an SMS verification code to unlock the new-password form."
+			: '';
+		$body = "Hi %s,
+
+A password reset has been requested for the '%s' user account at %s.
+
+To choose a new password, follow this link within 24 hours:
+%s%s
+
+If you didn't request this, you can ignore this email - your password will not change.";
+		$text = sprintf($body, $user['first_name'], $user['username'], SYSTEM_NAME, $url, $extra);
+		$html = sprintf(
+			nl2br($body),
+			ents($user['first_name']),
+			ents($user['username']),
+			ents(SYSTEM_NAME),
+			'<a href="'.ents($url).'">'.ents($url).'</a>',
+			nl2br($extra)
+		);
+
+		$from_address = $this->_systemEmailFromAddress();
+		if (!strlen($from_address)) return FALSE;
+
+		$message = Emailer::newMessage()
+			->setSubject('Password reset for '.SYSTEM_NAME)
+			->setFrom(array($from_address => SYSTEM_NAME.' Jethro System'))
+			->setTo(array($user['email'] => $user['first_name'].' '.$user['last_name']))
+			->text($text)
+			->html($html);
+		return Emailer::send($message);
+	}
+
+	/**
+	 * Resolve a From address for system-generated emails: MEMBER_REGO_EMAIL_FROM_ADDRESS
+	 * when configured, else the first sysadmin's address (same convention as _notifySysadmins()).
+	 * @return string	Empty when nothing usable is configured.
+	 */
+	private function _systemEmailFromAddress()
+	{
+		$from_address = ifdef('MEMBER_REGO_EMAIL_FROM_ADDRESS', '');
+		if (!strlen($from_address)) {
+			// No configured sender: fall back to the first sysadmin's address.
+			$from_address = (string)$GLOBALS['db']->queryOne('SELECT email
+					FROM _person p JOIN staff_member sm ON sm.id = p.id
+					WHERE email <> "" AND sm.active AND sm.permissions = '.PERM_SYSADMIN.'
+					ORDER BY p.id LIMIT 1');
+		}
+		return $from_address;
+	}
+
+	/**
+	 * Process the forgot-username form: email the active staff username(s)
+	 * registered to a given email address.
+	 *
+	 * Responds identically whether or not the address matches an account, so the
+	 * form reveals nothing to a probe. Several accounts may share an address
+	 * (_person.email is not unique); all their usernames are listed. Each account
+	 * is reminded at most once an hour (staff_member.usernamereminded), so a
+	 * looping requester cannot mail-bomb an address.
+	 * @return void
+	 */
+	private function _processForgotUsername()
+	{
+		$email = trim((string)$_POST['forgot_username_email']);
+		if (!request_origin_is_proven_current()) {
+			// Not a browser POST from a Jethro page (typically a scanner): refuse.
+			// See docs/docs/developer/reference/request-origin-protection.mdx
+			log_unproven_login_origin('staff');
+			add_message('Your browser did not confirm this request came from this site. Please try again.', 'error');
+			return;
+		}
+
+		require_once 'include/emailer.class.php';
+		if (Emailer::validateAddress($email)) {
+			$db = $GLOBALS['db'];
+			$rows = $db->queryAll('SELECT sm.id, sm.username, p.first_name, p.email
+					FROM staff_member sm
+					JOIN _person p ON sm.id = p.id
+					JOIN person_status ps ON ps.id = p.status
+					WHERE p.email = '.$db->quote($email).'
+						AND sm.active = 1 AND (NOT ps.is_archived)
+					ORDER BY sm.username');
+			$byAddress = Array();
+			foreach ($rows as $row) {
+				// The column collation folds accents (e.g. exämple.org = example.org), so a
+				// look-alike address on a domain the requester owns can match. Count only
+				// exact (ASCII case-insensitive) matches, and mail the stored address.
+				$address = trim((string)$row['email']);
+				if (strcasecmp($address, $email) !== 0) continue;
+				// One conditional UPDATE per account, so concurrent requests cannot
+				// all get past the hourly limit.
+				$claimed = $db->exec('UPDATE staff_member
+									SET usernamereminded = NOW()
+									WHERE id = '.(int)$row['id'].'
+										AND (usernamereminded IS NULL OR usernamereminded <= NOW() - INTERVAL 1 HOUR)');
+				if ($claimed) $byAddress[$address][] = $row;
+			}
+			foreach ($byAddress as $address => $addressRows) {
+				// Log the outcome, not the attempt: the hourly slot has already been
+				// claimed above, so a failed send is why this address goes unmailed
+				// until the hour is up.
+				if ($this->_sendUsernameEmail($address, $addressRows)) {
+					error_log('USERNAME REMINDER SENT (staff): email="'.log_safe_string($address).'" count='.count($addressRows).' remote='.array_get($_SERVER, 'REMOTE_ADDR', '-'));
+				} else {
+					error_log('USERNAME REMINDER FAILED (staff): email="'.log_safe_string($address).'" count='.count($addressRows).' remote='.array_get($_SERVER, 'REMOTE_ADDR', '-'));
+				}
+			}
+		}
+
+		add_message('If that email address matches a user account, an email has been sent listing the username(s) on the account.', 'success');
+		session_write_close();
+		header('Location: '.build_url(Array('*' => NULL)), true, 303); // 303 See Other: clean GET
+		exit;
+	}
+
+	/**
+	 * Email the username(s) registered to an address. Text-only; From-address
+	 * convention mirrors _notifySysadmins().
+	 * @param string $email
+	 * @param array $rows	username/first_name rows for the address
+	 * @return boolean TRUE on success
+	 */
+	private function _sendUsernameEmail($email, $rows)
+	{
+		$usernames = Array();
+		foreach ($rows as $row) $usernames[] = '- '.$row['username'];
+		$greeting = (count($rows) == 1) ? 'Hi '.$rows[0]['first_name'].',' : 'Hi,';
+		$body = "%s
+
+The following username(s) for user accounts at %s are registered to this email address:
+
+%s
+
+If you didn't request this, you can ignore this email - no passwords have been changed.";
+		$text = sprintf($body, $greeting, SYSTEM_NAME, implode("\n", $usernames));
+
+		$from_address = $this->_systemEmailFromAddress();
+		if (!strlen($from_address)) return FALSE;
+
+		$message = Emailer::newMessage()
+			->setSubject('Username reminder for '.SYSTEM_NAME)
+			->setFrom(array($from_address => SYSTEM_NAME.' Jethro System'))
+			->setTo($email)
+			->text($text);
+		return Emailer::send($message);
+	}
+
+	/**
+	 * Accept an emailed token and bind a reset session without sending SMS.
+	 * @return void
+	 */
+	private function _validateResetToken()
+	{
+		$token = (string)$_GET['reset_password'];
+		$username = trim((string)array_get($_GET, 'username', ''));
+		$row = strlen($username) ? $this->_findResetUser($username) : null;
+		// The support override accepted at login must never verify a reset token.
+		if (empty($row) || empty($row['reset_valid']) || empty($row['resethash'])
+			|| !password_verify($token, (string)$row['resethash'])) {
+			$this->_error = 'That password reset link is not valid. It may have expired or already been used. You can request a new one below.';
+			return;
+		}
+
+		unset($_SESSION['2fa_verified'], $_SESSION['2fa'], $_SESSION['user_requiring_password_upgrade']);
+		$_SESSION['password_reset'] = Array(
+			'userid' => (int)$row['id'],
+			'resethash' => $row['resethash'],
+			'username' => $row['username'],
+			'first_name' => $row['first_name'],
+		);
+		if ($this->_loadPasswordResetUser() === null) return;
+		session_regenerate_id(true);
+		session_write_close();
+		header('Location: '.build_url(Array('*' => NULL)), true, 303);
+		exit;
+	}
+
+	/**
+	 * SQL identity of the active request bound to this session.
+	 * Call only after _loadPasswordResetUser() has validated the session.
+	 * @return string
+	 */
+	private function _passwordResetWhere(): string
+	{
+		$state = $_SESSION['password_reset'];
+		return 'id = '.(int)$state['userid'].'
+				AND active = 1 AND resethash = '.$GLOBALS['db']->quote($state['resethash']).'
+				AND resetexpires > NOW()';
+	}
+
+	/**
+	 * Revalidate request identity, expiry and current policy for every reset stage.
+	 * A stricter policy voids an older email-only request; a relaxation cannot
+	 * remove an armed SMS requirement. See reference/password-reset.mdx.
+	 *
+	 * @param bool $post Require the normal pre-login POST origin proof.
+	 * @return array<string, mixed>|null Current account and reset state.
+	 */
+	private function _loadPasswordResetUser(bool $post = false): ?array
+	{
+		if ($post && !request_origin_is_proven_current()) {
+			log_unproven_login_origin('staff');
+			$this->_error = 'Your browser did not confirm this request came from this site. Please try again.';
+			return null;
+		}
+		$state = $_SESSION['password_reset'] ?? null;
+		$row = $state !== null ? $this->_findResetUser($state['username']) : null;
+		if (empty($row) || empty($row['reset_valid']) || empty($row['resethash'])
+			|| (int)$row['id'] !== (int)$state['userid']
+			|| !hash_equals((string)$state['resethash'], (string)$row['resethash'])) {
+			unset($_SESSION['password_reset']);
+			$this->_error = 'Your password reset has expired or already been used. Please request a new one.';
+			return null;
+		}
+		if (empty($row['resetsmsrequired']) && $this->_accountRequires2FA($row)) {
+			$GLOBALS['db']->exec('UPDATE staff_member
+				SET resethash = NULL, resetexpires = NULL, resetsmsrequired = 0,
+					resetsmshash = NULL, resetsmssent = NULL, resetsmsattempts = 0
+				WHERE '.$this->_passwordResetWhere());
+			unset($_SESSION['password_reset']);
+			error_log('PASSWORD RESET REFUSED (staff): email-only request for id='.$row['id'].' voided because the account now requires 2FA remote='.array_get($_SERVER, 'REMOTE_ADDR', '-'));
+			$this->_error = 'This account now requires a phone code to reset its password, so this earlier email-only reset link can no longer be used. Please request a new password reset.';
+			return null;
+		}
+		return $row;
+	}
+
+	/**
+	 * Whether this session verified the current, unexpired SMS challenge.
+	 * @param array<string, mixed> $row Current account/reset row.
+	 * @return bool
+	 */
+	private function _resetSmsVerified(array $row): bool
+	{
+		return !empty($row['reset_sms_valid']) && !empty($row['resetsmshash'])
+			&& hash_equals((string)$row['resetsmshash'], (string)($_SESSION['password_reset']['sms_verified'] ?? ''));
+	}
+
+	/**
+	 * Reserve one SMS send across all sessions before contacting the gateway.
+	 * A resend rotates the challenge, never its shared code-attempt budget.
+	 * @return void
+	 */
+	private function _processResetSmsSend()
+	{
+		$row = $this->_loadPasswordResetUser(true);
+		if ($row === null || empty($row['resetsmsrequired']) || $this->_resetSmsVerified($row)) return;
+		$db = $GLOBALS['db'];
+		$where = $this->_passwordResetWhere();
+		$code = generate_random_string(6, range(0, 9));
+		$codeHash = jethro_password_hash($code);
+		$reserved = $db->exec('UPDATE staff_member
+			SET resetsmshash = '.$db->quote($codeHash).', resetsmssent = NOW()
+			WHERE '.$where.' AND resetsmsrequired = 1 AND resetsmsattempts < 2
+				AND (resetsmssent IS NULL OR resetsmssent <= NOW() - INTERVAL 60 SECOND)');
+		if (!$reserved) {
+			$this->_error = 'A code was recently requested, or no verification attempts remain. Wait at least 60 seconds before requesting another code.';
+			return;
+		}
+		unset($_SESSION['password_reset']['sms_verified']);
+		require_once __DIR__.'/jethro_sms.php';
+		$problem = !strlen((string)$row['mobile_tel'])
+			? 'there is no mobile number on your account'
+			: $this->_resetSmsBlocked();
+		if ($problem === null && !$this->_send2FAMessage($code.' is your code to reset your password on '.SYSTEM_NAME, $row)) {
+			$problem = 'the SMS gateway could not send the code';
+		}
+		if ($problem !== null) {
+			// Keep the cooldown even on failure. A delayed failure must not clear
+			// a newer challenge or a replacement reset request.
+			$db->exec('UPDATE staff_member SET resetsmshash = NULL
+				WHERE '.$where.' AND resetsmshash = '.$db->quote($codeHash));
+			$this->_2faLog('ERROR: '.$row['username'].' could not be sent a password reset code: '.$problem);
+			$this->_error = 'Cannot send a verification code because '.$problem.'. Contact your system administrator, or try again after 60 seconds.';
+			return;
+		}
+		$this->_2faLog($row['username'].' was sent a password reset code');
+		add_message('A verification code has been sent to the mobile number on your account. It expires after 10 minutes.', 'success');
+		session_write_close();
+		header('Location: '.build_url(Array('*' => NULL)), true, 303);
+		exit;
+	}
+
+	/**
+	 * Verify only the reset's SMS factor, never authenticate the account.
+	 *
+	 * A row lock serializes the two checks: an earlier wrong attempt cannot
+	 * scrap a concurrently reserved correct final attempt. Resends and password
+	 * writes also lock this row, and the challenge is matched in every update.
+	 * @return void
+	 */
+	private function _processResetSmsVerification()
+	{
+		$user = $this->_loadPasswordResetUser(true);
+		if ($user === null || empty($user['resetsmsrequired']) || $this->_resetSmsVerified($user)) return;
+		$db = $GLOBALS['db'];
+		$where = $this->_passwordResetWhere();
+		$challenge = (string)$user['resetsmshash'];
+		$match = $where.' AND resetsmsrequired = 1 AND resetsmshash = '.$db->quote($challenge).'
+						AND resetsmssent > NOW() - INTERVAL 10 MINUTE';
+		$db->beginTransaction();
+		try {
+			$row = $db->queryRow('SELECT resetsmsattempts FROM staff_member WHERE '.$match.' FOR UPDATE');
+			if (empty($challenge) || empty($row)) {
+				$db->rollBack();
+				$this->_error = 'That code has expired or been replaced. Request a new code.';
+				return;
+			}
+			$reserved = $db->exec('UPDATE staff_member SET resetsmsattempts = resetsmsattempts + 1
+				WHERE '.$match.' AND resetsmsattempts < 2');
+			if (!$reserved) {
+				$db->rollBack();
+				$this->_error = 'Too many code attempts. Please request a new password reset when this request expires.';
+				return;
+			}
+			$code = trim((string)array_get($_POST, 'reset_sms_code', ''));
+			$correct = strlen($code) > 0 && password_verify($code, $challenge);
+			$exhausted = !$correct && (int)$row['resetsmsattempts'] + 1 >= 2;
+			if ($exhausted) {
+				$db->exec('UPDATE staff_member
+					SET resethash = NULL, resetexpires = NULL, resetsmsrequired = 0,
+						resetsmshash = NULL, resetsmssent = NULL, resetsmsattempts = 0
+					WHERE '.$match);
+			}
+			$db->commit();
+		} catch (\Throwable $e) {
+			$db->rollBack();
+			throw $e;
+		}
+		if (!$correct) {
+			if ($exhausted) {
+				unset($_SESSION['password_reset']);
+				error_log('PASSWORD RESET ABANDONED (staff): wrong SMS codes for id='.$user['id'].' remote='.array_get($_SERVER, 'REMOTE_ADDR', '-'));
+				$this->_error = 'Too many incorrect codes. Please request a new password reset.';
+			} else {
+				$this->_error = 'Incorrect code. Please try again.';
+			}
+			return;
+		}
+		session_regenerate_id(true);
+		$_SESSION['password_reset']['sms_verified'] = $challenge;
+		session_write_close();
+		header('Location: '.build_url(Array('*' => NULL)), true, 303);
+		exit;
+	}
+
+	/**
+	 * Save a new password only after this reset session passed its SMS gate.
+	 * The final write rechecks request, factor and challenge expiry atomically.
+	 * SMS verification can satisfy one password-authenticated login for five
+	 * minutes, without setting a durable trust cookie.
+	 * @return void
+	 */
+	private function _processResetCompletion()
+	{
+		$row = $this->_loadPasswordResetUser(true);
+		if ($row === null) return;
+		$requiresSms = !empty($row['resetsmsrequired']);
+		if ($requiresSms && !$this->_resetSmsVerified($row)) {
+			$this->_error = 'Verify the SMS code before choosing a new password.';
+			return;
+		}
+		$hashed = Staff_Member::processPasswordField('new_');
+		if (!$hashed) return;
+		$db = $GLOBALS['db'];
+		$where = $this->_passwordResetWhere().' AND resetsmsrequired = '.(int)$requiresSms;
+		if ($requiresSms) {
+			$where .= ' AND resetsmshash = '.$db->quote($row['resetsmshash']).'
+						AND resetsmssent > NOW() - INTERVAL 10 MINUTE';
+		}
+		$updated = $db->exec('UPDATE staff_member
+			SET password = '.$db->quote($hashed).',
+				resethash = NULL, resetexpires = NULL, resetsmsrequired = 0,
+				resetsmshash = NULL, resetsmssent = NULL, resetsmsattempts = 0
+			WHERE '.$where);
+		unset($_SESSION['password_reset'], $_SESSION['2fa_verified']);
+		if (!$updated) {
+			$this->_error = 'Your password reset has expired or been replaced. Please request a new one.';
+			return;
+		}
+		session_regenerate_id(true);
+		if ($requiresSms) {
+			$_SESSION['2fa_verified'] = ['userid' => (int)$row['id'], 'expires' => time() + 300];
+		}
+		error_log('PASSWORD RESET COMPLETED (staff): username="'.log_safe_string($row['username']).'" id='.$row['id'].' remote='.array_get($_SERVER, 'REMOTE_ADDR', '-'));
+		add_message('Your password has been updated. You can now log in with your new password.', 'success');
+		session_write_close();
+		header('Location: '.build_url(Array('*' => NULL)), true, 303);
+		exit;
 	}
 
 	/**
@@ -506,7 +1132,7 @@ class User_System extends Abstract_User_System
 	/**
 	 * Initialise the 2FA process
 	 * @param array $user_details  The user who has just entered their password correctly
-	 * @return voice
+	 * @return void
 	 */
 	private function _init2FA($user_details)
 	{
@@ -552,7 +1178,7 @@ class User_System extends Abstract_User_System
 
 	/**
 	 * Send the 2FA code by SMS to the 2fa-pending user.
-	 * @param string $message
+	 * @param string $msg
 	 * @param array	$recipient	person record data
 	 * @return boolean TRUE if sent successfully.
 	 */
