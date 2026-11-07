@@ -118,6 +118,16 @@
       "note": "Require 2-factor auth even for accounts with group/congregation restrictions?",
       "options": "boolean"
     },
+    "PASSWORD_RESET_ENABLED": {
+      "type": "select",
+      "label": "Password Reset Enabled",
+      "description": "Offer self-service \"forgot your password\" reset and \"forgot your username\" reminder on the staff login page. Reset links are emailed to the address on the account and must be confirmed with an SMS code sent to the account's mobile number, even for accounts that do not use 2FA at login.",
+      "explanation": "",
+      "default": "1",
+      "fileOnly": true,
+      "note": "Offer self-service \"forgot your password\" reset and \"forgot your username\" reminder on the staff login page. Reset links are emailed to the address on the account and must be confirmed with an SMS code sent to the account's mobile number, even for accounts that do not use 2FA at login.",
+      "options": "boolean"
+    },
     "2FA_TRUST_DAYS": {
       "type": "number",
       "label": "2fa Trust Days",
@@ -716,10 +726,35 @@
     "JETHROAU_API_KEY": {
       "type": "text",
       "label": "jethro.au API key",
-      "description": "API key for the online services jethro.au provides to Jethro sites, such as <em>URL shortening</em> (long URLs in SMS messages). Obtained by <em>Turn on</em> in the <em>jethro.au Services</em> section of System Configuration.",
-      "explanation": "One key covers every service, but each service is turned on separately: <em>Turn on</em> takes you to jethro.au, where you sign in (Google, GitHub or an emailed link) and agree to that service's privacy terms on behalf of your organisation. jethro.au records who agreed and when, and refuses services whose terms the key hasn't agreed to. See the <a href=\"https://jethro.au/url-shortener/privacy\">URL shortener's privacy policy</a>. <em>Turn off</em> withdraws a service's agreement; <em>Deregister</em> revokes the key. On a site run by a hosting provider (<code>JETHROAU_PROVIDER_KEY</code>), the key is obtained automatically and agreements are made within Jethro. Blank = no jethro.au services.",
+      "description": "API key for the online services jethro.au provides to Jethro sites: <em>URL shortening</em> (long URLs in SMS messages) and <em>SMS shortening</em> (a <em>Shorter alternative</em> wording for an SMS to several people that runs just over a segment boundary). Obtained by <em>Turn on</em> in the <em>jethro.au Services</em> section of System Configuration.",
+      "explanation": "One key covers every service, but each service is turned on separately: <em>Turn on</em> takes you to jethro.au, where you sign in (Google, GitHub or an emailed link) and agree to that service's privacy terms on behalf of your organisation. jethro.au records who agreed and when, and refuses services whose terms the key hasn't agreed to. See the privacy policies of the <a href=\"https://jethro.au/url-shortener/privacy\">URL shortener</a> and the <a href=\"https://jethro.au/sms-shortener/privacy\">SMS shortener</a> (which sends message text to Cloudflare Workers AI). <em>Turn off</em> withdraws a service's agreement; <em>Deregister</em> revokes the key. On a site run by a hosting provider (<code>JETHROAU_PROVIDER_KEY</code>), the key is obtained automatically and agreements are made within Jethro. Blank = no jethro.au services.",
       "default": null,
-      "note": "API key for jethro.au services (URL shortening), obtained by enabling a service in the panel above"
+      "note": "API key for jethro.au services (URL shortening, SMS shortening), obtained by enabling a service in the panel above"
+    },
+    "SMS_SHORTEN_MESSAGE_LIMIT": {
+      "type": "text",
+      "label": "Shorter alternative: largest cut",
+      "description": "How far over a segment boundary a message may be and still get a <em>Shorter alternative</em> suggestion: the largest share of its text (0.0 to 1.0) that would need cutting to save a segment. 1.0 (the default) suggests one for every multi-segment SMS to several people.",
+      "explanation": "Lower values skip messages that could only be shortened by losing meaning. For example, at <code>0.3</code> a 228-character message (cut 30% to reach 160) gets a suggestion but a 300-character one (cut 47%) does not; a 310-character message (cut 1% to reach 306) always does. <code>0.0</code> only suggests dropping emoji and similar characters that make a message cost more. Also limits the SMS shortener itself (sent as <code>max_cut</code>), which then makes no AI call. Has no effect unless SMS shortening is enabled (see <code>JETHROAU_API_KEY</code>).",
+      "default": "1.0",
+      "note": "Largest share of a message (0.0 to 1.0) that may need cutting for a shorter wording to be suggested. 1.0 = always suggest one; e.g. 0.3 skips messages far over a segment boundary."
+    },
+    "SMS_SHORTEN_MESSAGE_MINSAVINGS": {
+      "type": "text",
+      "label": "Shorter alternative: smallest saving ($)",
+      "description": "Smallest saving, in dollars across all recipients, for which a <em>Shorter alternative</em> is suggested. Default <code>1</code>; <code>0</code> suggests one whenever a segment can be saved.",
+      "explanation": "The saving is segments saved × recipients × the segment cost the cost estimate uses (<code>SMS_SEGMENT_COST</code> or the provider's price), e.g. saving 1 segment for 50 people at $0.02 is $1.00. Jethro checks the most any rewording could save before asking the AI, so small sends cost no AI call, and checks the actual saving before showing a suggestion. If no segment cost is known, savings can't be priced and this has no effect. Blank or non-numeric = 1.",
+      "default": "1",
+      "note": "Smallest saving, in dollars across all recipients, for which a shorter wording is suggested. Needs a known segment cost."
+    },
+    "SMS_SHORTEN_MESSAGE_SESSION_MAX": {
+      "type": "number",
+      "label": "Shorter alternative: AI calls per session",
+      "description": "Most SMS shortener (AI) calls one login session may make for <em>Shorter alternative</em> suggestions. Unset or <code>0</code> (the default) = unlimited.",
+      "explanation": "Each call counts, including <em>shorter</em> / <em>longer</em> requests and calls that fail; a suggestion Jethro already has for the same text is reused without a call. Once the limit is reached, no more suggestions appear until the user logs in again. Has no effect unless SMS shortening is enabled (see <code>JETHROAU_API_KEY</code>).",
+      "default": null,
+      "fileOnly": true,
+      "note": "Most SMS shortener (AI) calls per login session; unset or 0 = unlimited."
     },
     "JETHROAU_PROVIDER_KEY": {
       "type": "text",
@@ -1304,6 +1339,7 @@
         "DEFAULT_PERMISSIONS",
         "RESTRICTED_USERS_CAN_ADD",
         "PASSWORD_MIN_LENGTH",
+        "PASSWORD_RESET_ENABLED",
         "SESSION_TIMEOUT_MINS",
         "SESSION_MAXLENGTH_MINS"
       ]
@@ -1504,7 +1540,10 @@
         "SMS_SHORTEN_URLS",
         "JETHROAU_API_KEY",
         "JETHROAU_PROVIDER_KEY",
-        "JETHROAU_TENANT"
+        "JETHROAU_TENANT",
+        "SMS_SHORTEN_MESSAGE_LIMIT",
+        "SMS_SHORTEN_MESSAGE_MINSAVINGS",
+        "SMS_SHORTEN_MESSAGE_SESSION_MAX"
       ]
     },
     "legacyGateway": {

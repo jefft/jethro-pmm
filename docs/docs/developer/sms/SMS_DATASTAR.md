@@ -25,6 +25,7 @@ authority**.
 |------|------|
 | `jethro-sms/src/sms_statusline.php` | Pure PHP core + `renderStatusline()` / `renderPreviewPanel()` renderers. |
 | `calls/call_sms_statusline.class.php` | SSE endpoint for the live cost/segment/preview pipeline. Also says which recipients the send would leave out (no mobile number, archived; `Jethro\Sms\leftOutNotice()`), and blocks Send when nobody is left to send to. |
+| `calls/call_sms_shorten.class.php` | SSE endpoint for the "Shorter alternative" box: the textarea posts to it after 3 s without typing (`data-on:input__debounce.3000ms`). See [SMS shortener](../reference/sms-shortener.md). |
 | `include/sse.php` | SSE helper (`sseStart()`, `ssePatchElements()`, `ssePatchSignals()`). Used because the statusline response streams both HTML and signals in one request; a one-shot response could also patch signals from a plain `application/json` body. |
 | `resources/js/datastar-1.0.4.min.js` | Vendored Datastar v1.0.4 ESM bundle. |
 | `include/jethro_sms.php` | `printTextbox()` / `printBulkSmsForm()` / `printSmsModal()` — carries Datastar attributes, ids, initial server render. |
@@ -72,6 +73,7 @@ nginx/php-fpm don't buffer the stream (see `nginx/CLAUDE_NGINX.md`).
 | `$smspreview` / `$smspreviewbulk` | `data-bind` on preview checkbox | Show/hide the preview panel wrapper |
 | `$smsSendBlocked` | SSE `datastar-patch-signals` | `true` when blocked (unicode policy or over budget) |
 | `$smsBlockReason` | SSE `datastar-patch-signals` | Human-readable block reason |
+| `$smsshortersource` / `$smsshortersourcebulk` | SSE `datastar-patch-signals` (`Call_SMS_Shorten`) | Text the current suggestion rewords; `#sms-shorter<suffix>` shows only while `$smsmessage<suffix>` equals it |
 | `$editingRow` | Pencil button `data-on:click` | Key of the preview row in edit mode |
 | `$smsoverride_<KEY>` | `data-bind` on override textarea | Override text for that row's message |
 
@@ -100,7 +102,8 @@ nginx/php-fpm don't buffer the stream (see `nginx/CLAUDE_NGINX.md`).
   carries `data-on:change__window__debounce.300ms`, filtered to `personid[]`
   boxes and the list's `.select-all` box, because those live in the list
   table rather than inside `#smshttp`. It only fires once a message has been
-  typed.
+  typed. A second, 3-second listener re-runs the shorter-alternative check
+  (`?call=sms_shorten`) when the SMS shortener is configured.
 - `{contentType: 'form'}` submits the enclosing `<form>` so `sender`,
   `sms_type`, `personid[]` and `message_overrides[...]` ride along.
 
