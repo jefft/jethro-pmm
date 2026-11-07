@@ -97,7 +97,21 @@ class Staff_Member extends Person
 		return Array(
 
 			$this->_getInitSQL(),
-			
+
+			// Password-reset request and username-reminder state, managed with raw SQL in
+			// User_System and kept out of _getFields() so the ORM never exposes
+			// password-adjacent columns - same approach as _person.resethash for member resets.
+			// See docs/docs/developer/reference/password-reset.mdx: every reset request
+			// requires an SMS code, so resetsmssent records the last reserved send for
+			// cooldown and code expiry.
+			'ALTER TABLE `staff_member`
+				ADD COLUMN `resethash` VARCHAR(255) DEFAULT NULL,
+				ADD COLUMN `resetexpires` DATETIME DEFAULT NULL,
+				ADD COLUMN `resetsmshash` VARCHAR(255) DEFAULT NULL,
+				ADD COLUMN `resetsmssent` DATETIME DEFAULT NULL,
+				ADD COLUMN `resetsmsattempts` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+				ADD COLUMN `usernamereminded` DATETIME DEFAULT NULL',
+
 			'CREATE TABLE `2fa_trust` (
 			  `userid` int(11) NOT NULL,
 			  `token` varchar(255) NOT NULL,
@@ -463,8 +477,17 @@ class Staff_Member extends Person
 		// Only admins can edit staff other than themselves
 		if (!empty($GLOBALS['JETHRO_INSTALLING']) || ($GLOBALS['user_system']->getCurrentUser('id') == $this->id) || $GLOBALS['user_system']->havePerm(PERM_SYSADMIN)) {
 
+			// A password change (by the user, an admin or bin/jethro_resetpassword) voids
+			// any outstanding self-service reset request (docs/docs/developer/reference/password-reset.mdx).
+			$passwordChanged = array_key_exists('password', $this->_old_values);
+
 			// Save main fields
-			parent::save();
+			if (parent::save() && $passwordChanged) {
+				$GLOBALS['db']->exec('UPDATE staff_member
+										SET resethash = NULL, resetexpires = NULL,
+											resetsmshash = NULL, resetsmssent = NULL, resetsmsattempts = 0
+										WHERE id = '.(int)$this->id);
+			}
 
 			// Save restrictions
 			if (isset($this->_old_restrictions)) {

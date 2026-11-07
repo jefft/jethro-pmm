@@ -2799,6 +2799,46 @@ div#send-sms-modal div.results {
 	color: #999;
 }
 
+/* Composer's "Shorter alternative" (Jethro\Sms\renderShorterSuggestion()):
+   beside the textarea in a wrapping flex row (below it when there is no
+   room, e.g. in the send modal); fades in each time data-show reveals it. */
+.sms-compose-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 6px 12px;
+}
+.sms-compose-row textarea.sms-message {
+	margin-bottom: 0;
+}
+@keyframes sms-shorter-fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+.sms-shorter.alert {
+	margin: 0;
+	flex: 1 1 16em;
+	max-width: 28em;
+	animation: sms-shorter-fade-in 0.8s ease-in;
+}
+.sms-shorter-text {
+	margin: 4px 0;
+	white-space: pre-wrap;
+	color: #333;
+}
+
+/* Beside the bulk form's textarea, raise the box so the suggestion's first
+   line lines up with the message's: its heading line (20px) + text margin
+   (4px) + alert padding and border (8px + 1px), less the textarea's border
+   and padding (1px + 4px) = 28px. Only on desktop widths, where the two sit
+   side by side; when the box wraps below the textarea it must not overlap it.
+   !important because ".control-group .alert" sets margin: 0 !important. */
+@media (min-width: 980px) {
+	#smshttp .sms-shorter.alert {
+		margin-top: -28px !important;
+	}
+}
+
 /* Narrower control-label for the SMS form — labels like "To:" don't need 160px */
 #smshttp .control-label,
 #send-sms-modal .control-label {

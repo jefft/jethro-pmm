@@ -271,9 +271,13 @@ UPDATE setting SET note = 'Character limit for SMS messages sent from the web UI
 INSERT IGNORE INTO setting
 	(`rank`, heading, symbol, note, type, value)
 VALUES
-	(@sms_base + 150, 'jethro.au Services', 'JETHROAU_API_KEY', 'API key for jethro.au services (URL shortening), obtained by enabling a service in the panel above', 'text', '');
--- Also for a row an earlier run placed elsewhere.
+	(@sms_base + 150, 'jethro.au Services', 'JETHROAU_API_KEY', 'API key for jethro.au services (URL shortening, SMS shortening), obtained by enabling a service in the panel above', 'text', ''),
+	(@sms_base + 160, 'SMS Shortening', 'SMS_SHORTEN_MESSAGE_LIMIT', 'Largest share of a message (0.0 to 1.0) that may need cutting for a shorter wording to be suggested. 1.0 = always suggest one; e.g. 0.3 skips messages far over a segment boundary.', 'text', '1.0'),
+	(@sms_base + 165, '', 'SMS_SHORTEN_MESSAGE_MINSAVINGS', 'Smallest saving, in dollars across all recipients, for which a shorter wording is suggested. Needs a known segment cost.', 'text', '1');
+-- Also for rows an earlier run placed elsewhere.
 UPDATE setting SET `rank` = @sms_base + 150 WHERE symbol = 'JETHROAU_API_KEY';
+UPDATE setting SET `rank` = @sms_base + 160, heading = 'SMS Shortening' WHERE symbol = 'SMS_SHORTEN_MESSAGE_LIMIT';
+UPDATE setting SET `rank` = @sms_base + 165 WHERE symbol = 'SMS_SHORTEN_MESSAGE_MINSAVINGS';
 
 -- Sites that ran an earlier 2.40-DEV upgrade have the key in URLSHORTENER_API_KEY (or, briefly,
 -- SMSSHORTENER_API_KEY). Move it to JETHROAU_API_KEY and drop the old rows. The joins match no rows,
@@ -371,6 +375,50 @@ VALUES ('JETHROAU_SERVICES', 'hidden', '',
 --   HTTP_HOST=example.org php ./scripts/sms.php export-smslog
 -- Idempotent: DELETE WHERE returns 0 rows if already deleted.
 DELETE FROM setting WHERE symbol = 'SMS_SEND_LOGFILE';
+
+
+-- =========================================================================
+-- Self-service staff password reset (see docs/docs/developer/reference/password-reset.mdx)
+--
+-- Per-account reset request and username-reminder state on staff_member, written
+-- by raw SQL in User_System (kept out of the ORM like _person.resethash for member resets):
+--   resethash         bcrypt hash of the single-use emailed token (never the token itself)
+--   resetexpires      when the request stops being usable (24h after it was armed)
+--   resetsmshash      bcrypt hash of the current SMS code (never the code itself)
+--   resetsmssent      last reserved SMS send, used for the 60s cooldown and 10m code expiry
+--   resetsmsattempts  total SMS codes tried against the current request (2 allowed)
+--   usernamereminded  when a "forgot username" reminder last went out (1 per hour)
+-- Every reset request requires an SMS code, so there is no separate requirement flag.
+-- Column definitions must match db_objects/staff_member.class.php getInitSQL().
+--
+-- Idempotent on both MariaDB and MySQL: MySQL has no "ADD COLUMN IF NOT EXISTS"
+-- (MariaDB-only), so build one ALTER from whichever of the columns
+-- information_schema reports as missing. CONCAT_WS skips the NULL entries, and
+-- an empty list is a no-op. Same approach as the collation ALTER above.
+SET @staff_reset_missing = CONCAT_WS(', ',
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resethash') = 0,
+		'ADD COLUMN `resethash` VARCHAR(255) DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetexpires') = 0,
+		'ADD COLUMN `resetexpires` DATETIME DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetsmshash') = 0,
+		'ADD COLUMN `resetsmshash` VARCHAR(255) DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetsmssent') = 0,
+		'ADD COLUMN `resetsmssent` DATETIME DEFAULT NULL', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'resetsmsattempts') = 0,
+		'ADD COLUMN `resetsmsattempts` TINYINT UNSIGNED NOT NULL DEFAULT 0', NULL),
+	IF((SELECT COUNT(*) FROM information_schema.columns
+		WHERE table_schema = DATABASE() AND table_name = 'staff_member' AND column_name = 'usernamereminded') = 0,
+		'ADD COLUMN `usernamereminded` DATETIME DEFAULT NULL', NULL)
+);
+SET @staff_reset_sql = IF(@staff_reset_missing = '', 'DO 0', CONCAT('ALTER TABLE staff_member ', @staff_reset_missing));
+PREPARE staff_reset_stmt FROM @staff_reset_sql;
+EXECUTE staff_reset_stmt;
+DEALLOCATE PREPARE staff_reset_stmt;
 
 SET @rank = (SELECT `rank` FROM setting WHERE symbol = 'MEMBER_LOGIN_ENABLED');
 

@@ -95,7 +95,7 @@ require_once __DIR__ . '/Jethro/Sms/SmsRequestRecipients.php';
 require_once __DIR__ . '/Jethro/Sms/JethroSmsDelivery.php';
 require_once __DIR__ . '/Jethro/Sms/JethroSmsDeliveryBatch.php';
 require_once __DIR__ . '/Jethro/Sms/SessionSmsCache.php';
-require_once __DIR__ . '/jethroau.php';   // JethroAu; loads the URL shortener client
+require_once __DIR__ . '/jethroau.php';   // JethroAu; loads the URL and SMS shortener clients
 
 use Sms\AllSent;
 use Sms\Failed;
@@ -2035,8 +2035,9 @@ function printSmsModal(): void
  * fills #sms-send-response-bulk / #bulk-sms-results.
  *
  * Ticking or unticking people (a personid[] box, or the list's select-all
- * box) changes the recipients, so it re-posts the statusline. The boxes are
- * in the list table, not inside this element, so the listener is on window
+ * box) changes the recipients, so it re-posts the statusline, and the
+ * shorter-alternative check when available. The boxes are in the list
+ * table, not inside this element, so the listener is on window
  * (data-on:change__window), filtered to those boxes and debounced; it only
  * fires once a message has been typed.
  *
@@ -2052,7 +2053,8 @@ function printBulkSmsForm(string $noteType = 'person'): void
 	$recipientsChanged = "\$smsmessagebulk.trim() !== '' && (evt.target.name === 'personid[]' || evt.target.classList.contains('select-all'))";
 	?>
 	<div class="bulk-action well form-horizontal" id="smshttp" data-signals:smstype="'person'"
-	     data-on:change__window__debounce.300ms="<?php echo ents($recipientsChanged . " && @post('?call=sms_statusline', {contentType: 'form'})"); ?>">
+	     data-on:change__window__debounce.300ms="<?php echo ents($recipientsChanged . " && @post('?call=sms_statusline', {contentType: 'form'})"); ?>"
+	     <?php if (shorterSuggestionAvailable()): ?>data-on:change__window__debounce.3000ms="<?php echo ents($recipientsChanged . " && @post('?call=sms_shorten', {contentType: 'form'})"); ?>"<?php endif; ?>>
 		<input type="hidden" name="note_type" value="<?php echo ents($noteType); ?>" />
 		<input type="hidden" name="sms_form" value="bulk" />
 		<div class="control-group">
@@ -2273,15 +2275,25 @@ function printTextbox(string $idSuffix = ''): void
 	// personid[] and message_overrides ride along. The hidden id fields tell
 	// the SSE endpoint which elements to morph.
 	$post = "@post('?call=sms_statusline', {contentType: 'form'})";
+	// After 3s without typing, ask ?call=sms_shorten for a shorter rewording
+	// (it decides whether the message qualifies); see renderShorterSuggestion().
+	$shorterPost = "@post('?call=sms_shorten', {contentType: 'form'})";
 	?>
     <input type="hidden" name="statusline_id" value="<?php echo ents($statuslineId); ?>" />
     <input type="hidden" name="preview_id" value="<?php echo ents($previewId); ?>" />
     <input type="hidden" name="shorten_toggle_id" value="<?php echo ents($shortenToggleId); ?>" />
+    <?php // The textarea and the Shorter alternative box sit side by side
+          // (.sms-compose-row is a wrapping flex row), so the suggestion can be
+          // read against the message; in a narrow modal the box wraps below. ?>
+    <div class="sms-compose-row">
     <textarea class="sms-message span4" name="message"
               data-bind:<?php echo ents($sig); ?>
               data-on:input__debounce.300ms="<?php echo ents($post); ?>"
+              <?php if (shorterSuggestionAvailable()): ?>data-on:input__debounce.3000ms="<?php echo ents($shorterPost); ?>"<?php endif; ?>
               data-is-sysadmin="<?php echo $GLOBALS['user_system']->havePerm(PERM_SYSADMIN); ?>"
               rows="5" cols="30" maxlength="<?php echo ifdef('SMS_MAX_LENGTH') ?: 160; ?>"></textarea>
+    <?php echo renderShorterSuggestion($idSuffix); ?>
+    </div>
     <?php // One combined counter line: the live client-side char count
           // ($<sig>.length — the only client-side maths left) immediately
           // followed by the server-rendered segment/cost/recipient figures,
@@ -2372,6 +2384,283 @@ function renderShortenUrlsToggle(string $id, string $message, ?bool $shortenUrls
 		. '<label class="checkbox"><input type="checkbox" name="shorten_urls" value="1"'
 		. ' data-on:change="' . ents($post) . '"' . ($on ? ' checked="checked"' : '') . ' /> Shorten URLs</label>'
 		. '</div></div>';
+}
+
+/**
+ * Whether the composer offers a "Shorter alternative": SMS shortening is
+ * enabled ({@see \JethroAu::serviceEnabled()}: SMSSHORTENER is usable, and
+ * the jethro.au key has agreed to the SMS shortener's terms).
+ *
+ * See docs/docs/developer/reference/sms-shortener.md.
+ */
+function shorterSuggestionAvailable(): bool
+{
+	return \JethroAu::serviceEnabled('sms-shortener');
+}
+
+/**
+ * Segments the composed text uses, before %token% expansion: GSM-7 160/153
+ * per segment, or UCS-2 70/67 when it has any non-GSM character.
+ *
+ * With $shortenUrls, long bare URLs count as their shortened length, as in
+ * the statusline ({@see \Sms\shortenUrlsInText()}).
+ */
+function templateSegmentCount(string $message, bool $shortenUrls): int
+{
+	$text = $shortenUrls ? \Sms\shortenUrlsInText($message) : $message;
+	return \Sms\getNonGsmChars($text) !== []
+		? \Sms\ucs2SegmentCount(\Sms\utf16Length($text))
+		: \Sms\gsmSegmentCount(\Sms\gsmLength($text));
+}
+
+/**
+ * Largest share of a message's text a rewording may have to cut to save a
+ * segment, from SMS_SHORTEN_MESSAGE_LIMIT: 0.0 to 1.0, where 1.0 (the
+ * default, also used for blank or non-numeric values) means always offer one.
+ * Lower values skip messages too far over a boundary to shorten without
+ * losing meaning, e.g. 0.3 accepts 228 characters into 160 but not 300.
+ * Sent to the SMS shortener as max_cut, so both apply the same limit.
+ */
+function shorterSuggestionMaxCut(): float
+{
+	$value = trim((string) ifdef('SMS_SHORTEN_MESSAGE_LIMIT', '1.0'));
+	return is_numeric($value) ? max(0.0, min(1.0, (float) $value)) : 1.0;
+}
+
+/**
+ * Smallest saving, in dollars across all recipients, worth offering a shorter
+ * wording for: SMS_SHORTEN_MESSAGE_MINSAVINGS, default 1 (also used for blank
+ * or non-numeric values; negative values mean 0). Small sends rarely justify
+ * an AI call and a reworded message.
+ */
+function shorterSuggestionMinSavings(): float
+{
+	$value = trim((string) ifdef('SMS_SHORTEN_MESSAGE_MINSAVINGS', '1'));
+	return is_numeric($value) ? max(0.0, (float) $value) : 1.0;
+}
+
+/**
+ * Whether saving $segmentsSaved segments for each of $recipientCount
+ * recipients, at $segmentCost dollars a segment, reaches $minSavings dollars.
+ * Compared in whole cents, as the statusline shows costs.
+ *
+ * Call_SMS_Shorten asks this twice: before the AI call with the most any
+ * rewording could save (all but one segment), and after it with the actual
+ * saving. An unknown segment cost (0) can't be priced, so it always passes.
+ */
+function shorterSuggestionWorthIt(int $recipientCount, int $segmentsSaved, float $segmentCost, float $minSavings): bool
+{
+	if ($segmentCost <= 0) {
+		return true;
+	}
+	return round($recipientCount * $segmentsSaved * $segmentCost * 100) >= round($minSavings * 100);
+}
+
+/** Rewordings remembered per session ({@see shorterSuggestionCachePut()}). */
+const SHORTER_SUGGESTION_CACHE_SIZE = 20;
+
+/**
+ * Cache key for a rewording: the composed text, whether Shorten URLs is on
+ * (it changes the segment counts), and the segment count asked for.
+ */
+function shorterSuggestionCacheKey(string $message, bool $shortenUrls, int $segments): string
+{
+	return sha1($segments . "\0" . (int)$shortenUrls . "\0" . $message);
+}
+
+/**
+ * A rewording the SMS shortener already returned for $key this session, or
+ * null. Lets "shorter" then "longer", or the same text posted again (e.g.
+ * after ticking recipients), skip a second AI call.
+ */
+function shorterSuggestionCacheGet(string $key): ?string
+{
+	$value = $_SESSION['sms_shorter_cache'][$key] ?? null;
+	return is_string($value) ? $value : null;
+}
+
+/**
+ * Remember a rewording for $key, keeping only the SHORTER_SUGGESTION_CACHE_SIZE
+ * most recent, so the session stays small however much is typed.
+ * The session must be open.
+ */
+function shorterSuggestionCachePut(string $key, string $reworded): void
+{
+	$cache = $_SESSION['sms_shorter_cache'] ?? [];
+	unset($cache[$key]);
+	$cache[$key] = $reworded;
+	$_SESSION['sms_shorter_cache'] = array_slice($cache, -SHORTER_SUGGESTION_CACHE_SIZE, null, true);
+}
+
+/**
+ * How many times each %token% occurs in a message template: variables
+ * (`%firstname%`, `%selected.firstname%`) and function calls
+ * (`%(shorten "https://…")%`, whose quoted arguments may contain `%`). A
+ * bare `%` as in "20% off" is not a token. Keys are the tokens as written,
+ * sorted, so two templates use the same tokens exactly when their counts are
+ * equal (===).
+ *
+ * Call_SMS_Shorten compares a rewording's counts with the typed message's,
+ * and does not offer a rewording that lost, added or changed a token.
+ *
+ * @return array<string, int>
+ */
+function templateTokenCounts(string $message): array
+{
+	preg_match_all('/%(?:\((?:"[^"]*"|[^)"])*\)|[A-Za-z_][A-Za-z0-9_.]*)%/', $message, $matches);
+	$counts = array_count_values($matches[0]);
+	ksort($counts, SORT_STRING);
+	return $counts;
+}
+
+/**
+ * Most SMS shortener (AI) calls one login session may make, from the
+ * conf.php-only SMS_SHORTEN_MESSAGE_SESSION_MAX; null = unlimited (the
+ * default, also for 0, blank or non-numeric values).
+ */
+function shorterSuggestionSessionMax(): ?int
+{
+	$value = trim((string) ifdef('SMS_SHORTEN_MESSAGE_SESSION_MAX', ''));
+	return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
+}
+
+/**
+ * Whether this session may make another SMS shortener call: fewer than
+ * {@see shorterSuggestionSessionMax()} so far ({@see shorterSuggestionCountCall()}).
+ */
+function shorterSuggestionCallAllowed(): bool
+{
+	$max = shorterSuggestionSessionMax();
+	return $max === null || (int) ($_SESSION['sms_shorter_calls'] ?? 0) < $max;
+}
+
+/**
+ * Count one SMS shortener call against the session's
+ * SMS_SHORTEN_MESSAGE_SESSION_MAX. The session must be open.
+ */
+function shorterSuggestionCountCall(): void
+{
+	$_SESSION['sms_shorter_calls'] = (int) ($_SESSION['sms_shorter_calls'] ?? 0) + 1;
+}
+
+/**
+ * Whether a message is worth rewording: it goes to more than one recipient,
+ * its composed text is longer than one segment, and fitting one segment
+ * fewer means cutting at most $maxCut of it ({@see shorterSuggestionMaxCut()}).
+ *
+ * Rewordings are GSM-7, so the cut is measured against GSM-7 capacity: a
+ * UCS-2 message within it qualifies, as normalising its typographic
+ * characters or dropping its emoji may be all it needs.
+ *
+ * @param float $maxCut 0.0 to 1.0; 1.0 = every multi-segment message to several people
+ */
+function wantsShorterSuggestion(string $message, int $recipientCount, bool $shortenUrls, float $maxCut): bool
+{
+	if ($recipientCount <= 1 || trim($message) === '') {
+		return false;
+	}
+	$segments = templateSegmentCount($message, $shortenUrls);
+	if ($segments <= 1) {
+		return false;
+	}
+	$text = $shortenUrls ? \Sms\shortenUrlsInText($message) : $message;
+	$length = \Sms\getNonGsmChars($text) !== [] ? \Sms\utf16Length($text) : \Sms\gsmLength($text);
+	$capacity = $segments - 1 === 1 ? 160 : ($segments - 1) * 153;
+	return ($length - $capacity) / $length <= $maxCut;
+}
+
+/**
+ * Datastar signal names of a composer's shorter-alternative box.
+ *
+ * @param string $idSuffix '' for the modal, '-bulk' for the bulk form
+ * @return array{message: string, source: string, rewording: string}
+ *         message: the textarea's bound signal (as in printTextbox());
+ *         source: the text the current suggestion rewords (set by Call_SMS_Shorten);
+ *         rewording: true while a "shorter"/"longer" request is in flight (data-indicator)
+ */
+function shorterSuggestionSignals(string $idSuffix): array
+{
+	// Lowercase only: see printTextbox() on browsers lowercasing attribute names.
+	$clean = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $idSuffix));
+	return ['message' => 'smsmessage' . $clean, 'source' => 'smsshortersource' . $clean, 'rewording' => 'smsrewording' . $clean];
+}
+
+/**
+ * Render the composer's "Shorter alternative" box, #sms-shorter<suffix>.
+ *
+ * printTextbox() renders it empty and hidden; Call_SMS_Shorten morphs in a
+ * suggestion after 3 seconds without typing. The box is shown only while the
+ * textarea still holds the text that was reworded (data-show compares the
+ * message signal with the source signal), so typing hides a stale suggestion
+ * and a reply that arrives after further typing never appears. CSS fades it
+ * in. The heading gives the saving: "(Reduces cost from $x to $y)", the cost
+ * before and after (segments × recipients × segment cost, as the statusline's
+ * \Sms\buildCostLine() computes it), or "(Saves N segments per recipient)"
+ * when the segment cost or recipient count is unknown. The "Use instead?"
+ * link calls JethroSMS.useShorterSuggestion(), which puts data-suggestion
+ * into the textarea. Beside it, "(shorter | longer)" ask Call_SMS_Shorten
+ * again (?call=sms_shorten&segments=N) for one segment fewer, down to a
+ * single 160-character segment, or one more, up to one less than the typed
+ * message; each link only shows while that is possible.
+ *
+ * @param string      $idSuffix       '' for the modal, '-bulk' for the bulk form
+ * @param string|null $suggestion     Reworded message; null renders the empty, hidden box
+ * @param int         $fromSegments   Segments of the typed message
+ * @param int         $toSegments     Segments of $suggestion
+ * @param int         $recipientCount Recipients the message goes to
+ * @param float       $segmentCost    Dollars per segment (SmsStatuslineConfig::$segmentCost)
+ * @return string HTML <div id="sms-shorter<suffix>">
+ */
+function renderShorterSuggestion(string $idSuffix, ?string $suggestion = null, int $fromSegments = 0, int $toSegments = 0,
+                                 int $recipientCount = 0, float $segmentCost = 0.0): string
+{
+	$id = 'sms-shorter' . $idSuffix;
+	if ($suggestion === null) {
+		return '<div id="' . ents($id) . '" class="sms-shorter" style="display:none"></div>';
+	}
+	$sig = shorterSuggestionSignals($idSuffix);
+	$plural = fn (int $n): string => $n . ' segment' . ($n === 1 ? '' : 's');
+	$cost = fn (int $segments): string => '$' . number_format($segments * $recipientCount * $segmentCost, 2);
+	$saving = $recipientCount > 0 && $segmentCost > 0
+		? 'Reduces cost from ' . $cost($fromSegments) . ' to ' . $cost($toSegments)
+		: 'Saves ' . $plural($fromSegments - $toSegments) . ' per recipient';
+	return '<div id="' . ents($id) . '" class="sms-shorter alert alert-info" style="display:none"'
+		. ' data-show="' . ents('$' . $sig['message'] . ' === $' . $sig['source']) . '"'
+		. ' data-suggestion="' . ents($suggestion) . '">'
+		. '<strong>Shorter alternative</strong> <span class="sms-shorter-saving">(' . ents($saving) . ')</span>:'
+		. '<div class="sms-shorter-text">' . ents($suggestion) . '</div>'
+		. '<a href="#" class="sms-shorter-use" data-on:click__prevent="JethroSMS.useShorterSuggestion(el)">Use instead?</a>'
+		. shorterSuggestionResizeLinks($sig['rewording'], $fromSegments, $toSegments)
+		. '</div>';
+}
+
+/**
+ * The "(shorter | longer)" links after "Use instead?": each re-asks
+ * Call_SMS_Shorten for one segment fewer or more than the current
+ * suggestion. "shorter" needs the suggestion to be over one segment;
+ * "longer" needs it to stay under the typed message's $fromSegments.
+ *
+ * @param string $rewordingSignal Datastar signal set while either request is in flight
+ * @return string HTML; '' when neither link applies
+ */
+function shorterSuggestionResizeLinks(string $rewordingSignal, int $fromSegments, int $toSegments): string
+{
+	$link = fn (string $class, string $label, int $segments): string => '<a href="#" class="' . $class . '"'
+		. ' data-indicator:' . ents($rewordingSignal)
+		. ' data-on:click__prevent="' . ents("@post('?call=sms_shorten&segments=" . $segments . "', {contentType: 'form'})") . '">'
+		. $label . '</a>';
+	$links = [];
+	if ($toSegments > 1) {
+		$links[] = $link('sms-shorter-shorter', 'shorter', $toSegments - 1);
+	}
+	if ($toSegments < $fromSegments - 1) {
+		$links[] = $link('sms-shorter-longer', 'longer', $toSegments + 1);
+	}
+	if ($links === []) {
+		return '';
+	}
+	return ' (' . implode(' | ', $links) . ')'
+		. ' <span class="sms-shorter-busy soft" style="display:none" data-show="$' . ents($rewordingSignal) . '">rewording…</span>';
 }
 
 

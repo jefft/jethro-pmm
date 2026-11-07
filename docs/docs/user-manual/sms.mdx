@@ -194,6 +194,22 @@ For **bulk** messages, there are further features:
 
     ![Screenshot](/img/sms/group_sms_dialog_messagepreview.png)
 
+### Shorter alternative
+
+When a message is longer than one segment and goes to more than one person, Jethro can suggest a shorter wording that fits in one segment fewer. Pause typing for 3 seconds and, if a shorter wording is found, it fades in beside the message (or below it, where there is no room):
+
+> **Shorter alternative** (Reduces cost from $2.40 to $1.20):<br/>
+> Hi %firstname%, working bee Sat 8am-noon at the hall. Bring gloves, hat & water. https://example.com/working-bee<br/>
+> <u>Use instead?</u>
+
+Click **Use instead?** to replace your message with the suggestion, which you can then edit. Keep typing instead and the suggestion disappears. For a message several segments long, **(shorter | longer)** after it asks for a new suggestion one segment shorter (down to a single 160-character SMS) or one segment longer (keeping more of your wording). Suggestions keep `%tokens%`, URLs and phone numbers unchanged, but they are written by an AI model: read one before sending it.
+
+A suggestion is only offered when it would save at least $1 across all recipients (e.g. one segment for 50 people at 2c a segment), so small sends aren't interrupted; an administrator can change that with the [`SMS_SHORTEN_MESSAGE_MINSAVINGS`](../administration/config/sms.mdx#cost-and-url-shortening) setting. They can also limit suggestions with [`SMS_SHORTEN_MESSAGE_LIMIT`](../administration/config/sms.mdx#cost-and-url-shortening), e.g. to `0.3` so that messages needing more than 30% of their text cut (300 characters into 160) are left alone, as shortening them loses meaning. Suggestions are free, but an administrator must first turn them on: in System Configuration's **jethro.au Services** section, click **Turn on SMS shortening** and agree to the SMS shortener's terms on behalf of your organisation. On most sites that means signing in on jethro.au (Google, GitHub or an emailed link); on a site run by a hosting provider, ticking the box in Jethro is enough.
+
+:::caution Privacy
+With suggestions turned on, the text of qualifying messages (not recipients' names or numbers) is sent to jethro.au and processed by Cloudflare Workers AI, which runs Meta's Llama model on Cloudflare's own servers. Neither keeps the text. Turning it on agrees to this on behalf of your organisation, and jethro.au records who agreed and when; read the [SMS shortener privacy policy](https://jethro.au/sms-shortener/privacy) first, and consider leaving the feature off if your SMSes carry sensitive pastoral, health or safeguarding information. **Turn off SMS shortening** in the same section withdraws the agreement.
+:::
+
 ### Insufficient balance
 
 Before you send, Jethro checks that your SMS account has enough credit for the whole message: one credit per segment, for every number it goes to. If it hasn't, the cost counter shows

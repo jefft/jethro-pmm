@@ -13,6 +13,7 @@
 //   - applying a send's outcome to the page: row classes, closing the modal,
 //     reloading a visible Messages tab (JethroSMS.applySendOutcome);
 //   - defaulting the scheduled-send time;
+//   - "Use this instead" for the composer's shorter-alternative suggestion;
 //   - the Persons → Messages cost total and row layout (updateSmsCostSum).
 // See docs/docs/developer/sms/send-pipeline.mdx and SMS_DATASTAR.md.
 // =============================================================================
@@ -93,6 +94,22 @@ JethroSMS.confirmBulkRecipients = function(button) {
 	}
 	boxes.prop('checked', true);
 	return true;
+};
+
+/**
+ * "Use this instead" in the composer's Shorter alternative box
+ * (Jethro\Sms\renderShorterSuggestion()): replace the message with the
+ * suggestion. The synthetic input event updates the textarea's Datastar
+ * signal, which hides the box, and re-runs the statusline post.
+ *
+ * @param {HTMLElement} link  The "Use this instead" link, inside div.sms-shorter.
+ */
+JethroSMS.useShorterSuggestion = function(link) {
+	var box = link.closest('.sms-shorter');
+	var textarea = box.closest('.controls').querySelector('textarea.sms-message');
+	textarea.value = box.getAttribute('data-suggestion');
+	textarea.dispatchEvent(new Event('input', {bubbles: true}));
+	textarea.focus();
 };
 
 /**
