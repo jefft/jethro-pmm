@@ -172,10 +172,10 @@ test.describe("Staff recovery contacts are protected in the members area", () =>
     const passwordHex = sql("SELECT HEX(password) FROM staff_member WHERE username = 'demo'");
     const ids = sql(`
       START TRANSACTION;
-      INSERT INTO family
+      INSERT INTO _family
         (family_name, address_street, address_suburb, address_state, address_postcode, home_tel, status, history)
         SELECT 'Contact Fixture', address_street, address_suburb, address_state, address_postcode, '', status, ''
-        FROM family WHERE id = (SELECT familyid FROM _person WHERE id = 9);
+        FROM _family WHERE id = (SELECT familyid FROM _person WHERE id = 9);
       SET @family_id = LAST_INSERT_ID();
       INSERT INTO _person
         (familyid, first_name, last_name, gender, age_bracketid, email, mobile_tel, work_tel,
@@ -256,7 +256,7 @@ test.describe("Staff recovery contacts are protected in the members area", () =>
               OR (object_type = 'family' AND objectid = ${fixture.familyId});
             DELETE FROM staff_member WHERE id = ${fixture.staffId};
             DELETE FROM _person WHERE familyid = ${fixture.familyId};
-            DELETE FROM family WHERE id = ${fixture.familyId};`);
+            DELETE FROM _family WHERE id = ${fixture.familyId};`);
         }
       });
     }
