@@ -69,7 +69,7 @@ WHERE ...;
 
 The `family` view does the same for `address_street`, `address_suburb`, `address_state`, `address_postcode` and `home_tel`. The `custom_field_value` view returns only rows of fields the session may see.
 
-`Person` and `Family` read through the views and write `_person` / `_family`. Scripts that run without a Jethro session (shell scripts using the `mysql` client) must read the base tables `_family` and `_custom_field_value`; the views would return blank or no data.
+`Person` and `Family` read through the views and write `_person` / `_family`. Scripts and functional-test fixtures that run without a Jethro session (shell scripts using the `mariadb` client) must read and write the base tables `_person`, `_family` and `_custom_field_value`; the views would return blank or no data, and MariaDB refuses writes through them (`ERROR 1393: Can not modify more than one base table through a join view`, because the `CASE`/function expressions make them non-updatable).
 
 ## Write guard
 
