@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7f227bf47b004c63555e9020e6f816a0",
+    "content-hash": "4deeb4671b09ea6828b7b45040eb05fe",
     "packages": [
         {
             "name": "cweagans/composer-configurable-plugin",
@@ -361,6 +361,46 @@
                 "issues": "https://github.com/jethro-chms/jethro-sms/issues"
             },
             "time": "2026-11-17T10:04:07+00:00"
+        },
+        {
+            "name": "jethro/jethro-sms-shortener",
+            "version": "v0.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jethro-chms/jethro-sms-shortener.git",
+                "reference": "9462462e101477dd818277332e1d5201b6759f7a"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jethro-chms/jethro-sms-shortener/zipball/9462462e101477dd818277332e1d5201b6759f7a",
+                "reference": "9462462e101477dd818277332e1d5201b6759f7a",
+                "shasum": ""
+            },
+            "require": {
+                "ext-curl": "*",
+                "ext-json": "*",
+                "php": ">=8.1"
+            },
+            "type": "library",
+            "autoload": {
+                "files": [
+                    "src/php/SmsShortener.php"
+                ]
+            },
+            "scripts": {
+                "test": [
+                    "php src/php/test.php"
+                ]
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Rewords SMS messages to fit in fewer segments, via a Cloudflare Workers AI service",
+            "support": {
+                "source": "https://github.com/jethro-chms/jethro-sms-shortener/tree/v0.2.0",
+                "issues": "https://github.com/jethro-chms/jethro-sms-shortener/issues"
+            },
+            "time": "2026-11-17T22:36:42+00:00"
         },
         {
             "name": "jethro/jethro-url-shortener",

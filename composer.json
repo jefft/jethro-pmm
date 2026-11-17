@@ -6,6 +6,10 @@
         },
         {
             "type": "vcs",
+            "url": "https://github.com/jethro-chms/jethro-sms-shortener"
+        },
+        {
+            "type": "vcs",
             "url": "https://github.com/jethro-chms/jethro-url-shortener"
         },
         {
@@ -21,6 +25,7 @@
         "cweagans/composer-patches": "^2.0",
         "drewm/mailchimp-api": "@stable",
         "jethro/jethro-sms": "^2.40",
+        "jethro/jethro-sms-shortener": "^0.2",
         "jethro/jethro-url-shortener": "^0.3",
         "jethro/jethro-utils": "^1.0",
         "phpoffice/phpword": "v0.18.*",

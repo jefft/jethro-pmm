@@ -426,8 +426,11 @@ class Installer
 			-- SMS_LOCAL/INTERNATIONAL_PREFIX overrides are not created; the 2.40 upgrade deletes them
 			-- when blank/default. They can still be defined in conf.php (code defaults: '0' / '90').
 			-- Synced with upgrades/2026-upgrade-to-2.40.sql:266 — own heading so its status panel is shown
-			(@rank:=@rank+5, 'jethro.au Services',       'JETHROAU_API_KEY','API key for jethro.au services (URL shortening), obtained by enabling a service in the panel above','text',''),
-			(0,              '',                         'JETHROAU_SERVICES','Internal: comma-separated jethro.au services whose terms this site has agreed to, refreshed from jethro.au by the jethro.au Services status panel','hidden',''); "
+			(@rank:=@rank+5, 'jethro.au Services',       'JETHROAU_API_KEY','API key for jethro.au services (URL shortening, SMS shortening), obtained by enabling a service in the panel above','text',''),
+			(0,              '',                         'JETHROAU_SERVICES','Internal: comma-separated jethro.au services whose terms this site has agreed to, refreshed from jethro.au by the jethro.au Services status panel','hidden',''),
+			-- 'Shorter alternative' suggestions in the SMS composer
+			(@rank:=@rank+5, 'SMS Shortening',           'SMS_SHORTEN_MESSAGE_LIMIT','Largest share of a message (0.0 to 1.0) that may need cutting for a shorter wording to be suggested. 1.0 = always suggest one; e.g. 0.3 skips messages far over a segment boundary.','text','1.0'),
+			(@rank:=@rank+5, '',                         'SMS_SHORTEN_MESSAGE_MINSAVINGS','Smallest saving, in dollars across all recipients, for which a shorter wording is suggested. Needs a known segment cost.','text','1'); "
 		);
 		foreach ($sql as $s) {
 			$allSQL[] = $s;

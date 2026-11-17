@@ -1,7 +1,7 @@
 <?php
 /**
  * jethro.au services: online services for Jethro installations (URL
- * shortening, …) run at https://jethro.au.
+ * shortening, SMS shortening, …) run at https://jethro.au.
  *
  * One API key per installation (the JETHROAU_API_KEY setting) identifies the
  * organisation to every service. Each service has its own privacy terms, so
@@ -27,6 +27,7 @@
  */
 
 require_once __DIR__ . '/url_shortener.php';   // urlShortenerConfig()
+require_once __DIR__ . '/sms_shortener.php';   // smsShortenerConfig()
 
 class JethroAu
 {
@@ -47,6 +48,7 @@ class JethroAu
 	public static function services(): array
 	{
 		$url = \urlShortenerConfig();
+		$sms = \smsShortenerConfig();
 		return [
 			'url-shortener' => [
 				'name' => 'URL shortening',
@@ -57,6 +59,18 @@ class JethroAu
 					. 'with your organisation\'s name, so that the short links can redirect to them.',
 				'privacy' => self::BASE . '/url-shortener/privacy',
 				'enabled' => 'Long URLs in SMS messages can now be shortened.',
+			],
+			'sms-shortener' => [
+				'name' => 'SMS shortening',
+				'available' => $sms['supported'],
+				'unavailable' => 'The optional <code>SMSSHORTENER</code> setting in conf.php must be '
+					. '<code>jethroau</code> (the default) or an http(s) base URL. Current value: <code>'
+					. ents($sms['raw']) . '</code>.',
+				'notice' => 'The text of SMS messages being written in Jethro (to more than one person, over one '
+					. 'segment long) is sent to jethro.au and processed by Cloudflare Workers AI to suggest a '
+					. 'shorter wording. Recipients\' names and numbers are not sent, and the text is not kept.',
+				'privacy' => $sms['privacy'],
+				'enabled' => 'The SMS composer now suggests shorter wordings.',
 			],
 		];
 	}
