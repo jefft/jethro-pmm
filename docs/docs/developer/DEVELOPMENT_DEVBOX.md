@@ -29,7 +29,7 @@ This will:
 
  - download the full `devbox` binary if you don't already have it (`./devbox` is a stub [^devbox] ).
  - download binaries for php, nginx and mariadb. This will take a few minutes the first time.
- - install Jethro's PHP dependencies (the `vendor/` directory) with Composer. Composer is bundled in the devbox environment (via the php package), so no separate install is needed.
+ - install Jethro's PHP dependencies (the `vendor/` directory) with Composer. Composer is bundled in the devbox environment (via the php package), so no separate install is needed. This includes the dev-only SMS mock server (`jethro/smsmockserver`), linked into the tree as `smsmockserver/` → `vendor/jethro/smsmockserver`.
  - launch a MariaDB database and Nginx web server in the background (`-b`).
  - create a `jethro` database in the Devbox MariaDB
 
@@ -102,7 +102,7 @@ will be recreated on next `devbox` command. Of interest is:
 
 #### How devbox services run Jethro
 
-As `devbox info nginx` explains, Devbox's Nginx points to web root `devbox.d/web/`. This contains `../..` symlinks to Jethro PHP files, except for `devbox.d/web/conf.php` which configures Jethro to connect to the `jethro` MariaDB database on 127.0.0.1:3307.
+Devbox's Nginx plugin defaults its web root to `devbox.d/web/`; `devbox.json` overrides `NGINX_WEB_ROOT` to point at `devbox.d/demo/` instead (the plugin still recreates an unused, gitignored `devbox.d/web/index.html`). `devbox.d/demo/` contains `../..` symlinks to Jethro PHP files, except for `devbox.d/demo/conf.php` which configures Jethro to connect to the `jethro` MariaDB database on 127.0.0.1:3307.
 
 We could actually just rely on Devbox's built-in `.devbox/virtenv/*/process-compose.yaml` services to bring up Jethro.
 The `./process-compose.yml` adds usability tweaks, notably a `jethro_database_setup` "service" which creates the
@@ -115,6 +115,8 @@ that directory is added to your `$PATH` in a devbox shell:
  - `jethro_load_demodata DB [SYSTEM_NAME]` — recreate `DB` and fill it with the demo/functional-test data
  - `mariadb_dump_db DB [AS_NAME]` — dump a database to stdout, normalized for reloading elsewhere
  - `mariadb_as_root` — a `mariadb` client connected as root over the unix socket
+ - `jethro_compile [--nouse] [VERSION]` — compile the CSS/JS bundles and `include/version.txt` in the checkout
+ - `jethro_build [--with-dev] [VERSION]` — `jethro_compile`, `composer install` into `vendor/` (`--no-dev` unless `--with-dev`), and (re)create the [`dist/webroot/`](reference/dist-webroot.md) symlink webroot: a production-ready checkout and `dist/webroot/`
 
 Every devbox database is reachable as user `jethro`, password `jethro`, and `devbox.d/mariadb/my.cnf` makes that the
 client default — so `mariadb jethro_functest -e 'select 1'` (no `-u`/`-p`) just works, in scripts and tests alike.

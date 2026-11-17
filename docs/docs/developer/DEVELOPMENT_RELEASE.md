@@ -30,6 +30,11 @@ Assuming you are releasing version `$VER` (e.g. `2.40.0`):
 4. Review the draft on the repository's Releases page, edit the notes, and
    click **Publish release**.
 
+5. On `master`, bump `JETHRO_VERSION` in `devbox.json` to the next development
+   version (e.g. `2.41.0-DEV`). Until then the docs site still labels `$VER`
+   as unreleased, both in the version dropdown and on the What's New page (see
+   [Changelog release fragments](reference/changelog-releases.md#releasing)).
+
 ## Building locally
 
 The same build can be run from a checkout of the tagged commit, without GitHub:
@@ -54,13 +59,13 @@ suitable for release.
 1. refuses to run unless `HEAD` is a git tag matching the version (a leading
    `v` is allowed) and the version does not contain `DEV` — unless
    `--allow-untagged` is passed, which skips the tag check for test builds;
-2. compiles the JS/CSS bundles and stamps `include/version.txt`
-   (`devbox.d/bin/jethro_compile`);
-3. runs `composer install --no-dev --optimize-autoloader` to fetch `vendor/`;
-4. assembles the archive from `git archive` (which honours `.gitattributes`
+2. builds with `devbox.d/bin/jethro_build`: compiles the JS/CSS bundles, stamps
+   `include/version.txt`, and runs `composer install --no-dev --optimize-autoloader`
+   to fetch `vendor/` (see [dist/webroot](reference/dist-webroot.md));
+3. assembles the archive from `git archive` (which honours `.gitattributes`
    `export-ignore`, so dev-only files are left out) and overlays the
-   freshly-built `vendor/` and compiled assets;
-5. writes `jethro-$VER.zip` and a `sha256` checksum.
+   freshly-built `vendor/`, compiled assets and `include/version.txt`;
+4. writes `jethro-$VER.zip` and a `sha256` checksum.
 
 ## Notes
 

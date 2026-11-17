@@ -341,6 +341,13 @@ class DB_Object
 	}
 
 
+	/**
+	 * Save changes to an existing object.
+	 *
+	 * NOTE: This is for updating already-persisted objects (id > 0).
+	 * For creating a new object for the first time, use {@see create()} instead.
+	 * create() initialises required fields like 'history' that save() expects to exist.
+	 */
 	public function save()
 	{
 		if (!empty($this->_populated_partial)) {
@@ -998,7 +1005,10 @@ class DB_Object
 		$this->_held_locks[$type] = TRUE;
 		$this->_acquirable_locks[$type] = TRUE;
 
-		if (rand(10, 100) == 100) {
+		// Occasional housekeeping, skipped inside a transaction: there a table-wide DELETE can fail with
+		// "Record has changed since last read" (MariaDB innodb_snapshot_isolation).
+		// See docs/docs/developer/reference/object-locks.md
+		if (!$db->inTransaction() && (rand(10, 100) == 100)) {
 			$sql = 'DELETE FROM db_object_lock
 					WHERE expires < NOW()';
 			$res = $db->query($sql);
@@ -1069,7 +1079,7 @@ class DB_Object
 	 *						>  >=  < <= (comparison operators)
 	 *						!   (not equal)
 	 *						(   ("in", with value as an array of values)
-	 *						_   (WORDBEGIN)
+	 *						_   (WORDBEGIN; the value is matched literally)
 	 * @param string $logic - 'AND' or "or" (default)
 	 * @param type $order  Field to order results by
 	 * @return array
@@ -1173,7 +1183,7 @@ class DB_Object
 				$val = '('.$val.')'; // If val wasn't an array we dont quote it coz it's a subquery
 				$wheres[] = '('.$prefix.$field.' '.$operator.' '.$val.$suffix.')';
 			} else if ($operator == 'WORDBEGIN') {
-				$wheres[] = '(('.$field.' LIKE '.$GLOBALS['db']->quote($val.'%').') OR ('.$field.' LIKE '.$GLOBALS['db']->quote('% '.$val.'%').'))';
+				$wheres[] = '(('.$field.' LIKE '.$GLOBALS['db']->quoteLike($val).') OR ('.$field.' LIKE '.$GLOBALS['db']->quoteLike($val, '% ').'))';
 			} else if ((is_array($val) && !empty($val))) {
 				if ($operator == 'BETWEEN') {
 					$field_details = array_get($this->fields, $field);

@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<?php include 'head.template.php' ?>
+	<?php
+	$GLOBALS['datastarNeeded'] = FALSE; // High-traffic page with no Datastar markup; see docs/docs/developer/reference/datastar.md
+	include 'head.template.php';
+	?>
 </head>
 <body id="login">
 	<form method="post" id="login-box" class="well">
@@ -46,6 +49,14 @@
 					<br />
 				</div>
 			</div>
+			<?php if (ifdef('PASSWORD_RESET_ENABLED', TRUE)) { ?>
+			<div class="control-group">
+				<div class="controls">
+					<a class="clickable" href="<?php echo build_url(Array('forgot_password' => 1)); ?>">Forgot your password?</a><br />
+					<a class="clickable" href="<?php echo build_url(Array('forgot_username' => 1)); ?>">Forgot your username?</a>
+				</div>
+			</div>
+			<?php } ?>
 		<?php
 		if (defined('LOGIN_NOTE') && LOGIN_NOTE) {
 			?>

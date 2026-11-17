@@ -1,0 +1,117 @@
+# docker/process-compose.yml
+#
+# Standalone process-compose config for the Docker image.
+# Replaces the devbox plugin-generated process-compose.yaml files, which embed
+# absolute host paths, and overrides jethro_database_setup to bypass
+# mariadb_check (which rejects datadirs outside .devbox/virtenv/*/data/).
+#
+# All paths reference /app — the project source baked into the image.
+# Environment variables (MYSQL_DATADIR, MYSQL_HOME, NGINX_WEB_PORT, etc.)
+# are set by docker/entrypoint.sh before process-compose starts.
+#
+# Usage: process-compose up --tui=false --config /app/docker/process-compose.yml
+
+version: "0.5"
+
+processes:
+
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+
+  mariadb:
+    description: MariaDB database server
+    command: "mariadbd --user=root --log-error=$MYSQL_HOME/mysql.log"
+    shutdown:
+      command: "mariadb-admin -u root --skip-password shutdown"
+    availability:
+      restart: always
+    readiness_probe:
+      exec:
+        command: "mariadb-admin ping"
+      initial_delay_seconds: 2
+      period_seconds: 1
+      failure_threshold: 30
+
+  mariadb_logs:
+    description: Tail MariaDB error log to stdout
+    command: "tail --retry -f $MYSQL_HOME/mysql.log"
+    availability:
+      restart: always
+
+  php-fpm:
+    description: PHP-FPM backend
+    # /app/docker/php-fpm.conf uses $PHPFPM_UNIX_SOCKET, $PHPFPM_PID_FILE, $PHPFPM_ERROR_LOG_FILE
+    command: "php-fpm -y /app/docker/php-fpm.conf --nodaemonize --allow-to-run-as-root"
+    availability:
+      restart: always
+
+  nginx:
+    description: Nginx reverse proxy — Jethro UI on port $NGINX_WEB_PORT
+    command: |
+      # Copy static conf files to the writable prefix dir so nginx can find them.
+      # nginx uses -p $NGINX_PATH_PREFIX as its root; relative includes resolve there.
+      cp $NGINX_CONFDIR/mime.types   $NGINX_PATH_PREFIX/mime.types
+      cp $NGINX_CONFDIR/fastcgi.conf $NGINX_PATH_PREFIX/fastcgi.conf
+      # Expand env vars in nginx.template → nginx.conf in the writable prefix dir
+      envsubst $(awk 'BEGIN {for (k in ENVIRON) {printf "$"k","}}') \
+        < $NGINX_CONFDIR/nginx.template \
+        > $NGINX_PATH_PREFIX/nginx.conf
+      nginx -p $NGINX_PATH_PREFIX \
+            -c $NGINX_PATH_PREFIX/nginx.conf \
+            -e error.log \
+            -g "user root;pid nginx.pid;daemon off;"
+    depends_on:
+      php-fpm:
+        condition: process_started
+    availability:
+      restart: on_failure
+      max_restarts: 5
+    readiness_probe:
+      http_get:
+        host: localhost
+        port: ${NGINX_WEB_PORT}
+        path: /status.php
+      initial_delay_seconds: 1
+      period_seconds: 1
+      failure_threshold: 30
+
+  # ── Application ─────────────────────────────────────────────────────────────
+
+  jethro_database_setup:
+    description: Ensures the 'jethro' database/user exists (Docker-safe, bypasses mariadb_check)
+    depends_on:
+      mariadb:
+        condition: process_healthy
+    # Does not call devbox.d/bin/mariadb_ensure_db because mariadb_check
+    # rejects any datadir that doesn't match */.devbox/virtenv/*/data/.
+    # Connects via unix socket (wrapper adds --socket=$MYSQL_UNIX_PORT);
+    # 'jethro'@'localhost' matches socket connections in MariaDB.
+    command: |
+      mariadb -u root --skip-password --database=mysql --skip-show-warnings <<'SQL'
+      CREATE USER IF NOT EXISTS 'jethro'@'localhost' IDENTIFIED BY 'jethro';
+      CREATE DATABASE IF NOT EXISTS `jethro`
+        CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      GRANT ALL PRIVILEGES ON `jethro`.* TO 'jethro'@'localhost';
+      # Backs the in-image mock SMS server (smsmockserver/). The name is
+      # hardcoded in smsmockserver/webroot/index.php; Store::migrate() creates
+      # its tables on the first request.
+      CREATE DATABASE IF NOT EXISTS `jethro_functest_smsmockserver`
+        CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      GRANT ALL PRIVILEGES ON `jethro_functest_smsmockserver`.* TO 'jethro'@'localhost';
+      SQL
+      echo "Database ready: jethro"
+    readiness_probe:
+      exec:
+        command: "mariadb jethro -sNBe 'select database();'"
+      initial_delay_seconds: 1
+      period_seconds: 1
+      failure_threshold: 15
+
+  jethro:
+    description: "Jethro PMM at http://localhost:${NGINX_WEB_PORT}"
+    depends_on:
+      nginx:
+        condition: process_healthy
+      jethro_database_setup:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"

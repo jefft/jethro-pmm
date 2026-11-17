@@ -58,7 +58,8 @@
 					</div>
 				</div>
 			<?php
-			if (!empty($_REQUEST['view']) && $_REQUEST['view'] != 'home') {
+			// The search results page prints the search form itself.
+			if (!empty($_REQUEST['view']) && !in_array($_REQUEST['view'], Array('home', '_mixed_search'))) {
 				?>
 				<form method="get" class="form-horizontal global-search no-print pull-right">
 					<input type="hidden" name="view" value="_mixed_search" />
@@ -119,5 +120,10 @@
 		</div>
 	</div>
 	</div>
+<?php
+if (\Jethro\Sms\canSendSms()) {
+	\Jethro\Sms\printSmsModal();
+}
+?>
 </body>
 </html>

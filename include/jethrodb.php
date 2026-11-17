@@ -109,6 +109,22 @@ class JethroDB extends PDO
 	}
 
 	/**
+	 * Quote $value as the text of a LIKE pattern that matches it literally, with the caller's
+	 * wildcards ($prefix, $suffix) around it left unescaped. '%' and '_' in $value are escaped,
+	 * so they match themselves rather than acting as wildcards.
+	 * @param string $value
+	 * @param string $prefix	Wildcards to put before $value, e.g. '% ' for the start of a word
+	 * @param string $suffix	Wildcards to put after $value
+	 * @return string	A quoted pattern followed by " ESCAPE '|'", for use as `col LIKE <result>`
+	 */
+	public function quoteLike($value, $prefix='', $suffix='%')
+	{
+		$escaped = strtr((string)$value, Array('|' => '||', '%' => '|%', '_' => '|_'));
+		return $this->quote($prefix.$escaped.$suffix)." ESCAPE '|'";
+	}
+
+
+	/**
 	 * Quote an identifier (eg table or column name) ready for use in SQL
 	 * @param string $field
 	 * @return string
@@ -190,7 +206,7 @@ class JethroDB extends PDO
 				$shift_array = (!$force_array && $colnum == 2);
 			}
 			do {
-				$key = reset($row);
+				$key = reset($row) ?? '';	// NULL key column → '' (what PHP always did; null offsets are deprecated)
 				unset($row[key($row)]);
 				if ($shift_array) {
 					$row = array_shift($row);
