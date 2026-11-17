@@ -271,9 +271,13 @@ UPDATE setting SET note = 'Character limit for SMS messages sent from the web UI
 INSERT IGNORE INTO setting
 	(`rank`, heading, symbol, note, type, value)
 VALUES
-	(@sms_base + 150, 'jethro.au Services', 'JETHROAU_API_KEY', 'API key for jethro.au services (URL shortening), obtained by enabling a service in the panel above', 'text', '');
--- Also for a row an earlier run placed elsewhere.
+	(@sms_base + 150, 'jethro.au Services', 'JETHROAU_API_KEY', 'API key for jethro.au services (URL shortening, SMS shortening), obtained by enabling a service in the panel above', 'text', ''),
+	(@sms_base + 160, 'SMS Shortening', 'SMS_SHORTEN_MESSAGE_LIMIT', 'Largest share of a message (0.0 to 1.0) that may need cutting for a shorter wording to be suggested. 1.0 = always suggest one; e.g. 0.3 skips messages far over a segment boundary.', 'text', '1.0'),
+	(@sms_base + 165, '', 'SMS_SHORTEN_MESSAGE_MINSAVINGS', 'Smallest saving, in dollars across all recipients, for which a shorter wording is suggested. Needs a known segment cost.', 'text', '1');
+-- Also for rows an earlier run placed elsewhere.
 UPDATE setting SET `rank` = @sms_base + 150 WHERE symbol = 'JETHROAU_API_KEY';
+UPDATE setting SET `rank` = @sms_base + 160, heading = 'SMS Shortening' WHERE symbol = 'SMS_SHORTEN_MESSAGE_LIMIT';
+UPDATE setting SET `rank` = @sms_base + 165 WHERE symbol = 'SMS_SHORTEN_MESSAGE_MINSAVINGS';
 
 -- Sites that ran an earlier 2.40-DEV upgrade have the key in URLSHORTENER_API_KEY (or, briefly,
 -- SMSSHORTENER_API_KEY). Move it to JETHROAU_API_KEY and drop the old rows. The joins match no rows,

@@ -247,6 +247,10 @@ The checkbox is rendered on the server by `renderShortenUrlsToggle()` into `#sms
 
 When the checkbox is hidden, the current choice is carried in a hidden `shorten_urls` input.
 
+### Shorter alternative
+
+After 3 seconds without typing, the composer posts to `?call=sms_shorten` (`Call_SMS_Shorten`). When the message goes to more than one recipient, uses more than one segment, and needs at most `SMS_SHORTEN_MESSAGE_LIMIT` (default 1.0 = always) of its text cut to save one (`Jethro\Sms\wantsShorterSuggestion()`), the call asks the jethro.au SMS shortener (`getSmsShortener()`, Composer package `jethro/jethro-sms-shortener`, a Workers AI service) for a rewording, and streams a `#sms-shorter<suffix>` box with **Use instead?** and the cost saved. It needs SMS shortening enabled in the jethro.au services (`JethroAu::serviceEnabled('sms-shortener')`). See [SMS shortener](../reference/sms-shortener.md).
+
 ### Live statusline and preview (Datastar)
 
 The cost/segment line and the per-recipient preview panel are **rendered on the server and streamed over Datastar SSE** from `?call=sms_statusline` (`Call_SMS_Statusline`). See [SMS_DATASTAR.md](./SMS_DATASTAR.md).
@@ -417,6 +421,8 @@ Functional (Playwright) tests use the mock SMS server at repo-root `smsmockserve
 | `include/Jethro/Sms/Providers/` | The bridge decorators `DbLoggingSmsProvider` and `FailureCachingSmsProvider` |
 | `calls/call_sms.class.php` | Send: SSE for the Datastar Send buttons (results rendered by `presentSendResult()`), JSON otherwise |
 | `calls/call_sms_statusline.class.php` | Datastar SSE statusline/preview |
+| `calls/call_sms_shorten.class.php` | Datastar SSE "Shorter alternative" suggestion |
+| `include/sms_shortener.php` | Loads the `jethro/jethro-sms-shortener` client (`getSmsShortener()`) |
 | `calls/call_sms_info.class.php` | Delivery-status poll |
 | `calls/call_sms_cancel.class.php` | Cancel scheduled sends (single and bulk) |
 | `calls/call_sms_balance.class.php` | Balance |

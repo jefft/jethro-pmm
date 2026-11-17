@@ -158,6 +158,11 @@ define('2FA_ENABLED', true);
 // 60 seconds or less ahead immediately, so Jethro asks for 90).
 // define('SMS_SEND_COOLOFF', 30);
 
+// Most SMS shortener (AI) calls one login session may make for the composer's
+// "Shorter alternative" suggestions (when SMS shortening is enabled in the
+// jethro.au Services section).  Unset or 0 = unlimited.
+// define('SMS_SHORTEN_MESSAGE_SESSION_MAX', 50);
+
 // Comma-separated sender options for the SMS dropdown.  Recognised tokens:
 //   _SENDER_IDS_  — expands to every sender ID your SMS provider reports
 //   _USER_MOBILE_ — expands to the current user's mobile number

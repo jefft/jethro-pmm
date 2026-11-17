@@ -5,9 +5,10 @@ sidebar_position: 25
 
 # jethro.au services
 
-[jethro.au](https://jethro.au) runs online services for Jethro installations,
-such as the URL shortener ([jethro-url-shortener](https://github.com/jethro-chms/jethro-url-shortener)).
-More may follow.
+[jethro.au](https://jethro.au) runs online services for Jethro installations:
+the URL shortener ([jethro-url-shortener](https://github.com/jethro-chms/jethro-url-shortener))
+and the SMS shortener ([jethro-sms-shortener](https://github.com/jethro-chms/jethro-sms-shortener),
+see [SMS shortener](sms-shortener.md)). More may follow.
 
 ## Model
 
@@ -38,10 +39,11 @@ with `?sh_consented=<id>` only triggers a re-read of `/api/validate`.
 | `calls/call_admin_statuspanel_jethroau.class.php` | Status panel on the `JETHROAU_API_KEY` row (heading *jethro.au Services*): key status, one line per service, refreshes the mirror. |
 | `calls/call_admin_statuspanel_operation_jethroau.class.php` | Operations: `enable:<id>`, `disable:<id>`, `return`, `manual`, `deregister`. |
 | `Jethro\Sms\renderShortenUrlsToggle()`, `sendSms()`, `makeStatuslineConfig()` | Use `JethroAu::serviceEnabled('url-shortener')`. |
+| `Jethro\Sms\shorterSuggestionAvailable()` | `JethroAu::serviceEnabled('sms-shortener')`. |
 
 `JethroAu::services()` entries: `name` (what the admin enables),
-`available` (conf.php allows it, e.g. `urlShortenerConfig()['supported']`),
-`unavailable` (HTML: how to fix),
+`available` (conf.php allows it: `urlShortenerConfig()['supported']`,
+`smsShortenerConfig()['supported']`), `unavailable` (HTML: how to fix),
 `notice` (plain text: what using it shares), `privacy` (policy URL),
 `enabled` (sentence shown after enabling).
 
