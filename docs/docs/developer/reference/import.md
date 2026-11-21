@@ -24,7 +24,9 @@ from cron.
    `E_USER_NOTICE`/`E_USER_WARNING`s captured by `_captureErrors()`/`_handleError()`. Any captured
    error sends the user back to **begin** with a per-row error list.
 3. **import**: `Person_Importer::apply()` replays the plan inside one transaction. Any error rolls
-   everything back. The view then redirects by `<script>` to the import's group.
+   everything back. The view then redirects by `<script>` to the import's group. Each updated
+   family and person is edit-locked only while it is saved, then released, so imports (notably
+   the CLI, which never logs out) leave no lock rows behind.
 
 ## Sources
 

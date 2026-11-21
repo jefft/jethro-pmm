@@ -548,7 +548,9 @@ class Person_Importer
 				continue;
 			}
 			$person->fromCSVRow($row, $this->_plan['overwrite_existing']);
-			if (!$person->save()) {
+			$saved = $person->save();
+			$person->releaseLock();
+			if (!$saved) {
 				trigger_error("Person: ".$row['first_name'].' '.$row['last_name'].' not created', E_USER_WARNING);
 				continue;
 			}
