@@ -27,6 +27,33 @@ System requirements are:
     * with [curl extension](https://www.php.net/manual/en/book.curl.php) enabled, if you intend to use the Mailchimp or https://api.bible integration
     * with [exif extension](https://www.php.net/manual/en/book.exif.php) enabled, if you would like to automatically rotate images
 
+**Debian/Ubuntu:** distribution PHP packages are often older than Jethro needs. The [deb.sury.org](https://deb.sury.org/) repository provides current PHP versions for Debian and Ubuntu. Add it with:
+
+```bash
+sudo apt update
+sudo apt install -y lsb-release ca-certificates curl
+sudo curl -sSLo /tmp/debsuryorg-archive-keyring.deb https://packages.sury.org/debsuryorg-archive-keyring.deb
+sudo dpkg -i /tmp/debsuryorg-archive-keyring.deb
+sudo tee /etc/apt/sources.list.d/php.sources >/dev/null <<EOF
+Types: deb
+URIs: https://packages.sury.org/php/
+Suites: $(lsb_release -sc)
+Components: main
+Signed-By: /usr/share/keyrings/debsuryorg-archive-keyring.gpg
+EOF
+sudo apt update
+```
+
+Then install the web server, database and PHP with the required extensions (`gettext` and `exif` are included in `php8.4-common`; `php8.4-xml` provides `xmlwriter`):
+
+```bash
+sudo apt install nginx mariadb-server \
+    php8.4-fpm php8.4-cli php8.4-mysql php8.4-curl php8.4-gd \
+    php8.4-mbstring php8.4-xml php8.4-zip
+```
+
+Substitute another supported PHP version (8.2 or above) for `8.4` if preferred, and `apache2 libapache2-mod-php8.4` for `nginx php8.4-fpm` to use Apache. Install every extension package for the same PHP version as `php8.4-common`: an extension left at an older version, or removed while its `.ini` file remains, makes PHP log `Unable to load dynamic library` at startup. `php -m` lists the extensions that loaded.
+
 The steps to install are:
 1. Unzip the files into a web-accessible folder on your web server
 2. Create a mysql database and database user for your jethro system to use. The charset must be `utf8mb4`, and collation `utf8mb4_unicode_ci`. E.g.:
