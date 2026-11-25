@@ -22,11 +22,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # Build and upload in one job, deploy in the next. When upload and deploy
+  # share a job, deploy-pages can list zero artifacts for an artifact that was
+  # finalized moments earlier, and re-running the job only adds a second
+  # github-pages artifact, which deploy-pages then rejects as ambiguous.
+  # See https://github.com/actions/deploy-pages/issues/451.
+  build:
     runs-on: ubuntu-latest
     if: github.repository == 'tbar0970/jethro-pmm' || github.repository == 'jefft/jethro-pmm'
     steps:
@@ -58,7 +59,15 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: 'docs/build'
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.repository == 'tbar0970/jethro-pmm' || github.repository == 'jefft/jethro-pmm'
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
-
